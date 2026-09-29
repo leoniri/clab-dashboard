@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catalogue · Containerlab</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script>try{if(localStorage.getItem("clabd-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
+<link rel="stylesheet" href="ui.css">
+<style>
+.page-h .tabs{margin-left:auto}
+.ctabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 22px;overflow-x:auto}
+.ctabs button{flex:none;display:inline-flex;align-items:center;gap:7px;border:0;background:none;padding:10px 14px 9px;
+  font:500 13px var(--font-sans);color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.ctabs button svg{width:15px;height:15px}
+.ctabs button:hover{color:var(--ink)}
+.ctabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+.ctabs button[aria-selected="true"] svg{color:var(--accent)}
+.ctabs .n{font:500 10.5px var(--font-mono);color:var(--muted);background:var(--surface-2);padding:0 6px;border-radius:99px}
+
+.lead{color:var(--ink-2);max-width:860px;margin:0 0 16px;font-size:13px}
+.sect{display:flex;align-items:center;gap:10px;margin:30px 0 6px;font:600 18px var(--font-display);letter-spacing:-.01em}
+.sect:first-child{margin-top:0}
+.sect .n{font:500 11px var(--font-mono);color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+@media (max-width:420px){ .grid{grid-template-columns:1fr} }
+
+.tcard{position:relative;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r-lg);overflow:hidden;transition:border-color .15s,box-shadow .15s;animation:rise .2s ease-out both}
+.tcard:hover{border-color:var(--line-strong);box-shadow:var(--shadow-sm)}
+.tcard.open{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));box-shadow:var(--glow)}
+.viz{position:relative;height:118px;background:var(--canvas);border-bottom:1px solid var(--line);overflow:hidden;
+  background-image:radial-gradient(var(--grid) 1px,transparent 1.2px);background-size:14px 14px}
+.viz svg{position:absolute;inset:0;width:100%;height:100%}
+.viz line{stroke:var(--line-strong);stroke-width:1.4}
+.viz circle{stroke:var(--canvas);stroke-width:2}
+.viz .k-xe{fill:var(--xe)} .viz .k-xr{fill:var(--xr)} .viz .k-nx{fill:var(--nx)} .viz .k-lin{fill:var(--lin)}
+.viz .k-frr{fill:var(--frr)} .viz .k-srl{fill:var(--srl)} .viz .k-oth{fill:var(--oth)}
+.viz .ribbon{position:absolute;left:12px;top:10px;display:flex;gap:5px}
+.viz .stats{position:absolute;right:12px;bottom:9px;display:flex;gap:14px;font:600 11px var(--font-mono);color:var(--ink-2);
+  background:color-mix(in srgb,var(--canvas) 80%,transparent);padding:2px 6px;border-radius:5px}
+.viz .stats span{color:var(--muted);font-weight:500;margin-left:3px}
+.viz.gh{display:flex;align-items:center;justify-content:center}
+.viz.gh .glyph{font:600 12px var(--font-mono);color:var(--muted);display:flex;align-items:center;gap:10px}
+.viz.gh .glyph svg{position:static;width:34px;height:34px;color:var(--accent)}
+.tbody{padding:14px 16px 14px;display:flex;flex-direction:column;gap:9px;flex:1}
+.tbody h3{font:600 16px var(--font-display);margin:0;letter-spacing:-.01em}
+.tbody p{margin:0;color:var(--ink-2);font-size:12.8px}
+.tags{display:flex;gap:5px;flex-wrap:wrap}
+.facts{font:11px var(--font-mono);color:var(--muted);word-break:break-all}
+a.facts{text-decoration:none}
+a.facts:hover{color:var(--accent-ink)}
+.status{display:flex;gap:5px;flex-wrap:wrap}
+.form{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 12px;align-items:center;padding:12px;margin-top:2px;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r)}
+.form input,.form select{width:100%;min-width:0}
+.form label{font:600 10px var(--font-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+.acts{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:auto;padding-top:6px}
+.res{font-size:12.5px;border-radius:var(--r);padding:9px 11px;background:var(--surface-2);color:var(--ink-2)}
+.res:empty{display:none}
+.res.ok{background:var(--ok-soft);color:var(--ok)} .res.err{background:var(--crit-soft);color:var(--crit);white-space:pre-wrap}
+.res a{color:inherit;font-weight:600}
+.res .ub{margin-left:10px;vertical-align:middle}
+.jlog{max-height:220px;border-radius:var(--r);padding:9px 11px;flex:none}
+.filterbar{display:flex;gap:10px;align-items:center;margin:0 0 14px;flex-wrap:wrap}
+.filterbar label.chkl{display:flex;gap:7px;align-items:center;font-size:12.5px;color:var(--ink-2);cursor:pointer}
+.filterbar .search input{width:240px}
+
+/* scenarios */
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(440px,1fr));gap:14px}
+@media (max-width:520px){ .sgrid{grid-template-columns:1fr} }
+.viz.big{height:168px}
+.viz text{font:600 9.5px var(--font-mono);fill:var(--ink-2);paint-order:stroke;stroke:var(--canvas);stroke-width:3px}
+.viz text.role{font:500 8px var(--font-mono);fill:var(--muted)}
+.preset{display:flex;flex-direction:column;gap:5px}
+.preset label{font:600 10px var(--font-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.preset select{width:100%}
+.fam{display:flex;align-items:center;gap:10px;margin:28px 0 12px;font:600 18px var(--font-display);letter-spacing:-.01em}
+.fam:first-of-type{margin-top:4px}
+.fam .n{font:500 11px var(--font-mono);color:var(--muted)}
+/* import */
+.imp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;max-width:1100px}
+@media (max-width:900px){ .imp{grid-template-columns:1fr} }
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.panel .ph{display:flex;align-items:center;gap:11px}
+.panel .ph .ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  background:var(--accent-soft);color:var(--accent-ink);flex:none}
+.panel .ph .ic svg{width:18px;height:18px}
+.panel h3{font:600 16px var(--font-display);margin:0}
+.panel p{margin:0;color:var(--ink-2);font-size:12.8px}
+.drop{border:1.5px dashed var(--line-strong);border-radius:var(--r-lg);padding:30px 20px;text-align:center;color:var(--muted);
+  cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:8px;font-size:13px}
+.drop svg{width:28px;height:28px;color:var(--accent)}
+.drop small{font:11px var(--font-mono)}
+.drop:hover{border-color:var(--accent);color:var(--ink-2)}
+.drop.on{border-color:var(--accent);background:var(--accent-soft);box-shadow:var(--glow)}
+.panel .form{background:none;border:0;padding:0}
+</style>
+</head>
+<body class="dots">
+<header id="appbar"></header>
+<main class="page">
+  <div class="page-h">
+    <div>
+      <div class="eyebrow">ready-made labs</div>
+      <h1>Catalogue</h1>
+      <div class="sub">Templates, community labs and containerlab examples — or import your own.</div>
+    </div>
+  </div>
+  <div class="ctabs tabs" role="tablist">
+    <button role="tab" data-t="templates" aria-selected="true">Templates</button>
+    <button role="tab" data-t="scenarios" aria-selected="false">SP scenarios</button>
+    <button role="tab" data-t="community" aria-selected="false">Community</button>
+    <button role="tab" data-t="examples" aria-selected="false">Containerlab examples</button>
+    <button role="tab" data-t="import" aria-selected="false">Import</button>
+  </div>
+  <div id="wrap"><div class="empty plain"><span class="spin"></span>&nbsp; loading…</div></div>
+</main>
+<script src="ui.js"></script>
+<script>
+(function(){
+"use strict";
+UI.appbar(document.getElementById("appbar"), {active:"catalog"});
+function $(id){ return document.getElementById(id); }
+function el(t,c,x){ var e=document.createElement(t); if(c)e.className=c; if(x!==undefined)e.textContent=x; return e; }
+function svgEl(t,a){ var e=document.createElementNS("http://www.w3.org/2000/svg",t); for(var k in a) e.setAttribute(k,a[k]); return e; }
+var cat=null, tab="templates", freeOnly=true, exQuery="";
+try{ tab=localStorage.getItem("clabd-cat-tab")||tab; }catch(e){}
+if(/^#(templates|scenarios|community|examples|import)$/.test(location.hash)) tab=location.hash.slice(1);
+function gb(mb){ return mb>=1024 ? (mb/1024).toFixed(mb>=10240?0:1)+" GB" : mb+" MB"; }
+function post(u,b){ return fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)})
+  .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||("HTTP "+r.status)); return j; }); }); }
+function tagsOf(list, cls){ var t=el("div","tags"); (list||[]).forEach(function(x){ t.appendChild(el("span","ubadge "+(cls||""),x)); }); return t; }
+function kindTags(k){
+  var t=el("div","tags");
+  Object.keys(k||{}).sort().forEach(function(x){
+    var s=el("span","tag "+UI.kindClass(x)); s.title=x;
+    s.appendChild(el("i")); s.appendChild(el("b",null,k[x]+"×")); s.appendChild(document.createTextNode(UI.kindLabel(x)));
+    t.appendChild(s);
+  });
+  return t;
+}
+function slug(s){ return (s||"lab").toLowerCase().replace(/[^a-z0-9-]+/g,"-").replace(/^-+|-+$/g,"").slice(0,24).replace(/^([^a-z])/,"lab-$1"); }
+var TABICON={templates:"grid",scenarios:"route",community:"external",examples:"catalog",import:"upload"};
+document.querySelectorAll(".ctabs button").forEach(function(b){ b.prepend(UI.icon(TABICON[b.dataset.t])); });
+
+// A decorative sketch of a template: the node count on a ring, coloured by kind,
+// with as many links as the template has (ring first, then chords). Not the real wiring.
+function sketch(kinds, nodes, links){
+  var W=340, H=118, s=svgEl("svg",{viewBox:"0 0 "+W+" "+H,preserveAspectRatio:"xMidYMid meet","aria-hidden":"true"});
+  var cls=[]; Object.keys(kinds||{}).sort().forEach(function(k){ for(var i=0;i<kinds[k];i++) cls.push(UI.kindClass(k)); });
+  var n=Math.min(nodes||cls.length, 24); if(!n) return s;
+  var pts=[], rx=n<3?60:Math.min(120,40+n*8), ry=34;
+  for(var i=0;i<n;i++){ var a=-Math.PI/2+i*2*Math.PI/n; pts.push([W/2+rx*Math.cos(a), H/2+4+ry*Math.sin(a)]); }
+  var drawn=0, L=Math.min(links||n, n*3);
+  function ln(a,b){ s.appendChild(svgEl("line",{x1:pts[a][0],y1:pts[a][1],x2:pts[b][0],y2:pts[b][1]})); drawn++; }
+  for(i=0;i<n && drawn<L && n>1;i++){ if(n===2 && i===1) break; ln(i,(i+1)%n); }
+  for(var step=2; drawn<L && step<=n/2; step++) for(i=0;i<n && drawn<L;i++) ln(i,(i+step)%n);
+  var r=n>14?5:n>8?6.5:8;
+  pts.forEach(function(p,i){ s.appendChild(svgEl("circle",{cx:p[0],cy:p[1],r:r,"class":cls[i]||"k-oth"})); });
+  return s;
+}
+function viz(kinds, nodes, links, ribbon){
+  var v=el("div","viz"); v.appendChild(sketch(kinds,nodes,links));
+  if(ribbon) v.appendChild(ribbon);
+  if(nodes){ var st=el("div","stats");
+    st.innerHTML=""; [[nodes,"nodes"],[links,"links"]].forEach(function(x){ if(x[0]===undefined) return;
+      var d=el("div",null,String(x[0])); d.appendChild(el("span",null,x[1])); st.appendChild(d); });
+    v.appendChild(st); }
+  return v;
+}
+
+// where did an import land? find the lab ids for the topology paths
+function labLinks(paths, box){
+  fetch("api/state",{cache:"no-store"}).then(function(r){ return r.json(); }).then(function(s){
+    (s.labs||[]).forEach(function(l){
+      if(paths.indexOf(l.path)<0) return;
+      var a=el("a",null,"open "+(l.name||l.file)+" in the topology view"); a.href="topology.html?lab="+encodeURIComponent(l.id);
+      box.appendChild(document.createElement("br")); box.appendChild(a);
+    });
+  });
+}
+function showResult(box, res){
+  box.textContent=""; box.className="res ok";
+  box.appendChild(document.createTextNode("imported into "+res.dir+" — "+res.labs.length+" topolog"+(res.labs.length===1?"y":"ies")));
+  if(res.missing_images && res.missing_images.length){
+    box.appendChild(document.createElement("br"));
+    box.appendChild(document.createTextNode("images to pull (containerlab pulls public ones at deploy): "+res.missing_images.join(", ")));
+  }
+  labLinks(res.labs.map(function(l){ return l.path; }), box);
+}
+function showErr(box, e){ box.className="res err"; box.textContent=e.message||String(e); }
+function followJob(id, log, done){
+  var since=0;
+  (function poll(){
+    fetch("api/job/"+id+"?since="+since,{cache:"no-store"}).then(function(r){ return r.json(); }).then(function(j){
+      (j.lines||[]).forEach(function(line){ log.appendChild(document.createTextNode(line+"\n")); });
+      since=j.total_lines; log.scrollTop=log.scrollHeight;
+      if(j.running){ setTimeout(poll,1200); return; }
+      done(j);
+    }).catch(function(){ setTimeout(poll,2500); });
+  })();
+}
+
+// ---------- templates ----------
+function section(w, title, lead, n){
+  var h=el("h2","sect",title); if(n!==undefined) h.appendChild(el("span","n",n+" labs")); w.appendChild(h);
+  if(lead) w.appendChild(el("p","lead",lead));
+  var g=el("div","grid"); w.appendChild(g); return g;
+}
+function renderTemplates(w){
+  var sp=cat.templates.filter(function(t){ return t.built; }), bt=cat.templates.filter(function(t){ return !t.built; });
+  if(sp.length) drawTemplates(section(w,"Service-provider designs",
+    "Complete provider networks on IOS-XR: PEs, P routers and route reflectors on XRd, customer sites on FRR. "
+    +"Every config is written for the design - read README.md in the lab (Edit files) for the addressing and what to try. "
+    +"XRd needs 8 GB per router, so these want a big host and run one at a time.", sp.length), sp);
+  drawTemplates(section(w,"Builder templates","Generated by the topology builder: addressing, IGP and services on "
+    +"every node. The lab lands in /opt/clab-topologies and can be edited in the builder afterwards.", bt.length), bt);
+}
+function drawTemplates(g, list){
+  list.forEach(function(t, idx){
+    var c=el("div","tcard"); c.style.animationDelay=Math.min(idx,10)*25+"ms"; g.appendChild(c);
+    var rib=el("div","ribbon");
+    if(t.built) rib.appendChild(el("span","ubadge info","SP design"));
+    var short = cat.free_mb && t.est_ram_mb > cat.free_mb;
+    rib.appendChild(el("span","ubadge "+(short?"warn":""),"~"+gb(t.est_ram_mb)+" RAM"));
+    c.appendChild(viz(t.kinds, t.nodes, t.links, rib));
+    var bd=el("div","tbody"); c.appendChild(bd);
+    bd.appendChild(el("h3",null,t.title)); bd.appendChild(el("p",null,t.summary));
+    bd.appendChild(kindTags(t.kinds));
+    bd.appendChild(tagsOf(t.tags));
+    var st=el("div","status");
+    if(short) st.appendChild(el("span","ubadge warn","needs ~"+gb(t.est_ram_mb)+" · "+gb(cat.free_mb)+" free now"));
+    if(t.unavailable.length) t.unavailable.forEach(function(k){ st.appendChild(el("span","ubadge crit","no local image: "+k)); });
+    else if(t.missing_images.length) t.missing_images.forEach(function(i){ st.appendChild(el("span","ubadge warn","pulled at deploy: "+i)); });
+    else st.appendChild(el("span","ubadge ok","✓ all images on this host"));
+    bd.appendChild(st);
+    var f=el("div","form"); f.hidden=true; bd.appendChild(f);
+    f.appendChild(el("label",null,"name"));
+    var nm=el("input","uin mono"); nm.type="text"; nm.value=slug(t.built ? t.id : t.id.split("-").slice(0,2).join("-")); f.appendChild(nm);
+    var sels={};
+    Object.keys(t.kinds).sort().forEach(function(k){
+      f.appendChild(el("label",null,k.replace(/^cisco_|^nokia_/,"")));
+      var s=el("select","uin mono"); sels[k]=s;
+      var opts=(cat.images_by_kind[k]||[]).slice();
+      if(t.images[k] && opts.indexOf(t.images[k])<0) opts.unshift(t.images[k]);
+      if(!opts.length){ var o=el("option",null,"— no image —"); o.value=""; s.appendChild(o); s.disabled=true; }
+      opts.forEach(function(i){ var o=el("option",null,i); o.value=i; if(i===t.images[k]) o.selected=true; s.appendChild(o); });
+      f.appendChild(s);
+    });
+    var res=el("div"); bd.appendChild(res);
+    var a=el("div","acts"); bd.appendChild(a);
+    var b=UI.button("Create lab","primary",null,"plus"); a.appendChild(b);
+    var cfg=UI.button("Name & images","quiet",function(){ f.hidden=!f.hidden; cfg.setAttribute("aria-pressed",f.hidden?"false":"true");
+      c.classList.toggle("open",!f.hidden); if(!f.hidden) nm.focus(); },"gear");
+    a.appendChild(cfg);
+    b.disabled=t.unavailable.length>0;
+    if(b.disabled) b.title="build or upload the missing image in Manage › Images first";
+    b.addEventListener("click",function(){
+      var images={}; Object.keys(sels).forEach(function(k){ images[k]=sels[k].value; });
+      b.disabled=true; res.className="res"; res.textContent="generating…";
+      post("api/lab/import",{source:"template", template:t.id, name:nm.value.trim(), images:images})
+        .then(function(r){
+          res.className="res ok"; res.textContent="created "+r.topology_path+(r.warnings&&r.warnings.length?" · "+r.warnings.join("; "):"");
+          res.appendChild(document.createElement("br"));
+          var l=el("a",null,"open it in the topology view"); l.href="topology.html?lab="+encodeURIComponent(r.lab_id);
+          res.appendChild(l);
+          var stb=UI.button("start it","sm",null,"play");
+          stb.addEventListener("click",function(){
+            stb.disabled=true;
+            post("api/action",{lab_id:r.lab_id, action:"redeploy"}).then(function(){ location.href="/"; })
+              .catch(function(e){ alert(e.message); stb.disabled=false; });
+          });
+          res.appendChild(stb);
+        })
+        .catch(function(e){ showErr(res,e); }).then(function(){ b.disabled=false; });
+    });
+  });
+}
+
+// ---------- advanced SP scenarios ----------
+// The drawing is the real topology: node positions and links from the generator.
+function graphViz(g, ribbon, preset){
+  var v=el("div","viz big");
+  var W=440, H=168, pad=26, s=svgEl("svg",{viewBox:"0 0 "+W+" "+H,preserveAspectRatio:"xMidYMid meet","aria-hidden":"true"});
+  var xs=g.nodes.map(function(n){ return n.x; }), ys=g.nodes.map(function(n){ return n.y; });
+  var x0=Math.min.apply(null,xs), x1=Math.max.apply(null,xs), y0=Math.min.apply(null,ys), y1=Math.max.apply(null,ys);
+  var sc=Math.min((W-2*pad)/Math.max(1,x1-x0), (H-2*pad-10)/Math.max(1,y1-y0));
+  var ox=(W-(x1-x0)*sc)/2, oy=(H-(y1-y0)*sc)/2 - 4, pos={};
+  g.nodes.forEach(function(n){ pos[n.n]=[ox+(n.x-x0)*sc, oy+(n.y-y0)*sc]; });
+  g.links.forEach(function(l){ var a=pos[l[0]], b=pos[l[1]]; if(a&&b) s.appendChild(svgEl("line",{x1:a[0],y1:a[1],x2:b[0],y2:b[1]})); });
+  g.nodes.forEach(function(n){
+    var p=pos[n.n];
+    var c=svgEl("circle",{cx:p[0],cy:p[1],r:7,"class":UI.kindClass(n.k)}); var t=svgEl("title",{}); t.textContent=n.n+" · "+(n.role||"")+" · "+UI.kindLabel(n.k); c.appendChild(t);
+    s.appendChild(c);
+    var tx=svgEl("text",{x:p[0],y:p[1]+19,"text-anchor":"middle"}); tx.textContent=n.n; s.appendChild(tx);
+  });
+  v.appendChild(s);
+  if(ribbon) v.appendChild(ribbon);
+  var st=el("div","stats");
+  [[preset.nodes,"nodes"],[preset.links,"links"]].forEach(function(x){ var d=el("div",null,String(x[0])); d.appendChild(el("span",null,x[1])); st.appendChild(d); });
+  v.appendChild(st);
+  return v;
+}
+function renderScenarios(w){
+  var list=cat.scenarios||[];
+  w.appendChild(el("p","lead","Advanced provider designs, generated and fully pre-configured for the platforms you pick: "
+    +"every router boots with its IGP, segment routing, BGP and services in place, and the customer edges can reach each other "
+    +"as soon as the protocols converge. Each platform preset was deployed and checked end to end before it was listed. "
+    +"README.md in the lab (Edit files) has the addressing, the label or SID walk-through and what to try."));
+  if(!list.length){ w.appendChild(el("div","empty","no scenarios")); return; }
+  var fams=[];
+  list.forEach(function(sc){ if(fams.indexOf(sc.family)<0) fams.push(sc.family); });
+  fams.forEach(function(f){
+    var items=list.filter(function(sc){ return sc.family===f; });
+    var h=el("h2","fam",f); h.appendChild(el("span","n",items.length+" scenario"+(items.length===1?"":"s"))); w.appendChild(h);
+    var g=el("div","sgrid"); w.appendChild(g);
+    items.forEach(function(sc, idx){ drawScenario(g, sc, idx); });
+  });
+}
+function drawScenario(g, sc, idx){
+  var c=el("div","tcard"); c.style.animationDelay=Math.min(idx,10)*25+"ms"; g.appendChild(c);
+  var cur=sc.presets[0];
+  var vizHost=el("div"); c.appendChild(vizHost);
+  var bd=el("div","tbody"); c.appendChild(bd);
+  bd.appendChild(el("h3",null,sc.title)); bd.appendChild(el("p",null,sc.summary));
+  bd.appendChild(tagsOf(sc.tags));
+  var pr=el("div","preset"); bd.appendChild(pr);
+  pr.appendChild(el("label",null,"platforms"+(sc.presets.length>1?" · "+sc.presets.length+" verified presets":" · verified preset")));
+  var ps=el("select","uin"); pr.appendChild(ps);
+  sc.presets.forEach(function(p, i){ var o=el("option",null,p.label+"  ·  ~"+gb(p.est_ram_mb)); o.value=String(i); ps.appendChild(o); });
+  if(sc.presets.length===1) ps.disabled=true;
+  var kt=el("div"); bd.appendChild(kt);
+  var st=el("div","status"); bd.appendChild(st);
+  var f=el("div","form"); f.hidden=true; bd.appendChild(f);
+  var res=el("div"); bd.appendChild(res);
+  var a=el("div","acts"); bd.appendChild(a);
+  var b=UI.button("Create lab","primary",null,"plus"); a.appendChild(b);
+  var cfg=UI.button("Name & images","quiet",function(){ f.hidden=!f.hidden; cfg.setAttribute("aria-pressed",f.hidden?"false":"true");
+    c.classList.toggle("open",!f.hidden); if(!f.hidden) nm.focus(); },"gear");
+  a.appendChild(cfg);
+  var nm=el("input","uin mono"); nm.type="text"; nm.value=slug(sc.id);
+  var sels={};
+  function draw(){
+    cur=sc.presets[+ps.value||0];
+    var rib=el("div","ribbon");
+    rib.appendChild(el("span","ubadge info",sc.family));
+    var short = cat.free_mb && cur.est_ram_mb > cat.free_mb;
+    rib.appendChild(el("span","ubadge "+(short?"warn":""),"~"+gb(cur.est_ram_mb)+" RAM"));
+    vizHost.textContent=""; vizHost.appendChild(graphViz(cur.graph, rib, cur));
+    kt.textContent=""; kt.appendChild(kindTags(cur.kinds));
+    st.textContent="";
+    if(short) st.appendChild(el("span","ubadge warn","needs ~"+gb(cur.est_ram_mb)+" · "+gb(cat.free_mb)+" free now"));
+    if(cur.unavailable.length) cur.unavailable.forEach(function(k){ st.appendChild(el("span","ubadge crit","no local image: "+UI.kindLabel(k))); });
+    else if(cur.missing_images.length) cur.missing_images.forEach(function(i){ st.appendChild(el("span","ubadge warn","pulled at deploy: "+i)); });
+    else st.appendChild(el("span","ubadge ok","✓ all images on this host"));
+    f.textContent=""; sels={};
+    f.appendChild(el("label",null,"name")); f.appendChild(nm);
+    Object.keys(cur.kinds).sort().forEach(function(k){
+      f.appendChild(el("label",null,UI.kindLabel(k)));
+      var s=el("select","uin mono"); sels[k]=s;
+      var opts=(cat.images_by_kind[k]||[]).slice();
+      if(cur.images[k] && opts.indexOf(cur.images[k])<0) opts.unshift(cur.images[k]);
+      if(!opts.length){ var o=el("option",null,"— no image —"); o.value=""; s.appendChild(o); s.disabled=true; }
+      opts.forEach(function(i){ var o=el("option",null,i); o.value=i; if(i===cur.images[k]) o.selected=true; s.appendChild(o); });
+      f.appendChild(s);
+    });
+    b.disabled=cur.unavailable.length>0;
+    b.title=b.disabled ? "build or upload the missing image in Manage › Images first" : "";
+    res.textContent=""; res.className="";
+  }
+  ps.addEventListener("change", draw);
+  draw();
+  b.addEventListener("click",function(){
+    var images={}; Object.keys(sels).forEach(function(k){ images[k]=sels[k].value; });
+    b.disabled=true; res.className="res"; res.textContent="generating the configs…";
+    post("api/lab/import",{source:"template", scenario:sc.id, preset:cur.id, name:nm.value.trim(), images:images})
+      .then(function(r){
+        res.className="res ok"; res.textContent="created "+r.topology_path+" ("+r.written.length+" files)";
+        res.appendChild(document.createElement("br"));
+        var l=el("a",null,"open it in the topology view"); l.href="topology.html?lab="+encodeURIComponent(r.lab_id);
+        res.appendChild(l);
+        res.appendChild(document.createTextNode(" · "));
+        var rd=el("a",null,"read the README"); rd.href="edit.html?lab="+encodeURIComponent(r.lab_id)+"&file=README.md";
+        res.appendChild(rd);
+        var stb=UI.button("start it","sm",null,"play");
+        stb.addEventListener("click",function(){
+          stb.disabled=true;
+          post("api/action",{lab_id:r.lab_id, action:"redeploy"}).then(function(){ location.href="/"; })
+            .catch(function(e){ alert(e.message); stb.disabled=false; });
+        });
+        res.appendChild(stb);
+      })
+      .catch(function(e){ showErr(res,e); }).then(function(){ b.disabled=cur.unavailable.length>0; });
+  });
+}
+
+// ---------- community ----------
+function renderCommunity(w){
+  w.appendChild(el("p","lead","Public lab repositories that need only freely pullable images (SR Linux, FRR, linux "
+    +"tools). Importing clones the repository into its own lab directory; containerlab pulls the images the first "
+    +"time the lab is deployed, which can take a few minutes."));
+  var g=el("div","grid"); w.appendChild(g);
+  cat.community.forEach(function(t, idx){
+    var c=el("div","tcard"); c.style.animationDelay=Math.min(idx,10)*25+"ms"; g.appendChild(c);
+    var v=el("div","viz gh"), gl=el("div","glyph"); gl.appendChild(UI.icon("external"));
+    gl.appendChild(el("span",null,t.url.replace("https://github.com/","").replace("https://",""))); v.appendChild(gl); c.appendChild(v);
+    var bd=el("div","tbody"); c.appendChild(bd);
+    bd.appendChild(el("h3",null,t.title)); bd.appendChild(el("p",null,t.summary)); bd.appendChild(tagsOf(t.tags,"info"));
+    var src=el("a","facts",t.url.replace("https://","")); src.href=t.url; src.target="_blank"; src.rel="noopener";
+    bd.appendChild(src);
+    var log=el("div","jlog"); log.hidden=true; bd.appendChild(log);
+    var res=el("div"); bd.appendChild(res);
+    var a=el("div","acts"); bd.appendChild(a);
+    var b=UI.button("Import","primary",null,"download"); a.appendChild(b);
+    b.addEventListener("click",function(){
+      b.disabled=true; log.hidden=false; log.textContent=""; res.textContent="";
+      post("api/lab/import",{source:"git", url:t.url}).then(function(r){
+        followJob(r.job_id, log, function(j){
+          b.disabled=false;
+          if(j.rc===0){ res.className="res ok"; res.textContent="imported — it is in the lab list now.";
+            var m=/imported into (\S+)/.exec(log.textContent);
+            if(m) fetch("api/state",{cache:"no-store"}).then(function(x){ return x.json(); }).then(function(s){
+              labLinks((s.labs||[]).filter(function(l){ return l.path.indexOf(m[1]+"/")===0; }).map(function(l){ return l.path; }), res);
+            });
+          } else showErr(res,{message:"import failed - see the log above"});
+        });
+      }).catch(function(e){ b.disabled=false; showErr(res,e); });
+    });
+  });
+}
+
+// ---------- examples ----------
+function renderExamples(w){
+  w.appendChild(el("p","lead","The example labs that ship with containerlab (/etc/containerlab/lab-examples). "
+    +"Importing copies one into its own directory so it can be edited and deployed from here."));
+  var f=el("div","filterbar"); w.appendChild(f);
+  var sl=el("label","search"); sl.appendChild(UI.icon("search"));
+  var q=el("input","uin"); q.type="search"; q.placeholder="Filter examples"; q.value=exQuery; q.setAttribute("data-search","");
+  sl.appendChild(q); f.appendChild(sl);
+  var lb=el("label","chkl"), cb=el("input"); cb.type="checkbox"; cb.checked=freeOnly;
+  lb.appendChild(cb); lb.appendChild(document.createTextNode("only labs whose images are free to pull or already here"));
+  f.appendChild(lb);
+  var cnt=el("span","facts"); f.appendChild(cnt);
+  var g=el("div","grid"); w.appendChild(g);
+  function draw(){
+    g.textContent="";
+    var ql=exQuery.trim().toLowerCase();
+    var list=cat.examples.filter(function(e){ return !freeOnly || e.free || !e.missing_images.length; })
+      .filter(function(e){ return !ql || (e.title+" "+(e.summary||"")+" "+Object.keys(e.kinds||{}).join(" ")).toLowerCase().indexOf(ql)>=0; });
+    cnt.textContent=list.length+" of "+cat.examples.length;
+    if(!list.length) g.appendChild(el("div","empty","no example matches"));
+    list.forEach(function(t, idx){
+      var c=el("div","tcard"); c.style.animationDelay=Math.min(idx,10)*20+"ms"; g.appendChild(c);
+      var nodes=0; Object.keys(t.kinds||{}).forEach(function(k){ nodes+=t.kinds[k]; });
+      c.appendChild(viz(t.kinds, nodes, undefined));
+      var bd=el("div","tbody"); c.appendChild(bd);
+      bd.appendChild(el("h3",null,t.title));
+      if(t.summary) bd.appendChild(el("p",null,t.summary));
+      bd.appendChild(kindTags(t.kinds));
+      if(t.missing_images.length) bd.appendChild(tagsOf(t.missing_images.map(function(i){ return "not here: "+i; }),
+                                                      t.free?"warn":"crit"));
+      else bd.appendChild(tagsOf(["✓ all images on this host"],"ok"));
+      var res=el("div"); bd.appendChild(res);
+      var a=el("div","acts"); bd.appendChild(a);
+      var b=UI.button("Import","primary",null,"download"); a.appendChild(b);
+      var doc=el("a","ub quiet"); doc.appendChild(UI.icon("external")); doc.appendChild(document.createTextNode("docs"));
+      doc.href="https://containerlab.dev/lab-examples/"; doc.target="_blank"; doc.rel="noopener";
+      a.appendChild(doc);
+      b.addEventListener("click",function(){
+        b.disabled=true; res.className="res"; res.textContent="copying…";
+        post("api/lab/import",{source:"example", example:t.id}).then(function(r){ showResult(res,r); })
+          .catch(function(e){ showErr(res,e); }).then(function(){ b.disabled=false; });
+      });
+    });
+  }
+  cb.addEventListener("change",function(){ freeOnly=cb.checked; draw(); });
+  q.addEventListener("input",function(){ exQuery=q.value; draw(); });
+  draw();
+}
+
+// ---------- import ----------
+function panel(w, ic, title, text){
+  var p=el("div","panel"); w.appendChild(p);
+  var h=el("div","ph"), i=el("div","ic"); i.appendChild(UI.icon(ic)); h.appendChild(i); h.appendChild(el("h3",null,title));
+  p.appendChild(h); p.appendChild(el("p",null,text)); return p;
+}
+function renderImport(w){
+  var box=el("div","imp"); w.appendChild(box);
+  // archive
+  var p1=panel(box,"upload","From an archive","A .zip or .tar.gz of a lab directory (what “export” produces), or a single .clab.yml. "
+    +"It is unpacked into a new directory under /opt/clab-topologies; nothing existing is overwritten.");
+  var drop=el("div","drop"); drop.appendChild(UI.icon("upload"));
+  drop.appendChild(el("div",null,"drop the file here, or click to choose"));
+  drop.appendChild(el("small",null,".zip  .tar.gz  .tgz  .clab.yml"));
+  drop.tabIndex=0; p1.appendChild(drop);
+  var fi=el("input"); fi.type="file"; fi.accept=".zip,.tar,.gz,.tgz,.xz,.yml,.yaml"; fi.hidden=true; p1.appendChild(fi);
+  var f1=el("div","form"); p1.appendChild(f1);
+  f1.appendChild(el("label",null,"directory name"));
+  var as=el("input","uin mono"); as.type="text"; as.placeholder="optional - taken from the lab name"; f1.appendChild(as);
+  var r1=el("div"); p1.appendChild(r1);
+  function upload(file){
+    if(!file) return;
+    r1.className="res"; r1.textContent="uploading "+file.name+"…";
+    fetch("api/lab/import/upload?name="+encodeURIComponent(file.name)+(as.value.trim()?"&as="+encodeURIComponent(as.value.trim()):""),
+          {method:"POST", body:file})
+      .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||("HTTP "+r.status)); return j; }); })
+      .then(function(res){ showResult(r1,res); }).catch(function(e){ showErr(r1,e); });
+  }
+  drop.addEventListener("click",function(){ fi.click(); });
+  drop.addEventListener("keydown",function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); fi.click(); } });
+  fi.addEventListener("change",function(){ upload(fi.files[0]); fi.value=""; });
+  drop.addEventListener("dragover",function(e){ e.preventDefault(); drop.classList.add("on"); });
+  drop.addEventListener("dragleave",function(){ drop.classList.remove("on"); });
+  drop.addEventListener("drop",function(e){ e.preventDefault(); drop.classList.remove("on"); upload(e.dataTransfer.files[0]); });
+  // git
+  var p2=panel(box,"route","From a git repository","Any public https:// repository holding a containerlab topology. Only the latest commit "
+    +"is fetched; the .git directory is not kept.");
+  var f2=el("div","form"); p2.appendChild(f2);
+  f2.appendChild(el("label",null,"URL")); var url=el("input","uin mono"); url.type="text"; url.placeholder="https://github.com/org/repo"; f2.appendChild(url);
+  f2.appendChild(el("label",null,"sub-directory")); var sd=el("input","uin mono"); sd.type="text"; sd.placeholder="optional, e.g. labs/bgp"; f2.appendChild(sd);
+  f2.appendChild(el("label",null,"directory name")); var nm=el("input","uin mono"); nm.type="text"; nm.placeholder="optional"; f2.appendChild(nm);
+  var ga=el("div","acts"); p2.appendChild(ga);
+  var go=UI.button("Import","primary",null,"download"); ga.appendChild(go);
+  var log=el("div","jlog"); log.hidden=true; p2.appendChild(log);
+  var r2=el("div"); p2.appendChild(r2);
+  url.addEventListener("keydown",function(e){ if(e.key==="Enter" && !go.disabled) go.click(); });
+  go.addEventListener("click",function(){
+    go.disabled=true; r2.textContent=""; log.hidden=false; log.textContent="";
+    post("api/lab/import",{source:"git", url:url.value.trim(), subdir:sd.value.trim(), name:nm.value.trim()})
+      .then(function(r){ followJob(r.job_id, log, function(j){
+        go.disabled=false;
+        if(j.rc===0){ r2.className="res ok"; r2.textContent="imported - it is in the lab list now."; }
+        else showErr(r2,{message:"import failed - see the log above"});
+      }); })
+      .catch(function(e){ go.disabled=false; log.hidden=true; showErr(r2,e); });
+  });
+}
+
+function setTab(t){ tab=t; try{ localStorage.setItem("clabd-cat-tab",tab); }catch(e){} render(); }
+window.addEventListener("hashchange",function(){
+  if(/^#(templates|scenarios|community|examples|import)$/.test(location.hash)){ tab=location.hash.slice(1); render(); }
+});
+function render(){
+  document.querySelectorAll(".ctabs button").forEach(function(b){ b.setAttribute("aria-selected", b.dataset.t===tab?"true":"false"); });
+  var w=$("wrap"); w.textContent="";
+  if(!cat){ w.appendChild(el("div","empty plain","loading…")); return; }
+  ({templates:renderTemplates, scenarios:renderScenarios, community:renderCommunity, examples:renderExamples,
+    import:renderImport}[tab]||renderTemplates)(w);
+}
+document.querySelectorAll(".ctabs button").forEach(function(b){
+  b.addEventListener("click",function(){ setTab(b.dataset.t); });
+});
+UI.commands([
+  {label:"Templates", icon:"grid", run:function(){ setTab("templates"); }},
+  {label:"SP scenarios - Inter-AS, CsC, multicast, RR add-path, SRv6 migration, Flex-Algo, 6PE, EVPN-VPWS", icon:"route", run:function(){ setTab("scenarios"); }},
+  {label:"Community labs", icon:"external", run:function(){ setTab("community"); }},
+  {label:"Containerlab examples", icon:"catalog", run:function(){ setTab("examples"); }},
+  {label:"Import a zip or git repo", icon:"upload", run:function(){ setTab("import"); }}
+]);
+UI.keys([{keys:"1 2 3 4 5", label:"switch catalogue tab"}]);
+document.addEventListener("keydown",function(e){
+  if(e.ctrlKey||e.metaKey||e.altKey) return;
+  var t=e.target; if(t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+  if(document.querySelector(".scrim,.cmdk")) return;
+  var m={"1":"templates","2":"scenarios","3":"community","4":"examples","5":"import"}[e.key];
+  if(m) setTab(m);
+});
+Promise.all([fetch("api/catalog",{cache:"no-store"}).then(function(r){ return r.json(); }),
+             fetch("api/images",{cache:"no-store"}).then(function(r){ return r.json(); }),
+             fetch("api/state",{cache:"no-store"}).then(function(r){ return r.json(); }).catch(function(){ return {}; })])
+  .then(function(a){
+    cat=a[0]; cat.images_by_kind={};
+    var h=(a[2]||{}).host||{}; cat.free_mb=(h.mem_total_mb||0)-(h.mem_used_mb||0);
+    (a[1].images||[]).forEach(function(i){ if(i.kind) (cat.images_by_kind[i.kind]=cat.images_by_kind[i.kind]||[]).push(i.image); });
+    var n={templates:cat.templates.length, scenarios:(cat.scenarios||[]).length, community:cat.community.length, examples:cat.examples.length};
+    document.querySelectorAll(".ctabs button").forEach(function(b){ if(n[b.dataset.t]!==undefined) b.appendChild(el("span","n",String(n[b.dataset.t]))); });
+    render();
+  }).catch(function(e){ $("wrap").textContent=String(e); });
+})();
+</script>
+</body>
+</html>

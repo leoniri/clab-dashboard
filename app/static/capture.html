@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Packet capture · Containerlab</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script>try{if(localStorage.getItem("clabd-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
+<link rel="stylesheet" href="ui.css">
+<style>
+html,body{height:100%}
+body{overflow:hidden}
+.app{display:flex;flex-direction:column;height:100%}
+.meta{font:11.5px var(--font-mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}
+.main{flex:1;min-height:0;display:flex;flex-direction:column}
+
+/* ---------- filter bar ---------- */
+.fbar{display:flex;gap:8px;align-items:center;padding:9px 16px;background:var(--surface);border-bottom:1px solid var(--line);
+  flex:none;flex-wrap:wrap}
+.fin{position:relative;flex:1;min-width:220px;display:flex}
+.fin .p{position:absolute;left:11px;top:50%;transform:translateY(-50%);font:700 13px var(--font-mono);color:var(--accent);pointer-events:none}
+.fin input{flex:1;padding-left:28px;font-family:var(--font-mono);font-size:12.5px}
+.fin input.bad{border-color:var(--crit);box-shadow:0 0 0 3px var(--crit-soft)}
+.fin input.on{border-color:var(--accent);background:var(--accent-soft)}
+.qf{display:flex;gap:4px;flex-wrap:wrap}
+.qf button{height:24px;padding:0 8px;border-radius:5px;border:1px solid var(--line);background:var(--surface-2);cursor:pointer;
+  font:500 11px var(--font-mono);color:var(--ink-2)}
+.qf button:hover{border-color:var(--accent);color:var(--accent-ink)}
+.fbar .err{flex-basis:100%;color:var(--crit);font:11.5px var(--font-mono);white-space:pre-wrap}
+.fbar .err:empty{display:none}
+.fbar .cnt{font:11.5px var(--font-mono);color:var(--muted);white-space:nowrap}
+
+/* ---------- packet list ---------- */
+.list{flex:1 1 55%;min-height:90px;overflow:auto;background:var(--surface)}
+.pk{border-collapse:separate;border-spacing:0;width:100%;font:11.5px/1.45 var(--font-mono)}
+.pk thead th{position:sticky;top:0;background:var(--surface-2);text-align:left;font:600 9.5px var(--font-mono);letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);padding:6px 9px;border-bottom:1px solid var(--line-strong);white-space:nowrap;z-index:1}
+.pk tbody td{padding:2px 9px;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent);white-space:nowrap;cursor:pointer}
+.pk tbody td.info{white-space:normal;word-break:break-word;min-width:260px;color:var(--ink-2)}
+.pk tbody td.num{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.pk tbody td.pr{font-weight:600}
+.pk tbody tr td:first-child{box-shadow:inset 3px 0 0 transparent}
+.pk tbody tr:hover td{background:var(--surface-2)}
+.pk tr.p-rt td{background:color-mix(in srgb,var(--p-rt) 7%,transparent)} .pk tr.p-rt td:first-child{box-shadow:inset 3px 0 0 var(--p-rt)} .pk tr.p-rt td.pr{color:var(--p-rt)}
+.pk tr.p-tcp td{background:color-mix(in srgb,var(--p-tcp) 7%,transparent)} .pk tr.p-tcp td:first-child{box-shadow:inset 3px 0 0 var(--p-tcp)} .pk tr.p-tcp td.pr{color:var(--p-tcp)}
+.pk tr.p-icmp td{background:color-mix(in srgb,var(--p-icmp) 7%,transparent)} .pk tr.p-icmp td:first-child{box-shadow:inset 3px 0 0 var(--p-icmp)} .pk tr.p-icmp td.pr{color:var(--p-icmp)}
+.pk tr.p-arp td{background:color-mix(in srgb,var(--p-arp) 7%,transparent)} .pk tr.p-arp td:first-child{box-shadow:inset 3px 0 0 var(--p-arp)} .pk tr.p-arp td.pr{color:var(--p-arp)}
+.pk tr.p-mpls td{background:color-mix(in srgb,var(--p-mpls) 7%,transparent)} .pk tr.p-mpls td:first-child{box-shadow:inset 3px 0 0 var(--p-mpls)} .pk tr.p-mpls td.pr{color:var(--p-mpls)}
+.pk tbody tr.sel td{background:var(--accent)!important;color:var(--on-accent)!important}
+.pk tbody tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--accent-ink)}
+
+/* ---------- splitter + detail ---------- */
+.split{flex:none;height:7px;cursor:row-resize;background:var(--surface-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  position:relative}
+.split::after{content:"";position:absolute;left:50%;top:2px;width:36px;height:1px;margin-left:-18px;background:var(--line-strong);
+  box-shadow:0 2px 0 var(--line-strong)}
+.split:hover,.split.drag{background:var(--accent-soft)}
+.detail{flex:1 1 45%;min-height:90px;display:flex;background:var(--surface)}
+.pane{display:flex;flex-direction:column;min-width:0;min-height:0}
+.pane.t{flex:3}
+.pane.h{flex:2;border-left:1px solid var(--line)}
+.pane .ph{flex:none;display:flex;align-items:center;gap:8px;padding:6px 12px;font:600 9.5px var(--font-mono);letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);background:var(--surface)}
+.pane .ph b{color:var(--accent);font-weight:700;letter-spacing:.04em}
+.tree{flex:1;overflow:auto;padding:8px 12px;font:11.5px/1.6 var(--font-mono)}
+.hex{flex:1;overflow:auto;padding:8px 12px;font:11.5px/1.6 var(--font-mono);white-space:pre;background:var(--console-bg);color:var(--console-ink)}
+.tree details>summary{cursor:pointer;list-style:none;padding-left:15px;position:relative;border-radius:4px}
+.tree details>summary::-webkit-details-marker{display:none}
+.tree details>summary:hover{background:var(--surface-2)}
+.tree details>summary::before{content:"▸";position:absolute;left:2px;color:var(--accent)}
+.tree details[open]>summary::before{content:"▾"}
+.tree .kids{padding-left:16px;margin-left:5px;border-left:1px dashed var(--line-strong)}
+.tree .leaf{padding-left:15px;color:var(--ink-2)}
+.tree .top>summary{font-weight:600;color:var(--ink)}
+.tree .empty,.hex .empty{padding:30px 10px}
+@media (max-width:760px){ #abright .ub{font-size:0;gap:0;width:28px;padding:0} #abafter{display:none!important} }
+@media (max-width:700px){ .detail{flex-direction:column} .pane.h{border-left:0;border-top:1px solid var(--line)} .meta{display:none} }
+
+/* ---------- start form ---------- */
+.start{max-width:780px;margin:28px auto;padding:0 16px}
+.start .card{padding:22px 24px}
+.start h2{font:600 20px var(--font-display);margin:4px 0 6px;letter-spacing:-.01em}
+.start p.lead{color:var(--ink-2);font-size:13px;margin:0 0 18px}
+.start .field{margin-top:14px}
+.start .field input{width:100%}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.start .go{margin-top:20px}
+.prev{margin-top:22px}
+.prev a{display:flex;gap:12px;align-items:center;font:12px var(--font-mono);padding:8px 12px;border:1px solid var(--line);
+  border-radius:var(--r);margin-top:6px;text-decoration:none;color:var(--ink);background:var(--surface-2)}
+.prev a:hover{border-color:var(--accent)}
+.prev a span{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msg{color:var(--crit);font-size:12.5px;margin-top:12px;white-space:pre-wrap}
+.msg:empty{display:none}
+@media (max-width:700px){ .row2{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header id="appbar"></header>
+  <div id="abparts" hidden>
+    <span id="abafter" style="display:flex;align-items:center;gap:10px;min-width:0"><span id="state"></span>
+      <span class="meta" id="meta"></span></span>
+    <span id="abright" style="display:flex;gap:6px">
+      <button class="ub sm" id="follow" aria-pressed="true" title="keep the newest packet in view (f)" hidden>Follow</button>
+      <button class="ub sm danger" id="stopbtn" hidden>Stop</button>
+      <a class="ub sm" id="dlbtn" hidden title="download the pcap - opens in Wireshark">Download pcap</a>
+      <button class="ub sm quiet" id="delbtn" hidden title="delete this capture file">Delete</button></span>
+  </div>
+  <div class="main" id="main"><div class="empty plain"><span class="spin"></span>&nbsp; loading…</div></div>
+</div>
+<script src="ui.js"></script>
+<script>
+UI.appbar(document.getElementById("appbar"), {crumbs:[{label:"Labs", href:"/"}, {label:"topology", href:"/", id:"backlink"},
+  {label:"Packet capture", id:"title"}], after: document.getElementById("abafter"), right: document.getElementById("abright")});
+document.getElementById("abparts").remove();
+</script>
+<script>
+(function(){
+"use strict";
+function $(id){ return document.getElementById(id); }
+function el(t,c,x){ var e=document.createElement(t); if(c)e.className=c; if(x!==undefined)e.textContent=x; return e; }
+var qs=new URLSearchParams(location.search);
+var capId=qs.get("id"), labId=qs.get("lab"), node=qs.get("node"), port=qs.get("port");
+var cap=null, rows=[], total=0, t0=null, selN=null, follow=true, dfilter="", timer=null;
+var tbody=null, listEl=null, treeEl=null, hexEl=null, filterErr=null, filterIn=null, cntEl=null;
+
+$("follow").prepend(UI.icon("chevron"));
+$("stopbtn").prepend(UI.icon("stop"));
+$("dlbtn").prepend(UI.icon("download"));
+$("delbtn").prepend(UI.icon("trash"));
+
+function getJ(u){ return fetch(u,{cache:"no-store"}).then(function(r){ return r.json().then(function(j){
+  if(!r.ok) throw new Error(j.error||("HTTP "+r.status)); return j; }); }); }
+function post(u,b){ return fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)})
+  .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||("HTTP "+r.status)); return j; }); }); }
+
+// ---------- start form ----------
+function startForm(){
+  $("title").textContent="Capture on "+node+" "+port;
+  if(labId){ $("backlink").href="topology.html?lab="+encodeURIComponent(labId); $("backlink").textContent="topology"; }
+  var main=$("main"); main.textContent=""; main.style.overflow="auto";
+  var wrap=el("div","start"), box=el("div","card"); wrap.appendChild(box); main.appendChild(wrap);
+  box.appendChild(el("div","eyebrow","tcpdump · "+node));
+  box.appendChild(el("h2",null,"Capture on "+node+" · "+port));
+  box.appendChild(el("p","lead","tcpdump runs in the node's network namespace on the container side of the port — it "
+    +"sees both directions, exactly what goes over the link. Packets appear here as they arrive; the pcap can be "
+    +"downloaded for Wireshark at any time."));
+  var ff=el("div","field"); box.appendChild(ff);
+  ff.appendChild(el("label",null,"capture filter (BPF, optional)"));
+  var f=el("input","mono"); f.type="text"; f.placeholder="e.g. not arp · icmp · tcp port 179 · mpls · isis"; ff.appendChild(f);
+  var chips=el("div","chips"); ff.appendChild(chips);
+  [["everything",""],["BGP","tcp port 179"],["ICMP","icmp"],["MPLS","mpls"],["IS-IS","isis"],["OSPF","proto ospf"],
+   ["no hellos","not isis and not proto ospf"]].forEach(function(c){
+    var b=el("button","ub sm",c[0]); b.type="button"; b.title=c[1]||"no filter";
+    b.addEventListener("click",function(){ f.value=c[1]; f.focus(); }); chips.appendChild(b);
+  });
+  var r2=el("div","row2"); box.appendChild(r2);
+  var a=el("div","field"), b=el("div","field"); r2.appendChild(a); r2.appendChild(b);
+  a.appendChild(el("label",null,"stop after packets"));
+  var mp=el("input","mono"); mp.type="number"; mp.value="20000"; mp.min="1"; mp.max="20000"; a.appendChild(mp);
+  b.appendChild(el("label",null,"stop after seconds"));
+  var ms=el("input","mono"); ms.type="number"; ms.value="600"; ms.min="5"; ms.max="3600"; b.appendChild(ms);
+  var go=UI.button("Start capture","primary lg go",null,"play"); box.appendChild(go);
+  var msg=el("div","msg"); box.appendChild(msg);
+  go.addEventListener("click",function(){
+    go.disabled=true; msg.textContent="";
+    post("api/capture",{op:"start", lab_id:labId, node:node, port:port, filter:f.value,
+                        max_packets:+mp.value, max_seconds:+ms.value})
+      .then(function(c){
+        history.replaceState(null,"","capture.html?id="+encodeURIComponent(c.id));
+        capId=c.id; viewer();
+      }).catch(function(e){ msg.textContent=e.message; go.disabled=false; });
+  });
+  f.addEventListener("keydown",function(e){ if(e.key==="Enter") go.click(); });
+  f.focus();
+  // earlier captures of this lab
+  getJ("api/capture/list?lab="+encodeURIComponent(labId)).then(function(j){
+    if(!j.tools){ msg.textContent="tcpdump / tshark / editcap are not installed on the host."; go.disabled=true; }
+    if(!(j.captures||[]).length) return;
+    var pv=el("div","prev"); pv.appendChild(el("div","sech","earlier captures in this lab"));
+    j.captures.forEach(function(c){
+      var l=el("a"); l.href="capture.html?id="+encodeURIComponent(c.id);
+      l.appendChild(el("span","led "+(c.running?"ok pulse":"")));
+      l.appendChild(el("b",null,c.node+" "+c.port));
+      l.appendChild(el("span",null,new Date(c.started*1000).toLocaleString()+" · "+(c.running?"running":"stopped")
+        +" · "+Math.round(c.bytes/1024)+" KB"+(c.filter?" · "+c.filter:"")));
+      pv.appendChild(l);
+    });
+    box.appendChild(pv);
+  }).catch(function(){});
+}
+
+// ---------- viewer ----------
+function viewer(){
+  $("follow").hidden=false;
+  var main=$("main"); main.textContent=""; main.style.overflow="";
+  var bar=el("div","fbar");
+  var fin=el("div","fin"); fin.appendChild(el("span","p","❯"));
+  var fi=el("input","uin"); fi.type="text"; fi.setAttribute("data-search","");
+  fi.placeholder="display filter (Wireshark syntax), e.g. bgp · icmp · mpls.label == 16 · isis.hello";
+  fi.title="Wireshark display filter - press / to focus, Enter to apply, Esc to clear";
+  fin.appendChild(fi); filterIn=fi;
+  var ap=UI.button("Apply","sm primary"), cl=UI.button("Clear","sm quiet");
+  var qf=el("div","qf");
+  ["bgp","icmp","mpls","isis","ospf","arp","tcp.flags.reset==1"].forEach(function(x){
+    var b=el("button",null,x); b.type="button"; b.title="display filter: "+x;
+    b.addEventListener("click",function(){ fi.value=x; applyF(); }); qf.appendChild(b);
+  });
+  cntEl=el("span","cnt");
+  filterErr=el("span","err");
+  bar.appendChild(fin); bar.appendChild(ap); bar.appendChild(cl); bar.appendChild(qf); bar.appendChild(cntEl); bar.appendChild(filterErr);
+  main.appendChild(bar);
+  listEl=el("div","list");
+  var tb=el("table","pk"), thd=el("thead"), tr=el("tr");
+  ["No.","Time","Source","Destination","Protocol","Length","Info"].forEach(function(h){ tr.appendChild(el("th",null,h)); });
+  thd.appendChild(tr); tb.appendChild(thd); tbody=el("tbody"); tb.appendChild(tbody); listEl.appendChild(tb);
+  main.appendChild(listEl);
+  var sp=el("div","split"); sp.title="drag to resize"; main.appendChild(sp);
+  var det=el("div","detail");
+  var pt=el("div","pane t"), ph1=el("div","ph","packet detail"); pt.appendChild(ph1);
+  treeEl=el("div","tree"); pt.appendChild(treeEl);
+  var ph=el("div","pane h"), ph2=el("div","ph","bytes"); ph.appendChild(ph2);
+  hexEl=el("div","hex"); ph.appendChild(hexEl);
+  treeEl.appendChild(el("div","empty plain","select a packet  ·  ↑ ↓ to step through"));
+  det.appendChild(pt); det.appendChild(ph); main.appendChild(det);
+  function applyF(){ dfilter=fi.value.trim(); fi.classList.toggle("on",!!dfilter); fi.classList.remove("bad");
+    rows=[]; total=0; tbody.textContent=""; filterErr.textContent=""; poll(true); }
+  ap.addEventListener("click",applyF); fi.addEventListener("keydown",function(e){
+    if(e.key==="Enter") applyF();
+    else if(e.key==="Escape" && fi.value){ e.stopPropagation(); fi.value=""; applyF(); }
+  });
+  cl.addEventListener("click",function(){ fi.value=""; applyF(); });
+  listEl.addEventListener("scroll",function(){
+    var atEnd=listEl.scrollTop+listEl.clientHeight>=listEl.scrollHeight-4;
+    if(!atEnd && follow){ follow=false; $("follow").setAttribute("aria-pressed","false"); }
+  });
+  // splitter between list and detail
+  sp.addEventListener("pointerdown",function(e){
+    e.preventDefault(); sp.classList.add("drag"); sp.setPointerCapture(e.pointerId);
+    var top=main.getBoundingClientRect().top+bar.offsetHeight, h=main.clientHeight-bar.offsetHeight-sp.offsetHeight;
+    function mv(ev){ var y=Math.max(90,Math.min(h-90,ev.clientY-top)); listEl.style.flex="0 0 "+y+"px"; det.style.flex="1 1 0"; }
+    function up(){ sp.classList.remove("drag"); sp.removeEventListener("pointermove",mv); sp.removeEventListener("pointerup",up); }
+    sp.addEventListener("pointermove",mv); sp.addEventListener("pointerup",up);
+  });
+  poll(true);
+}
+function protoCls(p){
+  p=(p||"").toUpperCase();
+  return /BGP|ISIS|OSPF|LDP|BFD|PIM|VRRP|LLDP|CDP/.test(p) ? "p-rt" : /ICMP/.test(p) ? "p-icmp"
+       : /ARP/.test(p) ? "p-arp" : /MPLS/.test(p) ? "p-mpls" : /TCP|UDP|SSH|HTTP|TLS/.test(p) ? "p-tcp" : "";
+}
+function addRows(list){
+  var frag=document.createDocumentFragment();
+  list.forEach(function(p){
+    if(t0===null) t0=p.t;
+    var tr=el("tr",protoCls(p.proto)); tr.dataset.n=p.n;
+    tr.appendChild(el("td","num",p.n)); tr.appendChild(el("td","num",(p.t-t0).toFixed(6)));
+    tr.appendChild(el("td",null,p.src)); tr.appendChild(el("td",null,p.dst));
+    tr.appendChild(el("td","pr",p.proto)); tr.appendChild(el("td","num",p.len));
+    tr.appendChild(el("td","info",p.info));
+    if(p.n===selN) tr.className+=" sel";
+    frag.appendChild(tr);
+  });
+  tbody.appendChild(frag);
+  // keep the DOM bounded on long captures
+  while(tbody.children.length>5000) tbody.removeChild(tbody.firstChild);
+  if(follow) listEl.scrollTop=listEl.scrollHeight;
+}
+function header(c){
+  cap=c;
+  if(c.lab_id){ $("backlink").href="topology.html?lab="+encodeURIComponent(c.lab_id); $("backlink").textContent=c.lab; }
+  $("title").textContent="Capture · "+c.node+" "+c.port;
+  document.title="Capture "+c.node+" "+c.port+" · Containerlab";
+  $("state").textContent="";
+  $("state").appendChild(el("span","pill "+(c.running?"ok":c.error?"crit":"idle"), c.running?"capturing":"stopped"));
+  $("meta").textContent=c.lab+(c.filter?" · filter: "+c.filter:"")+" · "+total+" packets · "
+    +(c.bytes>1048576?(c.bytes/1048576).toFixed(1)+" MB":Math.round(c.bytes/1024)+" KB")
+    +(c.running?"":" · "+(c.reason||c.error||""));
+  $("meta").title=$("meta").textContent;
+  if(cntEl) cntEl.textContent=(dfilter?total+" match":total+" packets");
+  $("stopbtn").hidden=!c.running; $("dlbtn").hidden=false; $("delbtn").hidden=c.running;
+  $("dlbtn").href="api/capture/pcap?id="+encodeURIComponent(c.id);
+}
+function poll(reset){
+  clearTimeout(timer);
+  var u="api/capture/packets?id="+encodeURIComponent(capId)
+        +(dfilter ? "&filter="+encodeURIComponent(dfilter) : "&since="+total+"&limit=1000");
+  getJ(u).then(function(j){
+    if(dfilter){
+      if(reset || j.total!==total){ tbody.textContent=""; total=j.total; addRows(j.packets||[]); }
+    } else {
+      addRows(j.packets||[]); total=j.total;
+    }
+    header(j);
+    var more = !dfilter && (j.packets||[]).length>=1000;
+    if(j.running || more) timer=setTimeout(poll, more?50:(dfilter?2500:1000));
+  }).catch(function(e){
+    if(dfilter){ filterErr.textContent=e.message; if(filterIn) filterIn.classList.add("bad"); }
+    else if(!cap){ $("main").innerHTML=""; $("main").appendChild(el("div","empty",e.message)); return; }
+    timer=setTimeout(poll,3000);
+  });
+}
+function buildTree(text){
+  // tshark -V: four spaces per level
+  var root={kids:[]}, stack=[{lvl:-1,node:root}];
+  text.split("\n").forEach(function(line){
+    if(!line.trim()) return;
+    var m=/^( *)(.*)$/.exec(line), lvl=Math.floor(m[1].length/4);
+    var n={text:m[2],kids:[]};
+    while(stack.length>1 && stack[stack.length-1].lvl>=lvl) stack.pop();
+    stack[stack.length-1].node.kids.push(n);
+    stack.push({lvl:lvl,node:n});
+  });
+  function render(n, top){
+    if(!n.kids.length) return el("div","leaf",n.text);
+    var d=document.createElement("details"); if(top) d.className="top";
+    // open the interesting layers by default, keep the frame metadata folded
+    if(top && !/^Frame \d/.test(n.text)) d.open=true;
+    d.appendChild(el("summary",null,n.text));
+    var k=el("div","kids"); n.kids.forEach(function(c){ k.appendChild(render(c,false)); }); d.appendChild(k);
+    return d;
+  }
+  var frag=document.createDocumentFragment();
+  root.kids.forEach(function(k){ frag.appendChild(render(k,true)); });
+  return frag;
+}
+document.addEventListener("click",function(e){
+  var tr=e.target.closest && e.target.closest(".pk tbody tr"); if(!tr) return;
+  var prev=tbody.querySelector("tr.sel"); if(prev) prev.classList.remove("sel");
+  tr.classList.add("sel"); selN=+tr.dataset.n;
+  treeEl.textContent=""; treeEl.appendChild(el("div","empty plain","decoding packet "+selN+"…")); hexEl.textContent="";
+  var hd=document.querySelector(".pane.t .ph"); if(hd){ hd.textContent="packet detail "; hd.appendChild(el("b",null,"#"+selN)); }
+  getJ("api/capture/detail?id="+encodeURIComponent(capId)+"&n="+selN).then(function(d){
+    if(d.n!==selN) return;
+    treeEl.textContent=""; treeEl.appendChild(buildTree(d.tree)); hexEl.textContent=d.hex;
+  }).catch(function(err){ treeEl.textContent=""; treeEl.appendChild(el("div","empty",err.message)); });
+});
+document.addEventListener("keydown",function(e){
+  if(!tbody || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if(e.key==="f" && !e.ctrlKey && !e.metaKey && !e.altKey){ $("follow").click(); return; }
+  if(e.key!=="ArrowDown" && e.key!=="ArrowUp") return;
+  var cur=tbody.querySelector("tr.sel"), nx=cur ? (e.key==="ArrowDown"?cur.nextSibling:cur.previousSibling) : tbody.firstChild;
+  if(nx){ e.preventDefault(); nx.click(); nx.scrollIntoView({block:"nearest"}); }
+});
+$("follow").addEventListener("click",function(){
+  follow=!follow; $("follow").setAttribute("aria-pressed",follow?"true":"false");
+  if(follow && listEl) listEl.scrollTop=listEl.scrollHeight;
+});
+function stopCap(){
+  post("api/capture",{op:"stop", id:capId}).then(function(c){ header(c); poll(); }).catch(function(e){ alert(e.message); });
+}
+function deleteCap(){
+  UI.confirm("Delete this capture?", "The pcap file is removed from the host. Download it first if you want to keep it.",
+    {ok:"Delete", danger:true}).then(function(ok){
+    if(!ok) return;
+    post("api/capture",{op:"delete", id:capId}).then(function(){
+      location.href = cap && cap.lab_id ? "topology.html?lab="+encodeURIComponent(cap.lab_id) : "/";
+    }).catch(function(e){ alert(e.message); });
+  });
+}
+$("stopbtn").addEventListener("click",stopCap);
+$("delbtn").addEventListener("click",deleteCap);
+
+UI.commands([
+  {label:"Focus the display filter", icon:"search", hint:"/", run:function(){ if(filterIn){ filterIn.focus(); filterIn.select(); } }},
+  {label:"Toggle follow newest packet", icon:"chevron", hint:"f", run:function(){ if(listEl) $("follow").click(); }},
+  {label:"Download pcap", icon:"download", run:function(){ if(cap) location.href=$("dlbtn").href; }},
+  {label:"Stop capture", icon:"stop", run:function(){ if(cap && cap.running) stopCap(); }},
+  {label:"Delete capture", icon:"trash", run:function(){ if(cap && !cap.running) deleteCap(); }},
+  {label:"Back to the topology", icon:"map", run:function(){ location.href=$("backlink").href; }}
+]);
+UI.keys([{keys:"↑ ↓", label:"previous / next packet"}, {keys:"f", label:"follow the newest packet on / off"},
+         {keys:"Esc", label:"in the filter box: clear the display filter"}]);
+
+if(capId) viewer();
+else if(labId && node && port) startForm();
+else $("main").innerHTML='<div class="empty">no capture selected — start one from a link in the topology view.</div>';
+})();
+</script>
+</body>
+</html>

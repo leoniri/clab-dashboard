@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Convergence · Containerlab</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script>try{if(localStorage.getItem("clabd-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
+<link rel="stylesheet" href="ui.css">
+<style>
+.layout{display:grid;grid-template-columns:292px minmax(0,1fr);min-height:calc(100vh - 55px)}
+.side{background:var(--surface);border-right:1px solid var(--line);padding:18px 12px;position:sticky;top:55px;
+  height:calc(100vh - 55px);overflow:auto}
+.side-h{display:flex;align-items:center;gap:8px;margin:0 4px 4px}
+.side-h h2{font:600 15px var(--font-display);margin:0}
+.side .hint{margin:0 4px 12px}
+.tests{display:flex;flex-direction:column;gap:4px}
+.test{position:relative;border:1px solid transparent;border-radius:var(--r);padding:9px 11px;cursor:pointer}
+.test:hover{background:var(--surface-2)}
+.test[aria-current="true"]{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 50%,transparent)}
+.test b{display:block;font-size:13px;font-weight:600;padding-right:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.test span{font:11px var(--font-mono);color:var(--muted)}
+.test .last{position:absolute;right:10px;top:9px;font:600 11.5px var(--font-mono);padding:0 6px;border-radius:5px;background:var(--surface-2)}
+.main{padding:22px clamp(14px,2.5vw,30px) 70px;min-width:0;max-width:1240px}
+.card{padding:18px 20px;margin-bottom:16px}
+.card h2{font:600 16px var(--font-display);margin:0 0 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;letter-spacing:-.01em}
+.card h2 .hint{font-weight:400;font-family:var(--font-mono);font-size:11.5px}
+.card h2 .led{margin-right:2px}
+
+/* ---------- scenario builder ---------- */
+.bench{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px 16px;align-content:start}
+.form .field .uin{width:100%}
+.form .wide{grid-column:1/-1}
+.timing{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.dstrow{display:flex;gap:6px}
+.dstrow select{flex:1;min-width:0} .dstrow input{flex:1;min-width:0}
+.acts{display:flex;gap:8px;align-items:center;margin-top:16px;flex-wrap:wrap}
+.acts .hint{margin-left:auto;font-family:var(--font-mono);font-size:11.5px}
+.msg{font-size:12.5px;color:var(--crit);margin:0 0 10px;white-space:pre-wrap}
+.msg:empty{display:none}
+.card > .note{margin-bottom:12px}
+
+/* scenario preview: path + phases */
+.preview{background:var(--canvas);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px 16px;display:flex;
+  flex-direction:column;gap:14px;align-self:start}
+.pv-h{font:600 10px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.pvpath{display:flex;align-items:center;gap:0;font:600 12px var(--font-mono);min-width:0}
+.pvpath .n{padding:5px 9px;border-radius:7px;background:var(--surface);border:1px solid var(--line-strong);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;max-width:40%}
+.pvpath .n.src{border-color:var(--accent);color:var(--accent-ink)}
+.pvpath .w{flex:1;height:2px;min-width:30px;position:relative;
+  background:repeating-linear-gradient(90deg,var(--line-strong) 0 6px,transparent 6px 10px)}
+.pvpath .w::after{content:"";position:absolute;right:-1px;top:-4px;border:5px solid transparent;border-left:7px solid var(--line-strong);border-right:0}
+.pvlink{display:flex;align-items:center;gap:8px;font:12px var(--font-mono);color:var(--ink-2)}
+.pvlink .x{width:22px;height:22px;border-radius:50%;background:var(--crit-soft);color:var(--crit);display:flex;
+  align-items:center;justify-content:center;font-weight:700;flex:none}
+.phases{display:flex;height:30px;border-radius:7px;overflow:hidden;border:1px solid var(--line)}
+.phases div{display:flex;align-items:center;justify-content:center;font:600 10.5px var(--font-mono);min-width:0;overflow:hidden;white-space:nowrap}
+.phases .pre,.phases .post{background:var(--ok-soft);color:var(--ok)}
+.phases .down{background:repeating-linear-gradient(135deg,var(--crit-soft) 0 6px,transparent 6px 12px),var(--warn-soft);color:var(--crit)}
+.phlbl{display:flex;justify-content:space-between;font:10.5px var(--font-mono);color:var(--muted);margin-top:-8px}
+.pvstats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pvstats div{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:7px 10px}
+.pvstats b{display:block;font:600 16px var(--font-mono)}
+.pvstats span{font-size:11px;color:var(--muted)}
+
+/* ---------- live + results ---------- */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:4px 0 16px}
+.tile{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:11px 13px}
+.tile .k{font-size:11.5px;color:var(--muted)}
+.tile .v{font:600 23px var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em;margin-top:2px}
+.tile .v small{font-size:12px;color:var(--muted);font-weight:400;margin-left:3px;letter-spacing:0}
+.tile.bad{border-color:color-mix(in srgb,var(--crit) 40%,transparent)} .tile.bad .v{color:var(--crit)}
+.tile.good .v{color:var(--ok)}
+.prog{height:6px;border-radius:3px;background:var(--surface-3);overflow:hidden;margin:6px 0 8px}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .4s;
+  box-shadow:0 0 10px var(--accent)}
+.chartwrap{position:relative;background:var(--canvas);border:1px solid var(--line);border-radius:var(--r-lg);padding:6px 4px 0}
+#chart{width:100%;height:260px;display:block}
+.grid line{stroke:var(--grid);stroke-width:1}
+.axis text{font:10.5px var(--font-mono);fill:var(--muted)}
+.rttline{fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linejoin:round}
+.lossband{fill:var(--crit);opacity:.25}
+.losslbl{font:700 11px var(--font-mono);fill:var(--crit)}
+.downband{fill:var(--warn);opacity:.08}
+.evline{stroke:var(--ink-2);stroke-width:1;stroke-dasharray:3 3}
+.evlbl{font:500 11px var(--font-sans);fill:var(--ink-2)}
+.cross{stroke:var(--muted);stroke-width:1;pointer-events:none}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line-strong);border-radius:7px;
+  padding:5px 9px;font:12px var(--font-mono);box-shadow:var(--shadow);white-space:nowrap}
+.key{display:flex;gap:16px;font-size:12px;color:var(--ink-2);margin-top:10px;flex-wrap:wrap}
+.key i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.paths{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:13px;align-items:center}
+.paths .k{font:600 10px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.chain{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font:12px var(--font-mono)}
+.chain span{padding:2px 8px;border-radius:5px;background:var(--surface-2);border:1px solid var(--line)}
+.chain span.chg{background:var(--warn-soft);color:var(--warn);font-weight:600;border-color:transparent}
+.chain em{color:var(--muted);font-style:normal}
+.runs tbody tr{cursor:pointer}
+.runs tbody tr[aria-current="true"] td{background:var(--accent-soft)}
+.runs td.num{font-family:var(--font-mono);font-size:12px;font-variant-numeric:tabular-nums}
+.log{font:11.5px/1.55 var(--font-mono);white-space:pre-wrap;background:var(--console-bg);color:var(--console-ink);
+  border-radius:var(--r);padding:10px 12px;max-height:220px;overflow:auto;margin-top:10px}
+.log:empty::before{content:"waiting for output…";color:var(--console-dim)}
+@media (max-width:1100px){ .bench{grid-template-columns:1fr} }
+@media (max-width:820px){ .layout{grid-template-columns:1fr} .side{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}
+  .timing{grid-template-columns:1fr 1fr} }
+</style>
+</head>
+<body>
+<header id="appbar"></header>
+<div class="layout">
+  <aside class="side">
+    <div class="side-h"><h2>Tests</h2><span id="newbtn" style="margin-left:auto"></span></div>
+    <p class="hint">Fail a link while probing traffic, and measure how long it stops.</p>
+    <div class="tests" id="tests"></div>
+  </aside>
+  <main class="main" id="main"><div class="empty plain"><span class="spin"></span>&nbsp; loading…</div></main>
+</div>
+<script src="ui.js"></script>
+<script>
+(function(){
+"use strict";
+function $(id){ return document.getElementById(id); }
+function el(t,c,x){ var e=document.createElement(t); if(c)e.className=c; if(x!==undefined&&x!==null)e.textContent=x; return e; }
+function getJ(u){ return fetch(u,{cache:"no-store"}).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||r.status); return j; }); }); }
+function post(u,b){ return fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)})
+  .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||r.status); return j; }); }); }
+var qs=new URLSearchParams(location.search), labId=qs.get("lab");
+var data=null, cur=null, draft=null, runView=null, jobId=null, jobLines=0, logBox=null, timer=null, runBtn=null;
+
+var crumbLab={label:"…", href:"topology.html?lab="+encodeURIComponent(labId||""), id:"crumblab"};
+UI.appbar($("appbar"), {crumbs:[{label:"Labs", href:"/"}, crumbLab, {label:"Convergence"}]});
+$("newbtn").appendChild(UI.button("New","sm",function(){ newDraft(); },"plus"));
+
+function linkKey(l){ return l.a+":"+l.a_if+"|"+l.b+":"+l.b_if; }
+function linkLabel(l){ return l.a+" "+l.a_if+" ↔ "+l.b+" "+l.b_if; }
+function fmtMs(ms){ return ms===null||ms===undefined ? "—" : ms>=10000 ? (ms/1000).toFixed(1)+" s" : Math.round(ms)+" ms"; }
+function lastRun(sid){ return (data.runs||[]).filter(function(r){ return r.scenario.id===sid; })[0]; }
+
+function newDraft(link){
+  var probes=data.probe_nodes||[];
+  var src=probes.filter(function(n){ return /^ce|^h/.test(n); })[0]||probes[0]||"";
+  var dst=probes.filter(function(n){ return n!==src && /^ce|^h/.test(n); })[0]||probes.filter(function(n){ return n!==src; })[0]||"";
+  var l=link||(data.links||[])[0]||null;
+  draft={id:null, name: l ? "fail "+l.a+"–"+l.b : "test", src:src, dst:dst, interval_ms:5, pre_s:5, down_s:20, post_s:10,
+         mode: qs.get("mode")==="cut" ? "cut" : "shutdown", link: l ? {a:l.a,a_if:l.a_if,b:l.b,b_if:l.b_if} : null};
+  cur=null; runView=null; render();
+}
+
+function load(){
+  return getJ("api/convergence?lab="+encodeURIComponent(labId)).then(function(d){
+    data=d;
+    document.title="Convergence · "+(d.lab_name||"")+" · Containerlab";
+    if(!cur && !draft){
+      if(qs.get("a")){
+        var want=qs.get("a")+":"+qs.get("a_if")+"|"+qs.get("b")+":"+qs.get("b_if");
+        var l=(d.links||[]).filter(function(x){ return linkKey(x)===want || linkKey({a:x.b,a_if:x.b_if,b:x.a,b_if:x.a_if})===want; })[0];
+        newDraft(l); history.replaceState(null,"","convergence.html?lab="+encodeURIComponent(labId));
+      } else if((d.scenarios||[]).length) select(d.scenarios[d.scenarios.length-1]);
+      else newDraft();
+    }
+    render();
+  }).catch(function(e){ $("main").textContent=""; $("main").appendChild(el("div","empty",e.message)); });
+}
+function select(sc){ cur=sc; draft=JSON.parse(JSON.stringify(sc)); var r=lastRun(sc.id); runView=null;
+  if(r) openRun(r.id); render(); }
+
+function renderList(){
+  var box=$("tests"); box.textContent="";
+  (data.scenarios||[]).slice().reverse().forEach(function(sc){
+    var t=el("div","test"); t.setAttribute("aria-current", cur && cur.id===sc.id ? "true":"false");
+    t.tabIndex=0;
+    var r=lastRun(sc.id);
+    if(r && r.events && r.events[0]){ var ms=r.events[0].outage_ms; var lt=el("span","last",fmtMs(ms)); lt.title="traffic lost on failure, last run";
+      lt.style.color = ms>1000?"var(--crit)":ms>200?"var(--warn)":"var(--ok)"; t.appendChild(lt); }
+    t.appendChild(el("b",null,sc.name));
+    t.appendChild(el("span",null,sc.src+" → "+sc.dst+" · "+sc.mode));
+    t.addEventListener("click",function(){ select(sc); });
+    t.addEventListener("keydown",function(e){ if(e.key==="Enter") select(sc); });
+    box.appendChild(t);
+  });
+  if(!(data.scenarios||[]).length) box.appendChild(el("p","hint","No saved tests yet."));
+}
+
+function selectEl(opts, val, onch){
+  var s=el("select","uin");
+  opts.forEach(function(o){ var op=el("option",null,o[1]); op.value=o[0]; op.selected=String(o[0])===String(val); s.appendChild(op); });
+  s.addEventListener("change",function(){ onch(s.value); }); return s;
+}
+function field(parent, label, input, cls){ var l=el("div","field"+(cls?" "+cls:"")); l.appendChild(el("label",null,label)); l.appendChild(input); parent.appendChild(l); return input; }
+
+// the right-hand picture of the scenario: who probes whom, which link dies, and when
+function renderPreview(box){
+  box.textContent="";
+  box.appendChild(el("div","pv-h","scenario"));
+  var p=el("div","pvpath");
+  p.appendChild(el("span","n src",draft.src||"?")); p.appendChild(el("span","w"));
+  p.appendChild(el("span","n",draft.dst||"?")); box.appendChild(p);
+  var lk=el("div","pvlink"); lk.appendChild(el("span","x","✕"));
+  lk.appendChild(el("span",null, draft.link ? linkLabel(draft.link) : "no link selected"));
+  lk.appendChild(el("span","tag",draft.mode)); box.appendChild(lk);
+  var pre=+draft.pre_s||0, down=+draft.down_s||0, post=+draft.post_s||0, total=pre+down+post;
+  box.appendChild(el("div","pv-h","timeline"));
+  var ph=el("div","phases");
+  [["pre",pre,"probe"],["down",down,"link down"],["post",post,"recover"]].forEach(function(x){
+    if(!x[1]) return; var d=el("div",x[0],x[2]+" "+x[1]+"s"); d.style.flex=x[1]+" 1 0"; d.title=x[2]+" for "+x[1]+" s"; ph.appendChild(d); });
+  box.appendChild(ph);
+  var lb=el("div","phlbl"); lb.appendChild(el("span",null,"0 s")); lb.appendChild(el("span",null,total+" s")); box.appendChild(lb);
+  var st=el("div","pvstats");
+  [[total+" s","duration"],[Math.round(total*1000/(draft.interval_ms||5)).toLocaleString(),"probes"],
+   [(draft.interval_ms||5)+" ms","resolution"],[draft.mode==="cut"?"silent":"ports down","failure"]].forEach(function(x){
+    var d=el("div"); d.appendChild(el("b",null,x[0])); d.appendChild(el("span",null,x[1])); st.appendChild(d); });
+  box.appendChild(st);
+}
+
+function renderEditor(main){
+  var c=el("div","card"); main.appendChild(c);
+  var h=el("h2"); h.appendChild(el("span",null, cur ? "Test bench" : "New test"));
+  if(cur) h.appendChild(el("span","tag",cur.name));
+  c.appendChild(h);
+  if(!data.running) c.appendChild(el("div","note warn","The lab is not running - start it to run a test."));
+  if(!(data.probe_nodes||[]).length){ c.appendChild(el("div","note warn","This lab has no FRR or Linux node to send the probes from. "
+    +"Add a host (or an FRR CE) on each side of the network - the probe runs inside its network namespace.")); }
+  var bench=el("div","bench"); c.appendChild(bench);
+  var f=el("div","form"); bench.appendChild(f);
+  var pv=el("div","preview"); bench.appendChild(pv);
+  function upd(){ renderPreview(pv); updHint(); }
+  var nm=el("input","uin"); nm.value=draft.name; nm.addEventListener("input",function(){ draft.name=nm.value; });
+  field(f,"Name",nm,"wide");
+  field(f,"Probe from", selectEl((data.probe_nodes||[]).map(function(n){ return [n,n]; }), draft.src, function(v){ draft.src=v; upd(); }));
+  var nodes=(data.nodes||[]).map(function(n){ return [n.name,n.name]; });
+  field(f,"To (node or IP)", (function(){
+    var w=el("div","dstrow");
+    var isIp=/^\d+\.\d+\.\d+\.\d+$/.test(draft.dst||"");
+    var s=selectEl([["","IP →"]].concat(nodes), isIp?"":draft.dst, function(v){ if(v){ draft.dst=v; ip.value=""; upd(); } });
+    var ip=el("input","uin mono"); ip.placeholder="10.0.0.6"; ip.value=isIp?draft.dst:"";
+    ip.addEventListener("input",function(){ if(ip.value.trim()){ draft.dst=ip.value.trim(); s.value=""; upd(); } });
+    w.appendChild(s); w.appendChild(ip); return w; })());
+  field(f,"Link to fail", selectEl((data.links||[]).map(function(l){ return [linkKey(l), linkLabel(l)]; }),
+    draft.link ? linkKey(draft.link) : "", function(v){
+      var l=(data.links||[]).filter(function(x){ return linkKey(x)===v; })[0];
+      draft.link = l ? {a:l.a,a_if:l.a_if,b:l.b,b_if:l.b_if} : null; upd(); }), "wide");
+  field(f,"How", selectEl([["shutdown","Shut both ends — ports go down"],["cut","Cut — silent failure (VMs wait for hello timeout)"]],
+    draft.mode, function(v){ draft.mode=v; upd(); }), "wide");
+  var tm=el("div","timing wide"); f.appendChild(tm);
+  field(tm,"Probe every", selectEl([[1,"1 ms"],[2,"2 ms"],[5,"5 ms"],[10,"10 ms"],[20,"20 ms"]], draft.interval_ms, function(v){ draft.interval_ms=+v; upd(); }));
+  [["pre_s","Probe first (s)"],["down_s","Link down (s)"],["post_s","Probe after (s)"]].forEach(function(x){
+    var i=el("input","uin mono"); i.type="number"; i.min="0"; i.value=draft[x[0]];
+    i.addEventListener("input",function(){ draft[x[0]]=+i.value; upd(); }); field(tm,x[1],i);
+  });
+  var msg=el("div","msg"); c.appendChild(msg);
+  var a=el("div","acts"); c.appendChild(a);
+  var run=UI.button("Run test","primary",function(){
+    msg.textContent="";
+    post("api/convergence",{op:"save", lab_id:labId, scenario:draft}).then(function(sc){
+      draft.id=sc.id; cur=sc;
+      return post("api/convergence",{op:"run", lab_id:labId, scenario:sc});
+    }).then(function(j){ jobId=j.job_id; jobLines=0; runView=null; load().then(watch); })
+      .catch(function(e){ msg.textContent=e.message; load(); });
+  },"play");
+  run.disabled=!data.running || !!data.current || data.busy;
+  if(data.busy && !data.current) run.title="another dashboard action is running";
+  runBtn=run;
+  a.appendChild(run);
+  a.appendChild(UI.button("Save","",function(){
+    post("api/convergence",{op:"save", lab_id:labId, scenario:draft}).then(function(sc){ cur=sc; draft.id=sc.id; load(); UI.toast("Test saved","ok"); })
+      .catch(function(e){ msg.textContent=e.message; });
+  }));
+  if(cur) a.appendChild(UI.moreButton(function(){ return [
+    {label:"Duplicate", icon:"copy", onClick:function(){ draft.id=null; draft.name=draft.name+" (copy)"; cur=null; render(); }},
+    {label:"Delete test", icon:"trash", danger:true, onClick:function(){
+      var sc=cur;
+      UI.confirm("Delete the test “"+sc.name+"”?", "Its runs stay until you delete them.", {ok:"Delete test", danger:true}).then(function(ok){
+        if(!ok) return;
+        post("api/convergence",{op:"delete", lab_id:labId, id:sc.id}).then(function(){ cur=null; draft=null; load(); });
+      }); }}
+  ]; }));
+  var hint=el("span","hint"); a.appendChild(hint);
+  function updHint(){ var total=(+draft.pre_s||0)+(+draft.down_s||0)+(+draft.post_s||0);
+    hint.textContent="≈ "+total+" s · "+Math.round(total*1000/(draft.interval_ms||5))+" probes"; }
+  upd();
+}
+
+function renderLive(main){
+  var cr=data.current; if(!cr) return;
+  var c=el("div","card"); main.appendChild(c);
+  var h=el("h2"); h.appendChild(el("span","led warn pulse")); h.appendChild(el("span",null,"Running: "+cr.scenario.name)); c.appendChild(h);
+  var p=cr.progress||{t:0,sent:0,recv:0,run_ms:0};
+  var el_s=(Date.now()/1000-cr.started);
+  var bar=el("div","prog"), i=el("i"); i.style.width=Math.min(100, el_s/cr.total_s*100)+"%"; bar.appendChild(i); c.appendChild(bar);
+  var ev=(cr.events||[]).map(function(e){ return e.op==="fail"?"link down":"link back"; }).join(" · ");
+  c.appendChild(el("p","hint", Math.round(el_s)+" / "+cr.total_s+" s · "+cr.src_ip+" → "+cr.dst_ip+(ev?" · "+ev:"")));
+  var t=el("div","tiles");
+  [["sent",p.sent,""],["answered",p.recv,""],["lost",p.sent-p.recv,(p.sent-p.recv)?"bad":""],
+   ["loss right now",fmtMs(p.run_ms),p.run_ms?"bad":"good"]].forEach(function(x){
+    var d=el("div","tile "+x[2]); d.appendChild(el("div","k",x[0])); d.appendChild(el("div","v",String(x[1]))); t.appendChild(d); });
+  c.appendChild(t);
+  logBox=el("div","log"); c.appendChild(logBox);
+}
+
+function openRun(id){
+  getJ("api/convergence/run?lab="+encodeURIComponent(labId)+"&id="+encodeURIComponent(id))
+    .then(function(r){ runView=r; render(); }).catch(function(){});
+}
+
+function chain(path, base){
+  var d=el("div","chain");
+  if(!path || path.error){ d.appendChild(el("em",null, path ? "could not trace: "+path.error : "not traced")); return d; }
+  path.nodes.forEach(function(n,i){
+    if(i) d.appendChild(el("em",null,"›"));
+    d.appendChild(el("span", base && base.nodes && base.nodes.indexOf(n)<0 ? "chg" : null, n));
+  });
+  if(path.result!=="reached") d.appendChild(el("em",null," ("+path.result+")"));
+  return d;
+}
+
+function renderResult(main){
+  var r=runView; if(!r) return;
+  var c=el("div","card"); main.appendChild(c);
+  var h=el("h2",null,"Result"); h.appendChild(el("span","hint",new Date(r.when*1000).toLocaleString()+" · "+r.src_ip+" → "+r.dst_ip
+    +" · every "+r.interval_ms+" ms")); c.appendChild(h);
+  var t=el("div","tiles"), f=r.events[0]||{}, b=r.events[1]||{};
+  function tile(k,v,cls,sub){ var d=el("div","tile "+(cls||"")); d.appendChild(el("div","k",k)); var vv=el("div","v",v);
+    if(sub) vv.appendChild(el("small",null,sub)); d.appendChild(vv); t.appendChild(d); }
+  tile("Traffic lost when the link failed", fmtMs(f.outage_ms), f.outage_ms>1000?"bad":f.outage_ms>200?"":"good",
+       f.outage_parts>1 ? f.outage_parts+" gaps" : "");
+  tile("…and when it came back", fmtMs(b.outage_ms), b.outage_ms>1000?"bad":b.outage_ms?"":"good");
+  tile("Probes lost", String(r.lost), r.lost?"":"good", "of "+r.sent);
+  tile("Round trip before / during / after", (r.rtt_before_ms===null?"—":r.rtt_before_ms.toFixed(2)), "",
+       " / "+(r.rtt_during_ms===null?"—":r.rtt_during_ms.toFixed(2))+" / "+(r.rtt_after_ms===null?"—":r.rtt_after_ms.toFixed(2))+" ms");
+  c.appendChild(t);
+  var wrap=el("div","chartwrap"); c.appendChild(wrap);
+  drawChart(wrap, r);
+  var key=el("div","key");
+  [["var(--accent)","round-trip time"],["var(--crit)","traffic lost"],["var(--warn)","link down"]].forEach(function(k){
+    var s=el("span"); var i=el("i"); i.style.background=k[0]; if(k[0]!=="var(--accent)") i.style.opacity=".45";
+    s.appendChild(i); s.appendChild(document.createTextNode(k[1])); key.appendChild(s); });
+  c.appendChild(key);
+  var ph=el("div","sech","path"); ph.style.marginTop="20px"; c.appendChild(ph);
+  var p=el("div","paths"); c.appendChild(p);
+  [["before","before"],["during","link down"],["after","after"]].forEach(function(x){
+    p.appendChild(el("span","k",x[1])); p.appendChild(chain(r.paths[x[0]], x[0]!=="before" ? r.paths.before : null));
+  });
+}
+
+function drawChart(wrap, r){
+  var NS="http://www.w3.org/2000/svg";
+  function s(t,a){ var e=document.createElementNS(NS,t); for(var k in a) e.setAttribute(k,a[k]); return e; }
+  var W=Math.max(320, (wrap.clientWidth||900)-8), H=260, L=48, R=12, T=22, B=26;
+  var svg=s("svg",{id:"chart",viewBox:"0 0 "+W+" "+H,role:"img","aria-label":"round-trip time over the test, with lost traffic"});
+  wrap.appendChild(svg);
+  var rtt=r.rtt_us, iv=r.interval_ms/1000, n=rtt.length, dur=n*iv;
+  // bucket to ~1 per pixel: keep the max RTT and whether anything was lost
+  var nb=Math.min(n, W-L-R), per=n/nb, bk=[];
+  for(var b=0;b<nb;b++){
+    var a=Math.floor(b*per), z=Math.max(a+1,Math.floor((b+1)*per)), mx=-1, lost=0;
+    for(var k=a;k<z;k++){ if(rtt[k]<0) lost++; else if(rtt[k]>mx) mx=rtt[k]; }
+    bk.push({t:a*iv, mx:mx<0?null:mx/1000, lost:lost, cnt:z-a});
+  }
+  var ys=bk.filter(function(x){ return x.mx!==null; }).map(function(x){ return x.mx; }).sort(function(p,q){ return p-q; });
+  var ymax=ys.length ? Math.max(1, ys[Math.floor(ys.length*0.995)]*1.15) : 1;
+  function X(t){ return L+(t/dur)*(W-L-R); } function Y(v){ return T+(1-Math.min(v,ymax)/ymax)*(H-T-B); }
+  var g=s("g",{class:"grid"}), ax=s("g",{class:"axis"});
+  for(var i=0;i<=4;i++){ var v=ymax*i/4, y=Y(v); g.appendChild(s("line",{x1:L,x2:W-R,y1:y,y2:y}));
+    var tx=s("text",{x:L-6,y:y+3.5,"text-anchor":"end"}); tx.textContent=(v<10?v.toFixed(1):Math.round(v))+(i===4?" ms":""); ax.appendChild(tx); }
+  var step=dur>120?30:dur>40?10:5;
+  for(var ts=0; ts<=dur+0.01; ts+=step){ var t2=s("text",{x:X(ts),y:H-8,"text-anchor":"middle"}); t2.textContent=ts+" s"; ax.appendChild(t2); }
+  svg.appendChild(g); svg.appendChild(ax);
+  var f=r.events[0], back=r.events[1];
+  if(f && back){ svg.appendChild(s("rect",{class:"downband",x:X(f.t_s),y:T,width:Math.max(1,X(back.t_s)-X(f.t_s)),height:H-T-B})); }
+  (r.outages||[]).forEach(function(o){
+    var x1=X(o.from_s), x2=Math.max(x1+2, X(o.to_s));
+    svg.appendChild(s("rect",{class:"lossband",x:x1,y:T,width:x2-x1,height:H-T-B}));
+    if(o.ms>=r.interval_ms*3){ var lt=s("text",{class:"losslbl",x:x2+4,y:T+14}); lt.textContent=fmtMs(o.ms); svg.appendChild(lt); }
+  });
+  var dpath="", pen=false;
+  bk.forEach(function(x){ if(x.mx===null){ pen=false; return; } dpath+=(pen?"L":"M")+X(x.t).toFixed(1)+","+Y(x.mx).toFixed(1); pen=true; });
+  svg.appendChild(s("path",{class:"rttline",d:dpath}));
+  (r.events||[]).forEach(function(e){
+    var x=X(e.t_s); svg.appendChild(s("line",{class:"evline",x1:x,x2:x,y1:T-6,y2:H-B}));
+    var lt=s("text",{class:"evlbl",x:x+4,y:T-8}); lt.textContent=e.op==="fail"?"link down ("+(e.mode||"")+")":"link back"; svg.appendChild(lt);
+  });
+  // hover: crosshair + tooltip
+  var cross=s("line",{class:"cross",y1:T,y2:H-B,x1:-10,x2:-10}); svg.appendChild(cross);
+  var tip=el("div","tip"); tip.hidden=true; wrap.appendChild(tip);
+  var hit=s("rect",{x:L,y:T,width:W-L-R,height:H-T-B,fill:"transparent"}); svg.appendChild(hit);
+  hit.addEventListener("mousemove",function(ev){
+    var rect=svg.getBoundingClientRect(), px=(ev.clientX-rect.left)*W/rect.width;
+    var bi=Math.max(0,Math.min(nb-1,Math.round((px-L)/(W-L-R)*nb))), x=bk[bi];
+    cross.setAttribute("x1",X(x.t)); cross.setAttribute("x2",X(x.t));
+    tip.textContent="t "+x.t.toFixed(2)+" s · "+(x.lost===x.cnt?"lost":(x.mx===null?"—":x.mx.toFixed(2)+" ms"))
+      +(x.lost && x.lost<x.cnt ? " · "+x.lost+" lost":"");
+    tip.hidden=false;
+    var left=(ev.clientX-rect.left)+12; if(left>rect.width-170) left-=190;
+    tip.style.left=left+"px"; tip.style.top="8px";
+  });
+  hit.addEventListener("mouseleave",function(){ tip.hidden=true; cross.setAttribute("x1",-10); cross.setAttribute("x2",-10); });
+}
+
+function renderHistory(main){
+  var rs=(data.runs||[]).filter(function(r){ return cur && r.scenario.id===cur.id; });
+  if(!rs.length) return;
+  var c=el("div","card"); main.appendChild(c);
+  var h=el("h2",null,"Runs of this test"); h.appendChild(el("span","hint",rs.length+" run"+(rs.length>1?"s":""))); c.appendChild(h);
+  var tw=el("div"); tw.style.overflowX="auto"; c.appendChild(tw);
+  var tb=el("table","utable runs"), th=el("thead"), tr=el("tr");
+  ["when","link down","link back","lost","path while down",""].forEach(function(h){ tr.appendChild(el("th",null,h)); });
+  th.appendChild(tr); tb.appendChild(th); var body=el("tbody"); tb.appendChild(body);
+  rs.forEach(function(r){
+    var row=el("tr"); row.setAttribute("aria-current", runView && runView.id===r.id ? "true":"false");
+    row.appendChild(el("td",null,new Date(r.when*1000).toLocaleString()));
+    row.appendChild(el("td","num",fmtMs((r.events[0]||{}).outage_ms)));
+    row.appendChild(el("td","num",fmtMs((r.events[1]||{}).outage_ms)));
+    row.appendChild(el("td","num",r.lost+" / "+r.sent));
+    var pd=r.paths && r.paths.during; row.appendChild(el("td","num", pd && pd.nodes ? pd.nodes.join(" › ") : "—"));
+    var del=el("td"); del.style.textAlign="right"; del.appendChild(UI.moreButton(function(){ return [{label:"Delete run", icon:"trash", danger:true, onClick:function(){
+      post("api/convergence",{op:"delete_run", lab_id:labId, id:r.id}).then(function(){ if(runView&&runView.id===r.id) runView=null; load(); }); }}]; }));
+    row.appendChild(del);
+    row.addEventListener("click",function(e){ if(e.target.closest("button")) return; openRun(r.id); });
+    body.appendChild(row);
+  });
+  tw.appendChild(tb);
+}
+
+function render(){
+  if(!data) return;
+  $("crumblab").textContent=data.lab_name||"lab";
+  renderList();
+  var main=$("main"); main.textContent="";
+  if(draft) renderEditor(main);
+  renderLive(main);
+  renderResult(main);
+  renderHistory(main);
+}
+
+// while a run is going: refresh progress; afterwards open its result
+function watch(){
+  clearTimeout(timer);
+  getJ("api/convergence?lab="+encodeURIComponent(labId)).then(function(d){
+    var was=!!data.current; data=d;
+    if(jobId) getJ("api/job/"+jobId+"?since="+jobLines).then(function(j){
+      if(logBox) (j.lines||[]).forEach(function(line){ logBox.appendChild(document.createTextNode(line+"\n")); });
+      jobLines=j.total_lines||jobLines;
+      if(!j.running){
+        var id=jobId; jobId=null;
+        if(j.rc!==0) alert("The test failed:\n"+(j.lines||[]).slice(-4).join("\n"));
+        else UI.toast("Test finished","ok");
+        load().then(function(){ var r=cur && lastRun(cur.id); if(r) openRun(r.id); });
+      }
+    });
+    if(d.current){ var keep=logBox ? logBox.textContent : ""; render(); if(logBox) logBox.textContent=keep; timer=setTimeout(watch, 700); }
+    else if(jobId) timer=setTimeout(watch, 700);
+    else if(was) render();
+  });
+}
+
+UI.commands([
+  {label:"New convergence test", icon:"plus", hint:"n", run:function(){ if(data) newDraft(); }},
+  {label:"Run the current test", icon:"play", run:function(){ if(runBtn && !runBtn.disabled) runBtn.click(); }},
+  {label:"Back to the topology", icon:"map", run:function(){ location.href="topology.html?lab="+encodeURIComponent(labId||""); }}
+]);
+UI.keys([{keys:"n", label:"new test"}]);
+document.addEventListener("keydown",function(e){
+  if(e.ctrlKey||e.metaKey||e.altKey||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if(document.querySelector(".scrim,.cmdk")) return;
+  if(e.key==="n" && data){ e.preventDefault(); newDraft(); }
+});
+
+if(!labId){ $("main").textContent=""; $("main").appendChild(el("div","empty","no lab selected")); }
+else load().then(function(){ if(data && data.current) watch(); });
+})();
+</script>
+</body>
+</html>

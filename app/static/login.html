@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · clab dashboard</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script>
+  // same theme key as ui.js; this page does not load ui.js (it needs a session)
+  try { if (localStorage.getItem("clabd-theme") === "light") document.documentElement.setAttribute("data-theme", "light"); } catch(e){}
+</script>
+<link rel="stylesheet" href="ui.css">
+<style>
+  body{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+  .login{width:min(380px,100%)}
+  .login .brand{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+  .login .brand svg{width:40px;height:40px;flex:none}
+  .login .brand h1{font:700 21px/1.15 var(--font-display);letter-spacing:-.02em;margin:0}
+  .login .brand .sub{font:12px var(--font-mono);color:var(--muted)}
+  .login form{display:flex;flex-direction:column;gap:14px;padding:22px}
+  .login .err{display:none;padding:8px 11px;border-radius:var(--r);background:var(--crit-soft);color:var(--crit);font-size:12.5px}
+  .login .err.on{display:block}
+  .login .ub{width:100%;margin-top:4px}
+  .login .foot{margin-top:14px;text-align:center}
+</style>
+</head>
+<body class="dots">
+<main class="login">
+  <div class="brand">
+    <svg viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="clg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--accent-2)"/></linearGradient></defs>
+      <rect x="1" y="1" width="38" height="38" rx="10" fill="url(#clg)"/>
+      <g stroke="var(--on-accent)" stroke-width="2" stroke-linecap="round" fill="none"><path d="M20 13v6M18 21l-5 4M22 21l5 4"/></g>
+      <g fill="var(--on-accent)"><circle cx="20" cy="11" r="3.2"/><circle cx="11.5" cy="27" r="3.2"/><circle cx="28.5" cy="27" r="3.2"/></g></svg>
+    <div>
+      <h1>clab dashboard</h1>
+      <div class="sub" id="host"></div>
+    </div>
+  </div>
+  <form class="card" id="f" autocomplete="on">
+    <div class="err" id="err" role="alert"></div>
+    <div class="field">
+      <label for="user">User</label>
+      <input id="user" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" required value="admin">
+    </div>
+    <div class="field">
+      <label for="pw">Password</label>
+      <input id="pw" name="password" type="password" autocomplete="current-password" required>
+    </div>
+    <button class="ub primary lg" type="submit" id="go">Sign in</button>
+  </form>
+  <p class="hint foot">First install? The admin password was printed by the installer and is kept in
+    <code>/var/lib/clab-dashboard/initial-admin-password</code> until you change it.</p>
+</main>
+<script>
+(function(){
+  "use strict";
+  var q = new URLSearchParams(location.search);
+  var next = q.get("next") || "/";
+  // only ever go back to a path on this site
+  if (!/^\/(?!\/)/.test(next) || next.indexOf("/login.html") === 0) next = "/";
+  // the server never sees a #fragment, but the browser kept it on this URL
+  if (location.hash && next.indexOf("#") < 0) next += location.hash;
+  document.getElementById("host").textContent = location.host;
+
+  fetch("/api/auth/me", {cache: "no-store"}).then(function(r){ return r.json(); }).then(function(m){
+    if (!m.enabled || m.user) location.replace(next);
+  }).catch(function(){});
+
+  var f = document.getElementById("f"), err = document.getElementById("err"), go = document.getElementById("go");
+  function show(msg){ err.textContent = msg; err.classList.toggle("on", !!msg); }
+  if (!document.getElementById("user").value) document.getElementById("user").focus();
+  else document.getElementById("pw").focus();
+
+  f.addEventListener("submit", function(e){
+    e.preventDefault();
+    show(""); go.disabled = true; go.textContent = "Signing in…";
+    fetch("/api/auth/login", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({user: document.getElementById("user").value.trim(),
+                            password: document.getElementById("pw").value})
+    }).then(function(r){
+      return r.json().catch(function(){ return {}; }).then(function(b){ return {ok: r.ok, b: b}; });
+    }).then(function(res){
+      if (res.ok){ location.replace(next); return; }
+      show(res.b.error || "sign-in failed");
+      go.disabled = false; go.textContent = "Sign in";
+      document.getElementById("pw").select();
+    }).catch(function(){
+      show("the dashboard did not answer");
+      go.disabled = false; go.textContent = "Sign in";
+    });
+  });
+})();
+</script>
+</body>
+</html>

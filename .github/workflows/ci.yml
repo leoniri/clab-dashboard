@@ -1,0 +1,76 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  schedule:
+    - cron: "17 5 * * 1"        # weekly: catch a new containerlab release breaking us
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: python syntax
+        run: python3 -m py_compile app/*.py
+      - name: shell syntax
+        run: |
+          bash -n install.sh get.sh
+          shellcheck -S error install.sh get.sh
+      - name: scenario render self-test
+        run: |
+          sudo apt-get install -y -qq python3-yaml
+          cd app && python3 scenarios.py
+
+  install:
+    # the real installer on a clean runner: Docker is there, containerlab is not
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: install.sh
+        run: sudo ./install.sh --port 8080
+      - name: login required
+        run: |
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/api/state)" = 401
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/term/)" = 401
+          curl -s -o /dev/null -w '%{redirect_url}\n' http://127.0.0.1:8080/ | grep -q login.html
+      - name: sign in and deploy a lab
+        run: |
+          sudo mkdir -p /opt/clab-topologies/ci
+          sudo tee /opt/clab-topologies/ci/ci.clab.yml >/dev/null <<'YAML'
+          name: ci
+          topology:
+            nodes:
+              a: {kind: linux, image: alpine:3}
+              b: {kind: linux, image: alpine:3}
+            links:
+              - endpoints: ["a:eth1", "b:eth1"]
+          YAML
+          python3 .github/ci_deploy.py
+      - name: journal on failure
+        if: failure()
+        run: sudo journalctl -u clab-dashboard -u clab-term -u nginx --no-pager | tail -100
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: package
+        run: |
+          tag=${GITHUB_REF_NAME}
+          test "v$(cat app/VERSION)" = "$tag" || { echo "app/VERSION does not match $tag"; exit 1; }
+          git archive --format=tar.gz --prefix="clab-dashboard-$tag/" -o "clab-dashboard-$tag.tar.gz" "$tag"
+          sha256sum "clab-dashboard-$tag.tar.gz" > "clab-dashboard-$tag.tar.gz.sha256"
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=${GITHUB_REF_NAME}
+          gh release create "$tag" --title "clab-dashboard $tag" --generate-notes \
+             "clab-dashboard-$tag.tar.gz" "clab-dashboard-$tag.tar.gz.sha256"

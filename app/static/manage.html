@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manage · Containerlab</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script>try{if(localStorage.getItem("clabd-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
+<link rel="stylesheet" href="ui.css">
+<style>
+/* ---------- tab bar ---------- */
+.mtabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 22px;overflow-x:auto}
+.mtabs button{flex:none;display:inline-flex;align-items:center;gap:8px;background:none;border:0;border-bottom:2px solid transparent;
+  margin-bottom:-1px;padding:10px 14px 9px;cursor:pointer;font:500 13px var(--font-sans);color:var(--muted)}
+.mtabs button svg{width:16px;height:16px}
+.mtabs button:hover{color:var(--ink)}
+.mtabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+.mtabs button[aria-selected="true"] svg{color:var(--accent)}
+.mtabs .n{font:500 10.5px var(--font-mono);color:var(--muted);background:var(--surface-2);padding:0 6px;border-radius:99px}
+.mtabs .n:empty{display:none}
+.pane{padding-bottom:120px;animation:rise .18s ease-out}
+
+/* ---------- section heads + cards ---------- */
+.listhead{display:flex;align-items:center;gap:12px;margin:26px 0 12px;flex-wrap:wrap}
+.listhead:first-child{margin-top:0}
+.listhead h2{font:600 16px var(--font-display);margin:0;letter-spacing:-.01em}
+.listhead .count{font:12px var(--font-mono);color:var(--muted)}
+.listhead .tools{margin-left:auto;display:flex;gap:8px;align-items:center}
+.card{margin-bottom:14px}
+.card.pad h3{font:600 15px var(--font-display);margin:0 0 4px;letter-spacing:-.005em}
+.lead{color:var(--ink-2);font-size:13px;margin:0 0 14px;max-width:84ch}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.formrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.formrow .uin{flex:1 1 260px;min-width:0}
+.uin.mono{font-family:var(--font-mono)}
+textarea.uin{width:100%;height:auto;min-height:74px;padding:8px 10px;resize:vertical;font:12.5px/1.5 var(--font-mono)}
+label.k{display:block;font:600 10.5px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:12px 0 6px}
+.check{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--ink-2);cursor:pointer}
+.check input{margin-top:2px}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg)}
+.tablewrap table{min-width:720px}
+.tablewrap .utable th{background:var(--surface)}
+.utable td{font-size:12.5px}
+.utable td:last-child{text-align:right;width:1%;white-space:nowrap}
+td .sub{display:block;color:var(--muted);font:10.5px var(--font-mono);white-space:normal;margin-top:1px}
+td.tdwrap{white-space:normal;max-width:38ch}
+td.imgcol{white-space:normal;min-width:24ch;max-width:46ch;overflow-wrap:anywhere;font:600 12.5px var(--font-mono);color:var(--ink)}
+td.imgcol.dim{color:var(--muted)}
+td.ok{color:var(--ok)} td.bad{color:var(--crit)}
+.imgsub{display:block;font:400 10.5px var(--font-mono);color:var(--muted);margin-top:2px}
+.bits{display:inline-flex;gap:6px;align-items:center}
+.msg{font:11.5px var(--font-mono);margin-top:10px;color:var(--ink-2)}
+.msg:empty{display:none}
+.msg.err{color:var(--crit)} .msg.ok{color:var(--ok)}
+.progress{height:6px;border-radius:3px;background:var(--surface-3);overflow:hidden;margin-top:12px}
+.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .2s}
+input[type=file]{font:12.5px var(--font-sans);color:var(--ink-2);flex:1 1 260px;min-width:0}
+input[type=file]::file-selector-button{height:32px;padding:0 13px;margin-right:12px;border-radius:var(--r);border:1px solid var(--line-strong);
+  background:var(--surface-2);color:var(--ink);font:500 12.5px var(--font-sans);cursor:pointer}
+input[type=file]::file-selector-button:hover{background:var(--surface-3)}
+
+/* ---------- image stats ---------- */
+.statsline{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:0 0 16px}
+.statsline:empty{display:none}
+.fact{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 16px}
+.fact span{display:block;font:600 10.5px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.fact b{display:block;font:600 21px var(--font-mono);letter-spacing:-.02em;margin-top:4px}
+.fact small{display:block;font:11px var(--font-mono);color:var(--muted);margin-top:2px}
+
+/* ---------- add-image sheet ---------- */
+.addpanel{display:grid;grid-template-columns:250px minmax(0,1fr);background:var(--surface);border:1px solid var(--accent);
+  border-radius:var(--r-lg);margin:0 0 20px;box-shadow:var(--glow);overflow:hidden;animation:rise .18s ease-out}
+.addside{border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:4px;background:var(--surface-2)}
+.addside .ttl{display:flex;align-items:center;justify-content:space-between;padding:0 4px 10px 8px}
+.addside .ttl b{font:600 15px var(--font-display)}
+.opt{display:flex;gap:11px;align-items:flex-start;text-align:left;width:100%;border:1px solid transparent;background:none;
+  border-radius:var(--r);padding:9px 10px;cursor:pointer;color:var(--ink)}
+.opt svg{width:18px;height:18px;flex:none;margin-top:1px;color:var(--muted)}
+.opt b{display:block;font:600 13px var(--font-sans)}
+.opt span{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+.opt:hover{background:var(--surface)}
+.opt[aria-selected="true"]{background:var(--surface);border-color:var(--accent)}
+.opt[aria-selected="true"] svg{color:var(--accent)}
+.addmain{padding:18px 20px 16px;min-width:0}
+.addmain .card{border:0;padding:0;margin:0;background:none}
+.addmain h3{font:600 16px var(--font-display);margin:0 0 4px}
+.results{margin-top:12px;display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto}
+.results:empty{display:none}
+.res{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:var(--r);padding:7px 10px;font-size:12px;background:var(--surface-2)}
+.res .ref{font:600 12px var(--font-mono);min-width:0;word-break:break-all}
+.res .about{color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cat{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.catitem{border:1px solid var(--line);border-radius:var(--r);padding:11px 12px;background:var(--surface-2);display:flex;flex-direction:column;gap:6px;
+  transition:border-color .15s}
+.catitem:hover{border-color:var(--line-strong)}
+.catitem .ref{font:600 12px var(--font-mono);word-break:break-all}
+.catitem .about{font-size:12px;color:var(--ink-2);flex:1}
+.catitem .formrow{justify-content:space-between}
+.steps{display:flex;flex-direction:column;gap:0;margin-top:4px}
+.stp{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px;padding:0 0 16px;position:relative}
+.stp::before{content:"";position:absolute;left:13px;top:28px;bottom:0;width:2px;background:var(--line)}
+.stp:last-child::before{display:none}
+.stp .num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font:700 12px var(--font-mono);border:2px solid var(--line-strong);color:var(--muted);background:var(--surface)}
+.stp.on .num{border-color:var(--accent);color:var(--accent-ink);box-shadow:0 0 10px color-mix(in srgb,var(--accent) 40%,transparent)}
+.stp .sh{font:600 13px var(--font-sans);margin:4px 0 8px;color:var(--ink)}
+.stp.off .sh{color:var(--muted)}
+details.plats summary{cursor:pointer;font:12px var(--font-mono);color:var(--muted);margin-top:4px}
+details.plats summary:hover{color:var(--ink)}
+@media (max-width:860px){
+  .addpanel{grid-template-columns:1fr}
+  .addside{border-right:0;border-bottom:1px solid var(--line);flex-direction:row;flex-wrap:wrap}
+  .addside .ttl{width:100%}
+  .opt{width:auto;flex:1 1 180px}
+  .opt span{display:none}
+}
+
+/* ---------- LAN ---------- */
+.gw{display:inline-flex;align-items:center;gap:7px;font:12px var(--font-mono);margin-left:10px;vertical-align:1px}
+.divider{height:1px;background:var(--line);margin:20px -18px 18px}
+
+/* ---------- audit ---------- */
+.audittools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.audittools .search input{width:320px}
+.auditlog{font:11.5px/1.65 var(--font-mono);white-space:pre-wrap;word-break:break-word;background:var(--console-bg);
+  color:var(--console-ink);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 16px;max-height:68vh;overflow:auto}
+.auditlog div{padding:0 0 0 12px;border-left:2px solid transparent}
+.auditlog div:hover{background:rgba(255,255,255,.03)}
+.auditlog .a-del{color:#FF7B86;border-left-color:#FF5F6D}
+.auditlog .a-lan{color:#6CF0DF;border-left-color:#2BD9C5}
+.auditlog .a-down{color:#F5B946;border-left-color:#F5B946}
+
+/* ---------- confirm modal (purge needs a typed name) ---------- */
+#mextra label{display:block;font-size:12.5px;color:var(--ink-2);margin:0 0 6px}
+@media (max-width:520px){ .audittools .search input{width:100%} .audittools .search{flex:1} }
+</style>
+</head>
+<body class="dots">
+
+<header id="appbar"></header>
+
+<main class="page">
+  <div class="page-h">
+    <div>
+      <div class="eyebrow">host admin</div>
+      <h1>Manage</h1>
+      <div class="sub">Images, LAN access, docker networks, the lab trash and the audit trail of this host.</div>
+    </div>
+  </div>
+
+  <div class="mtabs" role="tablist" id="tabs">
+    <button role="tab" data-t="images" data-ic="box">Images<span class="n" id="n_images"></span></button>
+    <button role="tab" data-t="lan" data-ic="lan">LAN access<span class="n" id="n_lan"></span></button>
+    <button role="tab" data-t="networks" data-ic="link">Networks<span class="n" id="n_networks"></span></button>
+    <button role="tab" data-t="trash" data-ic="trash">Trash<span class="n" id="n_trash"></span></button>
+    <button role="tab" data-t="audit" data-ic="list">Audit log</button>
+  </div>
+
+  <!-- ================= images ================= -->
+  <section class="pane" id="p_images" hidden>
+    <div class="listhead">
+      <h2>Installed images</h2><span class="count" id="img_count"></span>
+      <div class="tools" id="img_tools"></div>
+    </div>
+    <div class="statsline" id="img_stats"></div>
+    <div class="addpanel" id="addpanel" hidden>
+      <div class="addside">
+        <div class="ttl"><b>Add an image</b><span id="addclose"></span></div>
+        <div id="addtabs" role="tablist" style="display:contents"></div>
+      </div>
+      <div class="addmain">
+      <div class="card" data-add="pull">
+        <h3>Pull an image</h3>
+        <p class="lead">Any public registry reference — Docker Hub, ghcr.io, quay.io.</p>
+        <div class="formrow">
+          <input class="uin mono" type="text" id="pull_ref" placeholder="ghcr.io/nokia/srlinux:latest" spellcheck="false" aria-label="image reference">
+          <button class="ub primary" id="pull_btn">Pull</button>
+        </div>
+        <label class="k" for="search_q">search Docker Hub</label>
+        <div class="formrow">
+          <input class="uin" type="text" id="search_q" placeholder="frr, gobgp, vyos…" spellcheck="false">
+          <button class="ub" id="search_btn">Search</button>
+        </div>
+        <div class="results" id="search_res"></div>
+      </div>
+      <div class="card" data-add="archive">
+        <h3>Load an image archive</h3>
+        <p class="lead">Vendor router images (IOS-XE, IOS-XR, NX-OS, cEOS, vJunos) cannot be pulled from
+        a public registry. Upload a <code>docker save</code> archive (<code>.tar</code>,
+        <code>.tar.gz</code>, <code>.tar.xz</code>) — for example a vrnetlab build made on another host.</p>
+        <div class="formrow">
+          <input type="file" id="up_file" accept=".tar,.gz,.tgz,.xz" aria-label="image archive">
+          <button class="ub primary" id="up_btn" disabled>Upload &amp; load</button>
+        </div>
+        <div class="progress" id="up_prog" hidden><i></i></div>
+        <div class="msg" id="up_msg"></div>
+      </div>
+      <div class="card" id="vcard" data-add="vendor">
+        <h3>Build a router image from a vendor file</h3>
+        <p class="lead">Upload the router image the way the vendor ships it — an installer
+        <b>.iso</b> or a <b>.qcow2</b> disk — and the host turns it into a containerlab image:
+        the ISO is installed onto a disk in a VM, then vrnetlab wraps the disk in a container.
+        Takes about 5–10 minutes; progress shows below.</p>
+        <div class="steps">
+          <div class="stp on" id="vs1"><div class="num">1</div><div>
+            <div class="sh">Choose the vendor file</div>
+            <div class="formrow"><input type="file" id="v_file" accept=".iso,.qcow2" aria-label="vendor image file"></div>
+            <div id="v_detect" class="msg"></div>
+          </div></div>
+          <div class="stp off" id="vs2"><div class="num">2</div><div>
+            <div class="sh">Platform and tag</div>
+            <div id="v_opts" hidden>
+              <div class="grid2">
+                <div id="v_platwrap" hidden><label class="k" for="v_plat">platform</label>
+                  <div class="formrow"><select class="uin" id="v_plat"></select></div></div>
+                <div><label class="k" for="v_tag">image tag</label>
+                  <div class="formrow"><input class="uin mono" type="text" id="v_tag" spellcheck="false"></div>
+                  <div class="msg" id="v_ref"></div></div>
+              </div>
+              <label class="check" style="margin-top:12px">
+                <input type="checkbox" id="v_replace"> replace the existing image with this tag</label>
+              <label class="check" style="margin-top:8px">
+                <input type="checkbox" id="v_boot" checked> boot-test the image after building — start it once
+                in a throw-away lab and log in (adds 3–5 min, needs the node's RAM free)</label>
+            </div>
+          </div></div>
+          <div class="stp off" id="vs3"><div class="num">3</div><div>
+            <div class="sh">Upload and build</div>
+            <div class="formrow"><button class="ub primary" id="v_go" disabled>Upload &amp; build</button></div>
+            <div class="progress" id="v_prog" hidden><i></i></div>
+            <div class="msg" id="v_msg"></div>
+          </div></div>
+        </div>
+        <details class="plats"><summary>what can be converted</summary>
+          <div class="tablewrap" style="margin-top:8px"><table class="utable" id="v_plats"></table></div></details>
+      </div>
+      <div class="card" data-add="ready">
+        <h3>Ready-to-run images</h3>
+        <p class="lead">Public images containerlab runs without any extra build step.</p>
+        <div class="cat" id="catalogue"></div>
+      </div>
+      </div>
+    </div>
+    <button id="prune_btn" hidden></button>
+    <div class="tablewrap"><table class="utable" id="img_tbl"></table></div>
+  </section>
+
+  <!-- ================= LAN ================= -->
+  <section class="pane" id="p_lan" hidden>
+    <div class="card pad">
+      <h3>LAN settings</h3>
+      <p class="lead">Router management interfaces get addresses from this pool on the host's LAN
+      interface. Keep the pool <b>outside your DHCP range</b> — the dashboard checks that nothing
+      answers on an address before handing it out, but a DHCP server does not know about it.</p>
+      <div class="grid2">
+        <div>
+          <label class="k" for="lan_iface">LAN interface</label>
+          <div class="formrow"><select class="uin" id="lan_iface"></select><span class="mono dim" style="font-size:12px" id="lan_host"></span></div>
+        </div>
+        <div>
+          <label class="k" for="lan_pool">address pool (ranges, one per line)</label>
+          <textarea class="uin in" id="lan_pool" spellcheck="false"></textarea>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <h3>SSH gateway <span class="gw" id="gw_status"></span></h3>
+      <p class="lead">FRR, plain Linux and other container nodes usually run no SSH server. For those,
+      port 22 of their LAN address goes to the dashboard's built-in SSH gateway, which opens the
+      node's CLI (vtysh, Cli, sr_cli…) — or a shell with <span class="mono">ssh -t … shell</span>.</p>
+      <div class="grid2">
+        <div>
+          <label class="k" for="gw_user">login</label>
+          <div class="formrow"><input class="uin mono in" id="gw_user" type="text" spellcheck="false" style="flex:0 1 16ch" placeholder="user">
+          <input class="uin mono in" id="gw_pass" type="text" spellcheck="false" style="flex:0 1 20ch" placeholder="password" aria-label="gateway password"></div>
+        </div>
+        <div>
+          <label class="k" for="gw_port">listens on host port</label>
+          <div class="formrow"><input class="uin mono in" id="gw_port" type="text" inputmode="numeric" style="flex:0 1 11ch"></div>
+        </div>
+      </div>
+      <div class="formrow" style="margin-top:16px">
+        <button class="ub primary" id="lan_save">Save settings</button>
+        <span class="msg" id="lan_msg" style="margin-top:0"></span>
+      </div>
+    </div>
+    <div class="listhead"><h2>Labs</h2><span class="count" id="lan_count"></span></div>
+    <div class="tablewrap"><table class="utable" id="lan_tbl"></table></div>
+    <div class="listhead"><h2>Live mappings</h2><span class="count" id="lan_live_count"></span></div>
+    <div class="tablewrap"><table class="utable" id="lan_live"></table></div>
+  </section>
+
+  <!-- ================= networks ================= -->
+  <section class="pane" id="p_networks" hidden>
+    <p class="lead">Docker networks on this host. Each lab's management network is created by containerlab
+    at deploy. One that no container uses and no lab declares is left over and safe to remove.</p>
+    <div class="tablewrap"><table class="utable" id="net_tbl"></table></div>
+  </section>
+
+  <!-- ================= trash ================= -->
+  <section class="pane" id="p_trash" hidden>
+    <p class="lead">Deleted labs are moved to <code id="trash_dir"></code>, not erased. Restore puts every
+    file back where it was; delete forever frees the disk space.</p>
+    <div class="tablewrap"><table class="utable" id="trash_tbl"></table></div>
+  </section>
+
+  <!-- ================= audit ================= -->
+  <section class="pane" id="p_audit" hidden>
+    <div class="audittools">
+      <label class="search"><span id="auditicon"></span><input class="uin" type="search" id="audit_q" data-search placeholder="filter the log…" spellcheck="false" aria-label="filter the audit log"></label>
+      <button class="ub" id="audit_refresh">Refresh</button>
+      <span class="count dim" id="audit_count" style="font:12px var(--font-mono)"></span>
+    </div>
+    <div class="auditlog" id="audit_log"></div>
+  </section>
+</main>
+
+<div class="console" id="console" hidden>
+  <div class="chead">
+    <span class="spin" id="cspin"></span>
+    <strong id="ctitle">—</strong>
+    <span class="cmd" id="ccmd"></span>
+    <span class="right"><button id="cclose">close</button></span>
+  </div>
+  <div class="clog" id="clog"></div>
+</div>
+
+<div class="scrim" id="scrim" hidden>
+  <div class="dlg" id="modal" role="dialog" aria-modal="true" aria-labelledby="mtitle">
+    <header><div class="dlg-ic danger" id="micon"></div><h3 id="mtitle">Confirm</h3></header>
+    <div class="body">
+      <p id="mbody"></p>
+      <div id="mextra"></div>
+    </div>
+    <footer>
+      <button class="ub quiet" id="mcancel">Cancel</button>
+      <button class="ub danger" id="mok">Confirm</button>
+    </footer>
+  </div>
+</div>
+
+<script src="lan-dialog.js"></script>
+<script src="ui.js"></script>
+<script>
+(function(){
+"use strict";
+function $(id){ return document.getElementById(id); }
+function el(t,c,x){ var e=document.createElement(t); if(c) e.className=c; if(x!==undefined&&x!==null) e.textContent=x; return e; }
+function getJ(u){ return fetch(u,{cache:"no-store"}).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||r.status); return j; }); }); }
+function post(u,b){ return fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)})
+  .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||r.status); return j; }); }); }
+function table(t, heads, rows){
+  t.textContent=""; var th=el("thead"), tr=el("tr");
+  heads.forEach(function(h){ tr.appendChild(el("th",null,h)); }); th.appendChild(tr); t.appendChild(th);
+  var tb=el("tbody"); rows.forEach(function(r){ tb.appendChild(r); }); t.appendChild(tb);
+  if(!rows.length){ var e=el("tr"), td=el("td","dim","nothing here"); td.colSpan=heads.length;
+    td.style.cssText="text-align:center;padding:26px;font-family:var(--font-mono)"; e.appendChild(td); tb.appendChild(e); }
+}
+function td(txt, cls, sub){ var d=el("td",cls,txt); if(sub){ d.appendChild(el("span","sub",sub)); } return d; }
+
+// ---------- app bar, tab icons ----------
+UI.appbar($("appbar"), {active:"manage"});
+Array.prototype.forEach.call(document.querySelectorAll("#tabs button"),function(b){
+  b.insertBefore(UI.icon(b.dataset.ic), b.firstChild);
+});
+$("micon").appendChild(UI.icon("warn"));
+$("auditicon").appendChild(UI.icon("search"));
+
+// ---------- add-image panel ----------
+var ADD=[["pull","Pull from a registry","download","Docker Hub, ghcr.io, quay.io"],
+         ["archive","Upload a docker archive","upload","a docker save .tar from another host"],
+         ["vendor","Build from a vendor ISO / qcow2","gear","IOS-XE, NX-OS … via vrnetlab"],
+         ["ready","Ready-to-run images","grid","curated public clab images"]];
+var addCur="pull";
+function openAdd(which){
+  addCur=which; $("addpanel").hidden=false;
+  var t=$("addtabs"); t.textContent="";
+  ADD.forEach(function(a){
+    var o=el("button","opt"); o.type="button"; o.setAttribute("role","tab");
+    o.setAttribute("aria-selected", a[0]===which ? "true" : "false");
+    o.appendChild(UI.icon(a[2]));
+    var tx=el("div"); tx.appendChild(el("b",null,a[1])); tx.appendChild(el("span",null,a[3])); o.appendChild(tx);
+    o.addEventListener("click",function(){ openAdd(a[0]); });
+    t.appendChild(o);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("#addpanel [data-add]"),function(c){ c.hidden=c.dataset.add!==which; });
+  var first=document.querySelector('#addpanel [data-add="'+which+'"] input');
+  if(first && first.type==="text") first.focus();
+}
+$("addclose").appendChild(UI.button("","quiet sm",function(){ $("addpanel").hidden=true; },"x"));
+$("addclose").firstChild.title="close";
+var addBtn;
+(function(){
+  var add=UI.button("Add image","primary",null,"plus"); add.setAttribute("aria-haspopup","menu");
+  add.addEventListener("click",function(){
+    UI.menu(add, ADD.map(function(a){ return {label:a[1], icon:a[2], onClick:function(){ openAdd(a[0]); }}; }));
+  });
+  addBtn=add;
+  $("img_tools").appendChild(add);
+  $("img_tools").appendChild(UI.moreButton(function(){ return [
+    {label:"Remove dangling images", icon:"trash", title:"docker image prune - untagged images no container uses",
+     onClick:function(){ $("prune_btn").click(); }}]; }));
+})();
+
+// ---------- modal ----------
+var pending=null;
+function confirmThen(title, body, okLabel, fn, typed){
+  $("mtitle").textContent=title; $("mbody").textContent=body; $("mok").textContent=okLabel;
+  $("mextra").textContent=""; $("mok").disabled=false; pending=fn;
+  if(typed){
+    var f=el("div","field");
+    var l=el("label",null,"Type "+typed+" to confirm"); var i=el("input","mono"); i.type="text"; i.id="mconfirm";
+    i.autocomplete="off"; i.spellcheck=false;
+    l.htmlFor="mconfirm"; f.appendChild(l); f.appendChild(i); $("mextra").appendChild(f);
+    $("mok").disabled=true; i.addEventListener("input",function(){ $("mok").disabled=i.value!==typed; });
+    i.addEventListener("keydown",function(e){ if(e.key==="Enter" && i.value===typed) $("mok").click(); });
+    $("scrim").hidden=false; i.focus(); return;
+  }
+  $("scrim").hidden=false; $("mok").focus();
+}
+function closeModal(){ $("scrim").hidden=true; pending=null; }
+$("mcancel").addEventListener("click",closeModal);
+$("scrim").addEventListener("click",function(e){ if(e.target===$("scrim")) closeModal(); });
+$("mok").addEventListener("click",function(){ var f=pending; closeModal(); if(f) f(); });
+document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeModal(); });
+
+// ---------- job console ----------
+var job=null, jobLines=0, onJobDone=null;
+function runJob(p, title, done){
+  p.then(function(r){
+    job=r.job_id; jobLines=0; onJobDone=done||null;
+    $("clog").textContent=""; $("console").hidden=false; $("cspin").style.display="";
+    $("ctitle").textContent=title; pollJob();
+  }).catch(function(e){ alert(e.message); });
+}
+function pollJob(){
+  if(!job) return;
+  getJ("api/job/"+job+"?since="+jobLines).then(function(j){
+    $("ccmd").textContent=j.cmd||"";
+    (j.lines||[]).forEach(function(line){
+      var cls=line.indexOf("$ ")===0?"cmdline":/exited with code 0/.test(line)?"done"
+             :/(error|Error|failed|denied|conflict)/.test(line)?"err":null;
+      $("clog").appendChild(el("div",cls,line));
+    });
+    jobLines=j.total_lines; $("clog").scrollTop=$("clog").scrollHeight;
+    if(!j.running){
+      $("cspin").style.display="none";
+      $("ctitle").textContent=j.action+" · "+j.lab_name+(j.rc===0?" — done":" — failed (rc "+j.rc+")");
+      UI.toast(j.action+" "+j.lab_name+(j.rc===0?" finished":" failed (rc "+j.rc+")"), j.rc===0?"ok":"crit");
+      job=null; if(onJobDone) onJobDone(j.rc); refresh();
+    } else setTimeout(pollJob,900);
+  }).catch(function(){ setTimeout(pollJob,2000); });
+}
+$("cclose").addEventListener("click",function(){ $("console").hidden=true; });
+
+// ---------- tabs ----------
+var TABS=["images","lan","networks","trash","audit"];
+var cur="images";
+function show(t){
+  cur=t;
+  Array.prototype.forEach.call(document.querySelectorAll("#tabs button"),function(b){
+    b.setAttribute("aria-selected", b.dataset.t===t ? "true":"false");
+  });
+  TABS.forEach(function(x){ $("p_"+x).hidden = x!==t; });
+  if(location.hash!=="#"+t) history.replaceState(null,"","#"+t);
+  refresh();
+}
+function hashTab(){ var h=(location.hash||"#images").slice(1).split("?")[0]; return TABS.indexOf(h)>=0 ? h : "images"; }
+Array.prototype.forEach.call(document.querySelectorAll("#tabs button"),function(b){
+  b.addEventListener("click",function(){ show(b.dataset.t); });
+});
+window.addEventListener("hashchange",function(){ var t=hashTab(); if(t!==cur) show(t); });
+
+// ---------- images ----------
+var installed={};
+function loadImages(){
+  return getJ("api/images/list").then(function(d){
+    installed={}; d.images.forEach(function(i){ if(i.ref) installed[i.ref]=1; });
+    $("n_images").textContent=d.images.length;
+    $("img_count").textContent=d.images.length+" image"+(d.images.length===1?"":"s");
+    var st=$("img_stats"); st.textContent="";
+    (d.disk||[]).forEach(function(x){
+      if(["Images","Containers","Build Cache"].indexOf(x.Type)<0) return;
+      var f=el("div","fact"); f.appendChild(el("span",null,x.Type.toLowerCase()));
+      f.appendChild(el("b",null,x.Size)); f.appendChild(el("small",null,x.Reclaimable+" reclaimable"));
+      st.appendChild(f);
+    });
+    var rows=d.images.map(function(i){
+      var tr=el("tr");
+      var ic=td(i.ref||"<untagged>", i.ref?"imgcol":"imgcol dim");
+      ic.appendChild(el("span","imgsub",i.id+" · "+i.created_since));
+      if(i.note) ic.title=i.note;
+      tr.appendChild(ic);
+      tr.appendChild(td(i.size,"mono"));
+      var kd=el("td");
+      if(i.kind){
+        var tg=el("span","tag "+UI.kindClass(i.kind, i.ref), UI.kindLabel(i.kind, i.ref)); tg.title=i.kind; kd.appendChild(tg);
+        var osx=(i.os && i.os!=="unknown" && i.os!==UI.kindLabel(i.kind, i.ref) ? i.os : "")
+          +(i.configurable?(i.os && i.os!=="unknown" && i.os!==UI.kindLabel(i.kind, i.ref)?" · ":"")+"builder templates":"");
+        if(osx) kd.appendChild(el("span","sub",osx));
+      } else { kd.className="dim"; kd.textContent="—"; if(i.os && i.os!=="unknown") kd.appendChild(el("span","sub",i.os)); }
+      tr.appendChild(kd);
+      var use = i.running ? i.running+" running" : i.containers ? i.containers+" stopped" : "—";
+      tr.appendChild(td(use, i.containers?"tdwrap":"tdwrap dim", i.labs.length ? "labs: "+i.labs.join(", ") : null));
+      var bt=i.boot_test, btd;
+      if(bt && bt.ok){ btd=el("td","tdwrap"); btd.appendChild(el("span","pill ok","passed"));
+        btd.appendChild(el("span","sub",bt.when+" · boots in "+bt.boot_s+"s"+(bt.version?" · "+bt.version:""))); }
+      else if(bt){ btd=el("td","tdwrap"); btd.appendChild(el("span","pill crit","failed"));
+        btd.appendChild(el("span","sub",bt.when+" · "+(bt.error||""))); }
+      else btd=td(i.boot_testable?"not tested":"—","dim");
+      tr.appendChild(btd);
+      var a=el("td");
+      function doTag(){
+        UI.prompt("Tag "+(i.ref||i.id), "New name for "+(i.ref||i.id)+"  (repository:tag)", i.ref||"", {ok:"Tag"})
+          .then(function(n){
+            if(n && n!==i.ref) runJob(post("api/images",{op:"tag",ref:i.ref||i.id,new_ref:n}),"tag · "+n);
+          });
+      }
+      function doRemove(){
+        confirmThen("Remove "+(i.ref||i.id)+"?",
+          (i.labs.length? "Labs that reference it ("+i.labs.join(", ")+") will not deploy until it is back. ":"")
+          +"Frees "+i.size+". A vendor image has to be rebuilt or re-uploaded to get it back.",
+          "Remove image", function(){ runJob(post("api/images",{op:"remove",ref:i.ref||i.id}),"remove · "+(i.ref||i.id)); });
+      }
+      function doBoot(){
+        confirmThen("Boot-test "+i.ref+"?","Starts it once in a throw-away one-node lab, waits until it "
+          +"is healthy and logs in, then removes the lab. Takes a few minutes and needs the node's RAM "
+          +"free while it runs.","Start boot test",function(){
+            runJob(post("api/images",{op:"boottest",ref:i.ref}),"boot test · "+i.ref); });
+      }
+      a.appendChild(UI.moreButton(function(){ return [
+        (i.boot_testable && i.ref) ? {label:"Boot test", icon:"play", onClick:doBoot,
+          title:"start it once in a throw-away one-node lab, wait until healthy, log in"} : null,
+        {label:"Tag as…", icon:"edit", onClick:doTag, title:"give this image another name, e.g. the one a topology expects"},
+        i.ref ? {label:"Copy reference", icon:"copy", onClick:function(){ copyRef(i.ref); }} : null,
+        {sep:1},
+        {label:"Remove", icon:"trash", danger:true, onClick:doRemove, disabled:i.containers>0,
+         title: i.containers ? "used by "+i.container_names.join(", ")+" — destroy those first" : "docker image rm"}
+      ]; }));
+      tr.appendChild(a);
+      return tr;
+    });
+    table($("img_tbl"),["image","size","kind","in use","boot test",""],rows);
+    var cat=$("catalogue"); cat.textContent="";
+    (d.catalogue||[]).forEach(function(c){
+      var it=el("div","catitem");
+      it.appendChild(el("div","ref",c.ref)); it.appendChild(el("div","about",c.about));
+      var r=el("div","formrow"); r.appendChild(el("span","tag "+UI.kindClass(c.kind, c.ref),c.kind+" · "+c.type));
+      var b=el("button","ub sm"+(installed[c.ref]?" quiet":" primary"), installed[c.ref]?"✓ installed":"Pull");
+      b.disabled=!!installed[c.ref];
+      b.addEventListener("click",function(){ runJob(post("api/images",{op:"pull",ref:c.ref}),"pull · "+c.ref); });
+      r.appendChild(b); it.appendChild(r); cat.appendChild(it);
+    });
+  });
+}
+function copyRef(txt){
+  function ok(){ UI.toast("copied "+txt,"ok",2200); }
+  if(navigator.clipboard && window.isSecureContext){ navigator.clipboard.writeText(txt).then(ok); return; }
+  var ta=el("textarea"); ta.value=txt; ta.style.cssText="position:fixed;opacity:0;top:0"; document.body.appendChild(ta); ta.select();
+  try{ if(document.execCommand("copy")) ok(); }catch(e){} ta.remove();
+}
+$("pull_btn").addEventListener("click",function(){
+  var r=$("pull_ref").value.trim(); if(!r) return;
+  runJob(post("api/images",{op:"pull",ref:r}),"pull · "+r);
+});
+$("pull_ref").addEventListener("keydown",function(e){ if(e.key==="Enter") $("pull_btn").click(); });
+$("search_btn").addEventListener("click",function(){
+  var q=$("search_q").value.trim(); if(!q) return;
+  var box=$("search_res"); box.textContent=""; box.appendChild(el("div","msg","searching…"));
+  getJ("api/images/search?q="+encodeURIComponent(q)).then(function(d){
+    box.textContent="";
+    if(!d.results.length) box.appendChild(el("div","msg","no results"));
+    d.results.forEach(function(r){
+      var row=el("div","res");
+      row.appendChild(el("span","ref",r.name+(r.official?"  ✓":"")));
+      row.appendChild(el("span","about",r.about||""));
+      row.appendChild(el("span","tag","★ "+r.stars));
+      var b=el("button","ub sm","Use"); b.type="button";
+      b.addEventListener("click",function(){ $("pull_ref").value=r.name+":latest"; $("pull_ref").focus(); });
+      b.title="put it in the pull box so you can pick a tag";
+      row.appendChild(b); box.appendChild(row);
+    });
+  }).catch(function(e){ box.textContent=""; box.appendChild(el("div","msg err",e.message)); });
+});
+$("search_q").addEventListener("keydown",function(e){ if(e.key==="Enter") $("search_btn").click(); });
+$("prune_btn").addEventListener("click",function(){
+  confirmThen("Remove dangling images?","Deletes untagged images that no container uses (docker image prune).",
+    "Remove",function(){ runJob(post("api/images",{op:"prune"}),"prune dangling images"); });
+});
+$("up_file").addEventListener("change",function(){ $("up_btn").disabled=!$("up_file").files.length; });
+$("up_btn").addEventListener("click",function(){
+  var f=$("up_file").files[0]; if(!f) return;
+  var xhr=new XMLHttpRequest(), prog=$("up_prog");
+  prog.hidden=false; $("up_btn").disabled=true; $("up_msg").className="msg"; $("up_msg").textContent="uploading "+f.name+"…";
+  xhr.upload.onprogress=function(e){ if(e.lengthComputable){ prog.firstChild.style.width=(e.loaded/e.total*100).toFixed(1)+"%";
+    $("up_msg").textContent="uploading "+f.name+" — "+(e.loaded/1048576).toFixed(0)+" / "+(e.total/1048576).toFixed(0)+" MB"; } };
+  xhr.onload=function(){
+    $("up_btn").disabled=false; var j={}; try{ j=JSON.parse(xhr.responseText); }catch(e){}
+    if(xhr.status!==200){ $("up_msg").className="msg err"; $("up_msg").textContent=j.error||("upload failed: HTTP "+xhr.status); return; }
+    $("up_msg").className="msg ok"; $("up_msg").textContent="uploaded — loading into docker";
+    runJob(Promise.resolve(j),"load · "+f.name);
+  };
+  xhr.onerror=function(){ $("up_btn").disabled=false; $("up_msg").className="msg err"; $("up_msg").textContent="upload failed"; };
+  xhr.open("POST","api/images/upload?name="+encodeURIComponent(f.name));
+  xhr.send(f);
+});
+
+// ---------- vendor image build ----------
+var vcheck=null;
+function vSteps(){
+  var has=!!$("v_file").files.length, opts=!$("v_opts").hidden, going=!$("v_prog").hidden;
+  $("vs1").className="stp on";
+  $("vs2").className="stp "+(opts?"on":"off");
+  $("vs3").className="stp "+((opts && !$("v_go").disabled) || going ? "on" : "off");
+  return has;
+}
+function vPlatform(){ return (vcheck && vcheck.platform) || (!$("v_platwrap").hidden && $("v_plat").value) || null; }
+function vRef(){
+  var pid=vPlatform();
+  if(!vcheck || !pid){ $("v_go").disabled = !(vcheck && /\.iso$/i.test(($("v_file").files[0]||{}).name||"")); vSteps(); return; }
+  var p=vcheck.platforms.filter(function(x){ return x.id===pid; })[0];
+  var ref=p.repo+":"+($("v_tag").value.trim()||vcheck.version||"");
+  $("v_ref").textContent="→ "+ref+(installed[ref]?"  (exists)":"");
+  $("v_ref").className="msg"+(installed[ref]?" err":"");
+  $("v_go").disabled = !$("v_tag").value.trim() || (installed[ref] && !$("v_replace").checked);
+  vSteps();
+}
+$("v_file").addEventListener("change",function(){
+  var f=$("v_file").files[0]; vcheck=null; $("v_opts").hidden=true; $("v_msg").textContent="";
+  vSteps();
+  if(!f) return;
+  getJ("api/images/vendor-check?name="+encodeURIComponent(f.name)).then(function(d){
+    vcheck=d;
+    $("v_platwrap").hidden=true;
+    if(!d.platform){
+      var ext=f.name.split(".").pop().toLowerCase();
+      $("v_opts").hidden=false; $("v_tag").value="";
+      if(ext==="iso"){
+        $("v_detect").className="msg";
+        $("v_detect").textContent="An ISO is identified from its contents after the upload.";
+        $("v_tag").placeholder="version (read from the ISO)";
+      } else {
+        $("v_detect").className="msg";
+        $("v_detect").textContent="The file name does not say which router this is — pick the platform "
+          +"and give the image a tag (usually its version).";
+        var sel=$("v_plat"); sel.textContent="";
+        d.platforms.filter(function(p){ return p.inputs.indexOf(ext)>=0; }).forEach(function(p){
+          var o=el("option",null,p.label); o.value=p.id; sel.appendChild(o); });
+        $("v_platwrap").hidden=false; $("v_tag").placeholder="e.g. 10.4.8";
+      }
+      vRef();
+      return;
+    }
+    $("v_detect").className = "msg" + (d.accepts ? " ok" : " err");
+    $("v_detect").textContent = d.accepts
+      ? "Looks like "+d.label+(d.version?" "+d.version:"")+" ("+(f.size/1048576).toFixed(0)+" MB)."
+      : d.label+" is not supported as a ."+f.name.split(".").pop()+" file.";
+    if(!d.accepts){ vSteps(); return; }
+    $("v_opts").hidden=false; $("v_tag").value=d.version||""; vRef();
+  }).catch(function(e){ $("v_detect").className="msg err"; $("v_detect").textContent=e.message; });
+});
+$("v_tag").addEventListener("input",vRef); $("v_replace").addEventListener("change",vRef);
+$("v_plat").addEventListener("change",vRef);
+$("v_go").addEventListener("click",function(){
+  var f=$("v_file").files[0]; if(!f) return;
+  var xhr=new XMLHttpRequest(), prog=$("v_prog");
+  prog.hidden=false; $("v_go").disabled=true; $("v_msg").className="msg"; vSteps();
+  xhr.upload.onprogress=function(e){ if(e.lengthComputable){ prog.firstChild.style.width=(e.loaded/e.total*100).toFixed(1)+"%";
+    $("v_msg").textContent="uploading "+f.name+" — "+(e.loaded/1048576).toFixed(0)+" / "+(e.total/1048576).toFixed(0)+" MB"; } };
+  xhr.onload=function(){
+    var j={}; try{ j=JSON.parse(xhr.responseText); }catch(e){}
+    if(xhr.status!==200){ $("v_go").disabled=false; $("v_msg").className="msg err";
+      $("v_msg").textContent=j.error||("upload failed: HTTP "+xhr.status); return; }
+    $("v_msg").className="msg ok"; $("v_msg").textContent="uploaded — building "+j.ref+" ("+j.how+")";
+    runJob(Promise.resolve(j),"build · "+j.ref, function(rc){ if(rc===0) $("v_msg").textContent="built "+j.ref; });
+  };
+  xhr.onerror=function(){ $("v_go").disabled=false; $("v_msg").className="msg err"; $("v_msg").textContent="upload failed"; };
+  xhr.open("POST","api/images/vendor-upload?name="+encodeURIComponent(f.name)+"&tag="+encodeURIComponent($("v_tag").value.trim())
+           +"&replace="+($("v_replace").checked?"1":"0")
+           +"&boottest="+($("v_boot").checked?"1":"0")
+           +(!$("v_platwrap").hidden ? "&platform="+encodeURIComponent($("v_plat").value) : ""));
+  xhr.send(f);
+});
+fetch("api/images/vendor-check?name=platforms.iso").then(function(r){ return r.json(); }).then(function(d){
+  var rows=(d.platforms||[]).map(function(p){
+    var tr=el("tr");
+    tr.appendChild(td(p.label, null, p.kind)); tr.appendChild(td(p.inputs.map(function(x){ return "."+x; }).join(" or "),"mono"));
+    tr.appendChild(td(p.repo,"dim mono"));
+    var s=el("td"); s.style.textAlign="left";
+    if(p.verified) s.appendChild(el("span","pill ok","verified ("+p.verified+")"));
+    else { s.className="dim"; s.textContent="not yet verified here"; }
+    tr.appendChild(s);
+    return tr;
+  });
+  table($("v_plats"),["platform","upload","image","status"],rows);
+});
+
+// ---------- LAN ----------
+var labs=[];
+function loadLan(){
+  return Promise.all([getJ("api/lan"), getJ("api/state")]).then(function(r){
+    var lan=r[0]; labs=r[1].labs||[];
+    var sel=$("lan_iface");
+    var editing=[sel,$("lan_pool"),$("gw_user"),$("gw_pass"),$("gw_port")].indexOf(document.activeElement)>=0;
+    if(!editing){
+      sel.textContent="";
+      lan.interfaces.forEach(function(i){ var o=el("option",null,i.name+"  "+i.addr); o.value=i.name; sel.appendChild(o); });
+      sel.value=lan.lan.iface;
+      $("lan_pool").value=(lan.lan.pool||[]).join("\n");
+      $("lan_pool").placeholder = lan.pool_hint ? "e.g. "+lan.pool_hint : "";
+      var g=lan.gateway||{};
+      $("gw_user").value=g.user||""; $("gw_pass").value=g.password||""; $("gw_port").value=g.port||"";
+    }
+    var g2=lan.gateway||{};
+    var gs=$("gw_status"); gs.textContent="";
+    gs.appendChild(el("span","led "+(g2.running?"ok":"crit")));
+    gs.appendChild(document.createTextNode(g2.running
+      ? "running on port "+g2.listening+(g2.listening!==g2.port?" ("+g2.port+" was taken)":"")
+      : "not running: "+(g2.error||"unknown")));
+    gs.style.color = g2.running ? "var(--ok)" : "var(--crit)";
+    $("lan_host").textContent = lan.lan.host ? "host "+lan.lan.host : (lan.lan.error||"");
+    // one row per lab name (several topology files can share one)
+    var byName={}; labs.forEach(function(l){ if(!byName[l.name]||l.running) byName[l.name]=l; });
+    var names=Object.keys(byName).sort();
+    var exposed=0;
+    var rows=names.map(function(n){
+      var l=byName[n], e=(lan.exposure||{})[n]||{}, nodes=e.nodes||{};
+      if(e.enabled) exposed++;
+      var tr=el("tr");
+      var nm=td(n, null, l.running ? "running" : "stopped"); nm.style.fontWeight="600";
+      tr.appendChild(nm);
+      var stc = e.enabled ? (l.lan.active.length ? "pill ok" : "pill warn") : "pill idle";
+      var sd=el("td"); sd.appendChild(el("span",stc, e.enabled ? (l.lan.active.length ? l.lan.active.length+" live" : "waiting for lab") : "off"));
+      tr.appendChild(sd);
+      var list=Object.keys(nodes).sort().map(function(k){ return k+" "+nodes[k]; });
+      tr.appendChild(td(list.length? list.slice(0,4).join(" · ")+(list.length>4?" · +"+(list.length-4):"") : "—", list.length?"tdwrap mono":"dim"));
+      var a=el("td"), b=UI.button(e.enabled?"Configure":"Expose", "sm", null, "lan");
+      b.addEventListener("click",function(){ LanDialog.open(l, function(){ loadLan(); }); });
+      a.appendChild(b); tr.appendChild(a);
+      return tr;
+    });
+    $("n_lan").textContent=exposed||"";
+    $("lan_count").textContent=exposed+" of "+names.length+" exposed";
+    table($("lan_tbl"),["lab","state","reserved addresses","" ],rows);
+    var live=(lan.active||[]).map(function(a){
+      var tr=el("tr");
+      tr.appendChild(td(a.lan_ip,"mono")); tr.appendChild(td(a.lab+" / "+a.node));
+      tr.appendChild(td(a.node_ip,"dim mono"));
+      tr.appendChild(td(a.reachable===false ? "node does not answer"
+                        : a.ssh==="gateway" ? "ssh via gateway" : a.ssh==="node" ? "ssh" : "no ssh answering yet",
+                        a.ssh==="none" || a.reachable===false ? "dim" : null));
+      return tr;
+    });
+    $("lan_live_count").textContent=live.length+" address"+(live.length===1?"":"es")+(lan.last_error?" · error: "+lan.last_error:"");
+    table($("lan_live"),["lan address","lab / node","mgmt address",""],live);
+  });
+}
+$("lan_save").addEventListener("click",function(){
+  var pool=$("lan_pool").value.split(/[\n,]+/).map(function(x){return x.trim();}).filter(Boolean);
+  post("api/lan/settings",{iface:$("lan_iface").value,pool:pool,
+    gateway:{user:$("gw_user").value,password:$("gw_pass").value,port:$("gw_port").value}}).then(function(){
+    $("lan_msg").className="msg ok"; $("lan_msg").textContent="saved"; $("lan_pool").blur(); loadLan();
+  }).catch(function(e){ $("lan_msg").className="msg err"; $("lan_msg").textContent=e.message; });
+});
+
+// ---------- networks ----------
+function loadNets(){
+  return getJ("api/networks").then(function(d){
+    $("n_networks").textContent=d.networks.length;
+    var rows=d.networks.map(function(n){
+      var tr=el("tr");
+      var nm=td(n.name, "mono", n.builtin?"docker built-in":n.bridge); nm.style.fontWeight="600";
+      tr.appendChild(nm);
+      tr.appendChild(td(n.driver,"dim"));
+      tr.appendChild(td(n.subnet||"—", n.subnet?"mono":"dim", n.gateway?"gw "+n.gateway:null));
+      tr.appendChild(td(n.containers.length? n.containers.length+" container"+(n.containers.length>1?"s":"") : "—",
+                        n.containers.length?null:"dim", n.containers.slice(0,3).join(", ")+(n.containers.length>3?" …":"")));
+      tr.appendChild(td(n.labs.join(", ")||"—", n.labs.length?null:"dim"));
+      var a=el("td");
+      if(!n.builtin){
+        var why = n.containers.length ? "containers are attached" : n.labs.length ? "declared by "+n.labs.join(", ")+" - clab recreates it at deploy" : "unused";
+        a.appendChild(UI.moreButton(function(){ return [
+          {label:"Remove network", icon:"trash", danger:true, disabled:n.containers.length>0, title:why, onClick:function(){
+            confirmThen("Remove network "+n.name+"?", n.labs.length
+              ? "It is declared by "+n.labs.join(", ")+"; containerlab creates it again on the next deploy."
+              : "No container uses it and no lab declares it.", "Remove", function(){
+                post("api/networks",{op:"remove",name:n.name}).then(loadNets).catch(function(e){ alert(e.message); });
+              });
+          }}]; }));
+        if(!n.containers.length && !n.labs.length){ var u=el("span","ubadge warn","unused"); u.style.marginRight="6px"; a.insertBefore(u,a.firstChild); }
+      }
+      tr.appendChild(a);
+      return tr;
+    });
+    table($("net_tbl"),["network","driver","subnet","containers","labs",""],rows);
+  });
+}
+
+// ---------- trash ----------
+function loadTrash(){
+  return getJ("api/trash").then(function(d){
+    $("trash_dir").textContent=d.dir;
+    $("n_trash").textContent=d.items.length||"";
+    var rows=d.items.map(function(i){
+      var tr=el("tr");
+      var nm=td(i.lab,null,i.deleted); nm.style.fontWeight="600"; tr.appendChild(nm);
+      tr.appendChild(td(i.originals.join("\n")||"—","tdwrap mono"));
+      tr.appendChild(td(i.size_mb>=1024?(i.size_mb/1024).toFixed(1)+" GB":i.size_mb+" MB","dim mono"));
+      var a=el("td"), bits=el("div","bits");
+      var r=UI.button("Restore","sm",null,"redo");
+      r.disabled=!i.restorable; r.title=i.restorable?"move the files back":"blocked: "+(i.blocked_by.join(", ")||"no restore data");
+      r.addEventListener("click",function(){
+        post("api/trash",{op:"restore",item:i.item}).then(function(){ UI.toast("restored "+i.lab,"ok"); loadTrash(); }).catch(function(e){ alert(e.message); });
+      });
+      function purge(){
+        confirmThen("Delete "+i.lab+" forever?","The files are erased and cannot be restored.","Delete forever",
+          function(){ post("api/trash",{op:"purge",item:i.item,confirm:i.item}).then(loadTrash).catch(function(e){ alert(e.message); }); },
+          i.lab);
+      }
+      bits.appendChild(r);
+      bits.appendChild(UI.moreButton(function(){ return [{label:"Delete forever…", icon:"trash", danger:true, onClick:purge}]; }));
+      a.appendChild(bits); tr.appendChild(a);
+      return tr;
+    });
+    table($("trash_tbl"),["lab","original location","size",""],rows);
+  });
+}
+
+// ---------- audit ----------
+var auditLines=[];
+function renderAudit(){
+  var q=$("audit_q").value.toLowerCase(), box=$("audit_log"); box.textContent="";
+  var shown=auditLines.filter(function(l){ return !q || l.toLowerCase().indexOf(q)>=0; });
+  shown.slice().reverse().forEach(function(l){
+    var c=/TRASHED|PURGED|delete|remove/.test(l)?"a-del":/ LAN /.test(l)?"a-lan":/LAB DOWN/.test(l)?"a-down":null;
+    box.appendChild(el("div",c,l));
+  });
+  if(!shown.length) box.appendChild(el("div",null,q?"no line matches “"+q+"”":"the log is empty"));
+  $("audit_count").textContent=(q? shown.length+" of " : "")+auditLines.length+" lines · newest first";
+}
+function loadAudit(){ return getJ("api/audit?lines=600").then(function(d){ auditLines=d.lines; renderAudit(); }); }
+$("audit_q").addEventListener("input",renderAudit);
+$("audit_refresh").addEventListener("click",loadAudit);
+
+// ---------- refresh ----------
+function refresh(){
+  var f={images:loadImages,lan:loadLan,networks:loadNets,trash:loadTrash,audit:loadAudit}[cur];
+  if(f) f().catch(function(e){ console.error(e); });
+}
+setInterval(function(){ if(!document.hidden && (cur==="lan"||cur==="networks") && $("scrim").hidden && !document.querySelector(".landlg")) refresh(); },8000);
+// counts for the other tabs
+getJ("api/trash").then(function(d){ $("n_trash").textContent=d.items.length||""; }).catch(function(){});
+getJ("api/networks").then(function(d){ $("n_networks").textContent=d.networks.length; }).catch(function(){});
+
+// ---------- palette ----------
+function addFlow(w){ return function(){ show("images"); openAdd(w); }; }
+UI.commands([
+  {label:"Add image - pull from a registry", icon:"download", run:addFlow("pull")},
+  {label:"Add image - upload a docker archive", icon:"upload", run:addFlow("archive")},
+  {label:"Add image - build from a vendor ISO / qcow2", icon:"gear", run:addFlow("vendor")},
+  {label:"Add image - ready-to-run catalogue", icon:"grid", run:addFlow("ready")},
+  {label:"Remove dangling images", icon:"trash", run:function(){ show("images"); $("prune_btn").click(); }},
+  {label:"Refresh this tab", icon:"redo", run:refresh}
+]);
+
+show(hashTab());
+})();
+</script>
+
+</body>
+</html>

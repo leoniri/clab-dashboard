@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edit · Containerlab</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script>try{if(localStorage.getItem("clabd-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
+<link rel="stylesheet" href="ui.css">
+<style>
+html,body{height:100%;overflow:hidden}
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+.banner{display:flex;align-items:center;gap:9px;padding:7px 18px;font:11.5px var(--font-mono);background:var(--warn-soft);
+  color:var(--warn);border-bottom:1px solid var(--line);flex:none}
+.banner svg{width:14px;height:14px;flex:none}
+.main{display:flex;flex:1;min-height:0}
+
+/* ---------- file tree ---------- */
+.files{width:264px;flex:none;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.files .fh{display:flex;align-items:center;gap:8px;padding:11px 12px 8px 14px;font:600 10.5px var(--font-mono);
+  letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.files .fh .n{margin-left:auto;letter-spacing:0;font-weight:500}
+.ftree{flex:1;overflow-y:auto;padding:2px 0 10px}
+.fgroup{display:flex;align-items:center;gap:6px;margin:10px 14px 3px;font:600 10px var(--font-mono);letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted)}
+.fgroup svg{width:12px;height:12px}
+.fgroup:first-child{margin-top:2px}
+.fbtn{position:relative;display:flex;width:100%;text-align:left;background:none;border:0;padding:5px 12px 5px 22px;
+  cursor:pointer;font:12px var(--font-mono);color:var(--ink-2);gap:8px;align-items:center}
+.fbtn::before{content:"";position:absolute;left:15px;top:0;bottom:0;border-left:1px solid var(--line)}
+.fbtn:hover{background:var(--surface-2);color:var(--ink)}
+.fbtn[aria-current="true"]{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+.fbtn[aria-current="true"]::after{content:"";position:absolute;left:0;top:4px;bottom:4px;width:3px;border-radius:0 3px 3px 0;
+  background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.fbtn .fi{flex:none;width:18px;height:15px;border-radius:3px;font:700 7.5px/15px var(--font-mono);text-align:center;
+  letter-spacing:0;color:var(--on-accent);background:var(--muted)}
+.fbtn .fi.yml{background:var(--xr)} .fbtn .fi.cfg{background:var(--xe)} .fbtn .fi.md{background:var(--lin)}
+.fbtn .fi.conf{background:var(--frr)} .fbtn .fi.cli{background:var(--srl)}
+.fbtn .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fbtn .fdirty{color:var(--warn);font-weight:700}
+.fbtn .miss{font:600 9px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--crit);
+  background:var(--crit-soft);border-radius:4px;padding:0 5px}
+.fbtn.gone .nm{text-decoration:line-through;opacity:.7}
+.newf{padding:10px 12px;border-top:1px solid var(--line)}
+.newf .ub{width:100%}
+
+/* ---------- editor ---------- */
+.ed{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--canvas)}
+.edbar{display:flex;align-items:stretch;gap:8px;padding:0 10px 0 0;border-bottom:1px solid var(--line);background:var(--surface);
+  min-height:42px;flex:none}
+.etab{display:flex;align-items:center;gap:8px;padding:0 14px;background:var(--canvas);border-right:1px solid var(--line);
+  position:relative;max-width:55%;min-width:0}
+.etab::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:var(--accent)}
+.etab::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:var(--canvas)}
+.edbar .fname{font:600 12.5px var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.edbar .state{font:11px var(--font-mono);color:var(--muted);white-space:nowrap}
+.edbar .state.dirty{color:var(--warn)}
+.edbar .acts{margin-left:auto;display:flex;gap:6px;align-items:center}
+.edbar .acts .kbd{margin-left:2px;background:rgba(0,0,0,.15);border-color:rgba(0,0,0,.2);color:inherit}
+.edwrap{flex:1;display:flex;min-height:0;position:relative}
+.gutter{width:56px;flex:none;overflow:hidden;background:var(--canvas);border-right:1px solid var(--line);
+  font:12.5px/1.6 var(--font-mono);color:var(--muted);text-align:right;padding:12px 10px 12px 0;user-select:none;
+  white-space:pre;opacity:.8}
+.gutter .cl{color:var(--accent-ink);font-weight:600}
+.gutter .err{color:#fff;background:var(--crit);border-radius:3px;padding:0 3px}
+textarea#code{flex:1;border:0;outline:0;resize:none;margin:0;padding:12px 16px;background:var(--canvas);
+  color:var(--ink);font:12.5px/1.6 var(--font-mono);white-space:pre;overflow:auto;tab-size:2;caret-color:var(--accent)}
+textarea#code:disabled{opacity:.5}
+.msgs{border-top:1px solid var(--line);max-height:30vh;overflow:auto;flex:none;background:var(--surface)}
+.msgs:empty{display:none}
+.msgs .note{margin:0;border-radius:0;border:0;border-left:3px solid;white-space:pre-wrap;display:flex;align-items:center;gap:10px;
+  font:12px var(--font-mono)}
+.msgs .note .t{flex:1}
+.msgs .note .ub{flex:none}
+.sbar{display:flex;align-items:center;gap:16px;height:26px;padding:0 12px;background:var(--surface);border-top:1px solid var(--line);
+  font:11px var(--font-mono);color:var(--muted);flex:none;white-space:nowrap;overflow:hidden}
+.sbar .r{margin-left:auto;display:flex;gap:16px}
+.sbar b{color:var(--ink-2);font-weight:500}
+.sbar .led{width:7px;height:7px}
+
+/* ---------- history drawer ---------- */
+.hist{width:360px;flex:none;border-left:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;min-height:0}
+.hist .hh{display:flex;align-items:center;gap:8px;padding:10px 10px 10px 14px;border-bottom:1px solid var(--line)}
+.hist .hh h2{font:600 10.5px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0;flex:1}
+.vlist{overflow:auto;max-height:36%;border-bottom:1px solid var(--line);padding:6px 0}
+.vbtn{position:relative;display:block;width:100%;text-align:left;background:none;border:0;padding:6px 12px 6px 32px;cursor:pointer;
+  font:12px var(--font-mono);color:var(--ink-2)}
+.vbtn::before{content:"";position:absolute;left:15px;top:0;bottom:0;border-left:1px solid var(--line-strong)}
+.vbtn::after{content:"";position:absolute;left:11px;top:11px;width:7px;height:7px;border-radius:50%;background:var(--surface);
+  border:1.5px solid var(--muted)}
+.vbtn:first-child::before{top:12px} .vbtn:last-child::before{bottom:calc(100% - 12px)}
+.vbtn:hover{background:var(--surface-2)}
+.vbtn[aria-current="true"]{background:var(--accent-soft);color:var(--accent-ink)}
+.vbtn[aria-current="true"]::after{background:var(--accent);border-color:var(--accent);box-shadow:0 0 8px var(--accent)}
+.vbtn .why{display:block;color:var(--muted);font-size:10.5px}
+.vlist .c{padding:8px 14px;color:var(--muted);font:11.5px var(--font-mono)}
+.diffbox{flex:1;overflow:auto;font:11.5px/1.55 var(--font-mono);white-space:pre;padding:6px 0;background:var(--canvas)}
+.diffbox .a{background:var(--ok-soft);color:var(--ok)}
+.diffbox .d{background:var(--crit-soft);color:var(--crit)}
+.diffbox .c{color:var(--muted)}
+.diffbox div{padding:0 12px}
+.difffoot{padding:9px 12px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.difffoot .state{font:11px var(--font-mono);color:var(--muted);flex:1}
+.main > .empty{flex:1}
+@media (max-width:1000px){ .files{width:200px} .hist{width:290px} }
+@media (max-width:720px){
+  .main{flex-direction:column}
+  .files{width:auto;max-height:30vh;border-right:0;border-bottom:1px solid var(--line)}
+  .hist{position:fixed;inset:54px 0 58px 0;width:auto;z-index:20}
+  .edbar .acts .ub .lbl,.sbar .opt{display:none}
+  #abafter{display:none!important}
+  #topolink,#builderlink{font-size:0;gap:0;width:32px;padding:0}
+  #topolink svg,#builderlink svg{width:16px;height:16px}
+}
+@media (max-width:1100px){ #labpath{display:none} }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header id="appbar"></header>
+  <div id="abparts" hidden>
+    <span id="abafter" style="display:flex;align-items:center;gap:10px;min-width:0">
+      <span id="labpill"></span><span class="ab-host" id="labpath"></span></span>
+    <span id="abright" style="display:flex;gap:6px">
+      <a class="ub quiet" id="topolink" href="#">Topology map</a>
+      <a class="ub" id="builderlink" href="#" hidden>Open in builder</a></span>
+  </div>
+  <div class="banner" id="banner" hidden></div>
+  <div class="main">
+    <nav class="files" aria-label="Files">
+      <div class="fh"><span>Explorer</span><span class="n" id="fcount"></span></div>
+      <div class="ftree" id="files"></div>
+      <div class="newf" id="newf"></div>
+    </nav>
+    <section class="ed">
+      <div class="edbar">
+        <div class="etab"><span class="fname" id="fname">—</span><span class="state" id="fstate"></span></div>
+        <div class="acts">
+          <button class="ub quiet sm" id="b_hist" title="earlier versions of this file"></button>
+          <button class="ub quiet sm" id="b_discard" disabled></button>
+          <button class="ub primary sm" id="b_save" disabled title="Ctrl+S"></button>
+        </div>
+      </div>
+      <div class="edwrap">
+        <div class="gutter" id="gutter" aria-hidden="true">1</div>
+        <textarea id="code" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="file content" disabled></textarea>
+      </div>
+      <div class="msgs" id="msgs"></div>
+      <div class="sbar" id="sbar">
+        <span id="s_state"><span class="led"></span> no file</span>
+        <span class="opt" id="s_lang"></span>
+        <span class="r"><span id="s_pos">Ln 1, Col 1</span><span class="opt" id="s_size"></span><span class="opt">spaces: 2</span><span class="opt">UTF-8</span></span>
+      </div>
+    </section>
+    <aside class="hist" id="hist" hidden>
+      <div class="hh"><h2>History</h2><button class="ub quiet sm icon" id="b_hclose" title="close history"></button></div>
+      <div class="vlist" id="vlist"></div>
+      <div class="diffbox" id="diff"><div class="c">Pick a version to compare it with what is in the editor.</div></div>
+      <div class="difffoot" id="difffoot"></div>
+    </aside>
+  </div>
+</div>
+
+<script src="ui.js"></script>
+<script>
+UI.appbar(document.getElementById("appbar"), {crumbs:[{label:"Labs", href:"/"}, {label:"…", id:"labname"}, {label:"Files"}],
+  after: document.getElementById("abafter"), right: document.getElementById("abright")});
+document.getElementById("abparts").remove();
+</script>
+<script>
+(function(){
+"use strict";
+function $(id){ return document.getElementById(id); }
+function el(t,c,x){ var e=document.createElement(t); if(c) e.className=c; if(x!==undefined&&x!==null) e.textContent=x; return e; }
+function getJ(u){ return fetch(u,{cache:"no-store"}).then(function(r){ return r.json().then(function(j){ if(!r.ok){ var e=new Error(j.error||r.status); e.j=j; e.status=r.status; throw e; } return j; }); }); }
+function post(u,b){ return fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)})
+  .then(function(r){ return r.json().then(function(j){ if(!r.ok){ var e=new Error(j.error||r.status); e.j=j; e.status=r.status; throw e; } return j; }); }); }
+
+var qs = new URLSearchParams(location.search);
+var labId = qs.get("lab") || "";
+var lab = null, files = [], cur = null;      // cur: {path, sha, orig}
+var code = $("code");
+
+// toolbar buttons with icons
+function fill(b, ic, label, kbd){ b.appendChild(UI.icon(ic)); var s=el("span","lbl",label); b.appendChild(s); if(kbd) b.appendChild(el("span","kbd",kbd)); }
+fill($("b_hist"),"snapshot","History");
+fill($("b_discard"),"redo","Discard");
+fill($("b_save"),"check","Save", navigator.platform.indexOf("Mac")>=0 ? "⌘S" : "Ctrl S");
+$("b_hclose").appendChild(UI.icon("x"));
+$("topolink").prepend(UI.icon("map"));
+
+// ---------- dialogs ----------
+// ask(title, body, okLabel, fn) - fn runs only when confirmed; fn null = notice only
+function ask(title, body, okLabel, fn, danger){
+  UI.confirm(title, body, {ok: okLabel||"OK", danger: !!danger}).then(function(ok){ if(ok && fn) fn(); });
+}
+
+// ---------- messages ----------
+function msg(kind, text, action){
+  var m=el("div","note "+kind); m.appendChild(el("span","t",text));
+  if(action){ var b=UI.button(action.label, "sm "+(action.cls||""), action.fn); m.appendChild(b); }
+  $("msgs").appendChild(m);
+  return m;
+}
+function clearMsgs(){ $("msgs").textContent=""; }
+
+// ---------- gutter + status bar ----------
+var errLines = {}, curLine = 1;
+function caretLine(){ return code.value.slice(0, code.selectionStart).split("\n").length; }
+function gutter(){
+  var n = code.value.split("\n").length, out = [];
+  curLine = cur ? caretLine() : 0;
+  for (var i=1;i<=n;i++) out.push(errLines[i] ? '<span class="err">'+i+'</span>' : i===curLine ? '<span class="cl">'+i+'</span>' : String(i));
+  $("gutter").innerHTML = out.join("\n");
+  $("gutter").scrollTop = code.scrollTop;
+  status();
+}
+function status(){
+  if(!cur) return;
+  var before = code.value.slice(0, code.selectionStart), ln = before.split("\n");
+  $("s_pos").textContent = "Ln "+ln.length+", Col "+(ln[ln.length-1].length+1)
+    + (code.selectionEnd>code.selectionStart ? " ("+(code.selectionEnd-code.selectionStart)+" selected)" : "");
+  var lines = code.value.split("\n").length, bytes = new Blob([code.value]).size;
+  $("s_size").textContent = lines+" lines · "+(bytes>=1024 ? (bytes/1024).toFixed(1)+" KB" : bytes+" B");
+}
+function caretMoved(){ if(cur && caretLine()!==curLine) gutter(); else status(); }
+code.addEventListener("scroll",function(){ $("gutter").scrollTop = code.scrollTop; });
+code.addEventListener("input",function(){ errLines={}; gutter(); dirtyState(); });
+code.addEventListener("keyup",caretMoved);
+code.addEventListener("click",caretMoved);
+code.addEventListener("select",caretMoved);
+code.addEventListener("keydown",function(e){
+  if(e.key==="Tab" && !e.ctrlKey && !e.metaKey && !e.altKey){
+    // YAML forbids tabs for indentation - insert two spaces instead
+    e.preventDefault();
+    var s=code.selectionStart, t=code.selectionEnd;
+    code.setRangeText("  ", s, t, "end"); code.dispatchEvent(new Event("input"));
+  }
+});
+document.addEventListener("keydown",function(e){
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="s"){ e.preventDefault(); if(!$("b_save").disabled) save(); }
+});
+function isDirty(){ return cur && code.value !== cur.orig; }
+function dirtyState(){
+  var d = isDirty();
+  $("fstate").textContent = !cur ? "" : d ? "● unsaved" : (cur.exists===false ? "new file" : "");
+  $("fstate").className = "state" + (d ? " dirty" : "");
+  $("b_save").disabled = !d; $("b_discard").disabled = !d;
+  var fb = document.querySelector('.fbtn[aria-current="true"] .fdirty'); if(fb) fb.textContent = d ? "●" : "";
+  var s=$("s_state"); s.textContent="";
+  if(cur){
+    s.appendChild(el("span","led "+(d?"warn":cur.exists===false?"":"ok")));
+    s.appendChild(document.createTextNode(" "+(d ? "modified" : cur.exists===false ? "not on disk yet" : "saved")));
+  }
+}
+window.addEventListener("beforeunload",function(e){ if(isDirty()){ e.preventDefault(); e.returnValue=""; } });
+
+// ---------- files ----------
+function ext(p){
+  if(/\.clab\.ya?ml$|\.ya?ml$/.test(p)) return ["yml","YML","YAML"];
+  if(/\.frr\.conf$|\.conf$|daemons$/.test(p)) return ["conf","CNF","config"];
+  if(/\.cfg$|\.txt\.cfg$/.test(p)) return ["cfg","CFG","router config"];
+  if(/\.cli$/.test(p)) return ["cli","CLI","SR Linux CLI"];
+  if(/\.(md|txt)$|README|ADDRESSING/i.test(p)) return ["md","TXT","text"];
+  if(/\.json$/.test(p)) return ["cfg","{}","JSON"];
+  if(/\.sh$/.test(p)) return ["conf","SH","shell"];
+  return ["", "···", "plain text"];
+}
+var GROUP_ICON = {"topology":"map","referenced by the topology":"link","configs/":"file","notes":"list","removed - in history":"trash"};
+function renderFiles(){
+  var box=$("files"); box.textContent="";
+  var groups={};
+  files.forEach(function(f){ (groups[f.group]=groups[f.group]||[]).push(f); });
+  ["topology","referenced by the topology","configs/","notes","removed - in history"].forEach(function(g){
+    if(!groups[g]) return;
+    var gh=el("div","fgroup"); gh.appendChild(UI.icon(GROUP_ICON[g]||"file")); gh.appendChild(document.createTextNode(g));
+    box.appendChild(gh);
+    groups[g].forEach(function(f){
+      var gone = f.group==="removed - in history";
+      var b=el("button","fbtn"+(gone?" gone":"")); b.type="button";
+      var x=ext(f.path); b.appendChild(el("span","fi "+x[0],x[1]));
+      b.appendChild(el("span","nm",f.path)); b.appendChild(el("span","fdirty",""));
+      if(!f.exists) b.appendChild(el("span","miss", gone ? "removed" : "missing"));
+      b.title=f.path+(f.exists?"": gone ? " - no longer on disk; its earlier versions are in history"
+                                         : " - referenced but does not exist yet; saving creates it");
+      if(cur && cur.path===f.path){ b.setAttribute("aria-current","true"); if(isDirty()) b.querySelector(".fdirty").textContent="●"; }
+      b.addEventListener("click",function(){ openFile(f.path); });
+      box.appendChild(b);
+    });
+  });
+  $("fcount").textContent = files.length+" files";
+}
+function newConfigFile(){
+  UI.prompt("New config file","Creates configs/<name> in this lab's directory. Reference it from the "
+    +"topology with startup-config: configs/<name>.","r5.cfg",{ok:"Create"}).then(function(v){
+      var n=(v||"").trim(); if(!n) return;
+      post("api/edit/file",{lab_id:labId,path:"configs/"+n,content:"",create:true,sha:null})
+        .then(function(){ return loadFiles(); }).then(function(){ openFile("configs/"+n); })
+        .catch(function(e){ clearMsgs(); msg("crit",e.message); });
+    });
+}
+$("newf").appendChild(UI.button("New config file","sm",newConfigFile,"plus"));
+
+var cmdsDone=false;
+function loadFiles(){
+  return getJ("api/edit/files?lab="+encodeURIComponent(labId)).then(function(d){
+    lab=d.lab; files=d.files;
+    $("labname").textContent=lab.name; $("labpath").textContent=lab.path;
+    document.title = "Edit · " + lab.name;
+    var p=$("labpill"); p.textContent="";
+    p.appendChild(el("span","pill "+(lab.running?"ok":"idle"),lab.running?"running":"stopped"));
+    $("topolink").href="topology.html?lab="+encodeURIComponent(labId);
+    var bl=$("builderlink"); bl.hidden=false;
+    bl.href="builder.html?edit="+encodeURIComponent(labId);
+    bl.textContent = d.builder.in_place ? "Edit in builder" : "Copy into builder";
+    bl.prepend(UI.icon("builder"));
+    bl.title = d.builder.in_place ? "reopen the drawing, change it and save it back"
+             : d.builder.why;
+    bl.onclick = function(e){
+      if(isDirty()){ e.preventDefault(); ask("Unsaved changes","Save or discard your edits to "+cur.path+" first.","OK",null); }
+    };
+    var ban=$("banner");
+    if(lab.running){
+      ban.hidden=false; ban.textContent="";
+      ban.appendChild(UI.icon("warn"));
+      ban.appendChild(document.createTextNode("This lab is running. Edits are saved to disk now and take effect on the next "
+        +"redeploy — the running routers are not changed."));
+    } else ban.hidden=true;
+    renderFiles();
+    if(!cmdsDone){
+      cmdsDone=true;
+      UI.commands([
+        {label:"Save file", icon:"check", hint:"Ctrl S", run:function(){ if(!$("b_save").disabled) save(); }},
+        {label:"Discard changes", icon:"redo", run:function(){ if(!$("b_discard").disabled) $("b_discard").click(); }},
+        {label:"Toggle history", icon:"snapshot", run:function(){ $("b_hist").click(); }},
+        {label:"New config file", icon:"plus", run:newConfigFile},
+        {label:"Open topology map", icon:"map", run:function(){ location.href=$("topolink").href; }},
+        {label:bl.textContent, icon:"builder", run:function(){ bl.click(); }}
+      ].concat(files.map(function(f){ return {group:"Files", label:"Open "+f.path, icon:"file", sub:f.group,
+        run:function(){ openFile(f.path); }}; })));
+    }
+  });
+}
+UI.keys([{keys:"Ctrl S", label:"save the file"},{keys:"Tab", label:"in the editor: indent with two spaces"}]);
+
+function openFile(path){
+  function go(){
+    getJ("api/edit/file?lab="+encodeURIComponent(labId)+"&path="+encodeURIComponent(path)).then(function(f){
+      cur={path:f.path, sha:f.sha, orig:f.content, exists:f.exists};
+      code.disabled=false; code.value=f.content; code.scrollTop=0; errLines={};
+      code.setSelectionRange(0,0);
+      $("fname").textContent=f.path; clearMsgs(); gutter(); dirtyState(); renderFiles();
+      $("s_lang").textContent=ext(f.path)[2];
+      var meta = files.filter(function(x){ return x.path===f.path; })[0] || {};
+      if(!f.exists && meta.group==="removed - in history"){
+        msg("warn","This file was removed. Its earlier versions are in history — pick one, load it "
+          +"into the editor and save to bring it back.");
+        $("hist").hidden=false;
+      } else if(!f.exists) msg("warn","This file is referenced by the topology but does not exist yet. Saving creates it.");
+      try{ history.replaceState(null,"","?lab="+encodeURIComponent(labId)+"&file="+encodeURIComponent(path)); }catch(e){}
+      if(!$("hist").hidden) loadHistory();
+      code.focus({preventScroll:true});
+    }).catch(function(e){ clearMsgs(); msg("crit",e.message); });
+  }
+  if(isDirty() && cur.path!==path){
+    ask("Discard changes?","You have unsaved edits to "+cur.path+".","Discard",go,true);
+  } else go();
+}
+
+// ---------- save ----------
+function save(){
+  if(!cur) return;
+  var text=code.value;
+  $("b_save").disabled=true;
+  post("api/edit/file",{lab_id:labId,path:cur.path,content:text,sha:cur.exists===false?null:cur.sha,
+                        create:cur.exists===false})
+    .then(function(r){
+      cur.orig=text; cur.sha=r.sha; cur.exists=true; dirtyState(); clearMsgs();
+      var m = r.unchanged ? "Nothing changed." : "Saved. The previous version is kept in history.";
+      (r.warnings||[]).forEach(function(w){ msg("warn",w); });
+      var file = files.filter(function(f){ return f.path===cur.path; })[0];
+      if(file) file.exists = true;
+      if(!r.unchanged && (lab.running || (lab.containers||[]).length)){
+        msg("ok", m + " The lab is deployed - redeploy it to load the change.",
+          {label:"redeploy now", cls:"primary", fn: redeploy});
+      } else msg("ok", m);
+      if(!r.unchanged) UI.toast("Saved "+cur.path, "ok", 2500);
+      loadFiles();
+      if(!$("hist").hidden) loadHistory();
+    })
+    .catch(function(e){
+      dirtyState(); clearMsgs();
+      if(e.status===409){
+        msg("crit", e.message, {label:"reload from disk", fn:function(){ cur.orig=code.value; openFile(cur.path); }});
+        return;
+      }
+      msg("crit", e.message);
+      // point at the YAML error line
+      var mm = /line (\d+)/.exec(e.message);
+      if(mm){ errLines={}; errLines[+mm[1]]=1; gutter(); }
+    });
+}
+$("b_save").addEventListener("click",save);
+$("b_discard").addEventListener("click",function(){
+  ask("Discard changes?","Puts "+cur.path+" back to the saved version.","Discard",function(){
+    code.value=cur.orig; errLines={}; gutter(); dirtyState(); clearMsgs();
+  },true);
+});
+function redeploy(){
+  ask("Redeploy "+lab.name+"?","Destroys the running lab and deploys it again from the files on disk "
+    +"(clab deploy --reconfigure). Anything configured on the nodes and not saved to these files is lost.",
+    "Redeploy",function(){
+      post("api/action",{lab_id:labId,action:"redeploy"}).then(function(){
+        clearMsgs(); msg("ok","Redeploy started — follow it on the lab list.",
+          {label:"open lab list", fn:function(){ location.href="/"; }});
+      }).catch(function(e){ clearMsgs(); msg("crit",e.message); });
+    },true);
+}
+
+// ---------- history + diff ----------
+var selVersion=null;
+$("b_hist").addEventListener("click",function(){ $("hist").hidden=!$("hist").hidden;
+  $("b_hist").setAttribute("aria-pressed", $("hist").hidden?"false":"true"); if(!$("hist").hidden) loadHistory(); });
+$("b_hclose").addEventListener("click",function(){ $("hist").hidden=true; $("b_hist").setAttribute("aria-pressed","false"); });
+function loadHistory(){
+  if(!cur) return;
+  $("b_hist").setAttribute("aria-pressed","true");
+  var vl=$("vlist"); vl.textContent="";
+  $("diff").textContent=""; $("diff").appendChild(el("div","c","Pick a version to compare it with what is in the editor."));
+  $("difffoot").textContent="";
+  getJ("api/edit/history?lab="+encodeURIComponent(labId)+"&path="+encodeURIComponent(cur.path)).then(function(d){
+    if(!d.versions.length){ vl.appendChild(el("div","c","no versions"));
+      $("diff").textContent=""; $("diff").appendChild(el("div","c","No earlier versions yet — one is kept every time you save."));
+      return; }
+    d.versions.forEach(function(v){
+      var b=el("button","vbtn",v.when); b.type="button";
+      b.appendChild(el("span","why",(v.why||"")+" · "+v.size+" bytes"));
+      b.addEventListener("click",function(){
+        Array.prototype.forEach.call(vl.children,function(x){ x.removeAttribute("aria-current"); });
+        b.setAttribute("aria-current","true"); showVersion(v);
+      });
+      vl.appendChild(b);
+    });
+  });
+}
+function showVersion(v){
+  getJ("api/edit/version?lab="+encodeURIComponent(labId)+"&path="+encodeURIComponent(cur.path)
+       +"&version="+encodeURIComponent(v.version)).then(function(d){
+    renderDiff(d.content, code.value);
+    var f=$("difffoot"); f.textContent="";
+    f.appendChild(el("span","state","red = only in "+v.when+" · green = only in the editor"));
+    var b=UI.button("Load into editor","sm",null,"download");
+    b.title="replaces the editor text with this version; nothing is written until you save";
+    b.addEventListener("click",function(){ code.value=d.content; errLines={}; gutter(); dirtyState();
+      clearMsgs(); msg("warn","Loaded the "+v.when+" version into the editor — save to make it current."); });
+    f.appendChild(b);
+  });
+}
+function renderDiff(a, b){
+  var A=a.split("\n"), B=b.split("\n"), box=$("diff"); box.textContent="";
+  if(A.length*B.length > 9e6){ box.appendChild(el("div","c","too large to compare line by line")); return; }
+  // LCS table, then walk it
+  var n=A.length, m=B.length, L=new Array(n+1);
+  for(var i=0;i<=n;i++){ L[i]=new Uint32Array(m+1); }
+  for(i=n-1;i>=0;i--) for(var j=m-1;j>=0;j--) L[i][j] = A[i]===B[j] ? L[i+1][j+1]+1 : Math.max(L[i+1][j],L[i][j+1]);
+  var rows=[]; i=0; j=0;
+  while(i<n||j<m){
+    if(i<n&&j<m&&A[i]===B[j]){ rows.push(["c",A[i]]); i++; j++; }
+    else if(j<m&&(i===n||L[i][j+1]>=L[i+1][j])){ rows.push(["a",B[j]]); j++; }
+    else { rows.push(["d",A[i]]); i++; }
+  }
+  var changed=rows.some(function(r){ return r[0]!=="c"; });
+  if(!changed){ box.appendChild(el("div","c","identical to the editor")); return; }
+  // show changes with 3 lines of context
+  var show=rows.map(function(r,k){
+    for(var q=Math.max(0,k-3);q<=Math.min(rows.length-1,k+3);q++) if(rows[q][0]!=="c") return true;
+    return false;
+  });
+  var gap=false;
+  rows.forEach(function(r,k){
+    if(!show[k]){ if(!gap){ box.appendChild(el("div","c","  ⋯")); gap=true; } return; }
+    gap=false;
+    box.appendChild(el("div",r[0],(r[0]==="a"?"+ ":r[0]==="d"?"- ":"  ")+r[1]));
+  });
+}
+
+// ---------- boot ----------
+if(!labId){ document.querySelector(".main").innerHTML='<div class="empty">no lab selected</div>'; return; }
+loadFiles().then(function(){
+  var want = qs.get("file");
+  var first = files.filter(function(f){ return f.path===want; })[0] || files[0];
+  if(first) openFile(first.path);
+}).catch(function(e){
+  document.querySelector(".main").innerHTML='';
+  var d=el("div","empty",e.message+" — the lab may have been removed."); document.querySelector(".main").appendChild(d);
+});
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Labs · Containerlab</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script>try{if(localStorage.getItem("clabd-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
+<link rel="stylesheet" href="ui.css">
+<style>
+/* ---------- header ---------- */
+.live{display:inline-flex;align-items:center;gap:7px;font:500 11.5px var(--font-mono);color:var(--muted);
+  padding:4px 10px;border:1px solid var(--line);border-radius:99px;background:var(--surface)}
+.live.stale{color:var(--crit);border-color:color-mix(in srgb,var(--crit) 40%,transparent)}
+
+/* ---------- host instruments ---------- */
+.host{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 26px}
+.meter{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:13px 16px 14px;min-width:0;overflow:hidden}
+.meter::after{content:"";position:absolute;inset:0 0 auto 0;height:1px;
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--accent) 45%,transparent),transparent);opacity:.6}
+.meter .k{display:flex;align-items:center;gap:7px;font:600 10.5px var(--font-mono);letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted)}
+.meter .k svg{width:14px;height:14px;color:var(--accent)}
+.meter .k .side{margin-left:auto;letter-spacing:.02em;text-transform:none;font-weight:500;color:var(--ink-2)}
+.meter .v{font:600 24px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums;white-space:nowrap;
+  letter-spacing:-.02em}
+.meter .v small{font:400 12px var(--font-mono);color:var(--muted);margin-left:6px;letter-spacing:0}
+.meter .spark{position:absolute;right:12px;bottom:12px;width:44%;height:34px;opacity:.9}
+.meter .spark path.a{fill:color-mix(in srgb,var(--accent) 16%,transparent);stroke:none}
+.meter .spark path.l{fill:none;stroke:var(--accent);stroke-width:1.6;vector-effect:non-scaling-stroke}
+.meter .spark.warn path.l{stroke:var(--warn)} .meter .spark.warn path.a{fill:var(--warn-soft)}
+.meter .spark.crit path.l{stroke:var(--crit)} .meter .spark.crit path.a{fill:var(--crit-soft)}
+.bar{height:5px;border-radius:3px;background:var(--surface-3);margin-top:12px;overflow:hidden;max-width:52%}
+.bar.full{max-width:none}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-ink));border-radius:3px;transition:width .6s ease}
+.bar i.warn{background:var(--warn)} .bar i.crit{background:var(--crit)}
+.segbar{display:flex;gap:3px;margin-top:12px;height:5px}
+.segbar i{flex:1;border-radius:2px;background:var(--surface-3)}
+.segbar i.on{background:var(--ok);box-shadow:0 0 6px color-mix(in srgb,var(--ok) 60%,transparent)}
+@media (max-width:980px){ .host{grid-template-columns:1fr 1fr} }
+@media (max-width:520px){ .host{grid-template-columns:1fr} }
+
+/* ---------- toolbar ---------- */
+.listhead{display:flex;align-items:center;gap:10px;margin:0 0 12px;flex-wrap:wrap}
+.listhead .count{font:12px var(--font-mono);color:var(--muted)}
+.listhead .tools{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.search input{width:260px}
+@media (max-width:760px){ .search input{width:170px} }
+
+/* ---------- lab rows ---------- */
+.labs{display:flex;flex-direction:column;gap:8px}
+.lab{position:relative;display:grid;grid-template-columns:96px minmax(0,1fr) auto auto;align-items:center;gap:18px;
+  padding:10px 12px 10px 10px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s;animation:rise .2s ease-out both}
+.lab:hover{border-color:var(--line-strong);box-shadow:var(--shadow-sm)}
+.lab.run{border-color:color-mix(in srgb,var(--ok) 38%,var(--line))}
+.lab.run::before{content:"";position:absolute;left:-1px;top:14px;bottom:14px;width:3px;border-radius:0 3px 3px 0;
+  background:var(--ok);box-shadow:0 0 12px var(--ok)}
+.lab.part::before{background:var(--warn);box-shadow:0 0 12px var(--warn)}
+.lab.open{border-bottom-left-radius:0;border-bottom-right-radius:0;border-color:var(--line-strong)}
+.thumb{width:96px;height:60px;border-radius:8px;background:var(--canvas);border:1px solid var(--line);display:block;overflow:hidden}
+.thumb line{stroke:var(--line-strong);stroke-width:1.3}
+.thumb circle{fill:var(--oth);stroke:var(--canvas);stroke-width:1.2}
+.thumb .k-xe{fill:var(--xe)} .thumb .k-xr{fill:var(--xr)} .thumb .k-nx{fill:var(--nx)} .thumb .k-lin{fill:var(--lin)}
+.thumb .k-frr{fill:var(--frr)} .thumb .k-srl{fill:var(--srl)}
+.lab.run .thumb line{stroke:color-mix(in srgb,var(--ok) 55%,var(--line-strong))}
+.labmain{min-width:0}
+.labname{display:flex;align-items:center;gap:9px;flex-wrap:wrap;min-width:0}
+.labname a{font:600 16px var(--font-display);color:var(--ink);text-decoration:none;letter-spacing:-.01em}
+.labname a:hover{color:var(--accent-ink)}
+.kinds{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.labsub{font:11px var(--font-mono);color:var(--muted);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.facts{display:grid;grid-template-columns:repeat(3,auto);gap:2px 18px;text-align:right;font-variant-numeric:tabular-nums}
+.facts b{display:block;font:600 15px var(--font-mono);color:var(--ink)}
+.facts span{display:block;font:500 9.5px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.acts{display:flex;gap:4px;align-items:center}
+.acts .ub.main{min-width:108px}
+.acts .ub.main.go svg{color:var(--ok)} .acts .ub.main.re svg{color:var(--warn)} .acts .ub.main.halt svg{color:var(--crit)}
+.acts .chev svg{transition:transform .18s}
+.lab.open .acts .chev svg{transform:rotate(180deg)}
+@media (max-width:1060px){ .facts{display:none} }
+@media (max-width:760px){
+  .lab{grid-template-columns:minmax(0,1fr) auto} .thumb{display:none}
+  .acts .ub.main{min-width:0}
+}
+
+/* node table */
+.nodes{margin-top:-9px;border:1px solid var(--line-strong);border-top:1px dashed var(--line);
+  border-radius:0 0 var(--r-lg) var(--r-lg);background:var(--surface);overflow-x:auto;padding:4px 8px 8px}
+.nodes table{min-width:760px}
+.nodes td{font:12px var(--font-mono);white-space:nowrap;padding:7px 12px}
+.nodes td.nm{font-weight:600;color:var(--ink)}
+.nodes td.nm .tag{margin-left:6px}
+.nodes .ok{color:var(--ok)}
+
+/* ---------- empty / first run ---------- */
+.first{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:6px}
+.first a{display:flex;flex-direction:column;gap:6px;padding:20px;border-radius:var(--r-lg);background:var(--surface);
+  border:1px solid var(--line);text-decoration:none;color:var(--ink);transition:border-color .15s,box-shadow .15s}
+.first a:hover{border-color:var(--accent);box-shadow:var(--glow)}
+.first svg{width:26px;height:26px;color:var(--accent)}
+.first b{font:600 15px var(--font-display)}
+.first span{font-size:12.5px;color:var(--muted)}
+@media (max-width:760px){ .first{grid-template-columns:1fr} }
+
+/* ---------- confirm modal (delete needs a typed name) ---------- */
+.plan{font:11.5px var(--font-mono);margin:6px 0 12px;padding:9px 12px;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:var(--r);list-style:none;word-break:break-all;color:var(--ink)}
+.plan li+li{margin-top:4px}
+#mextra label{display:block;font-size:12.5px;color:var(--ink-2);margin:0 0 6px}
+#mextra .note{margin-bottom:12px}
+</style>
+</head>
+<body class="dots">
+
+<header id="appbar"></header>
+
+<main class="page">
+  <div class="page-h">
+    <div>
+      <div class="eyebrow">lab control</div>
+      <h1>Labs</h1>
+      <div class="sub" id="hostline">connecting…</div>
+    </div>
+    <div class="tools" id="headtools"></div>
+  </div>
+
+  <section class="host" id="stats" aria-label="Host status"></section>
+
+  <div class="listhead">
+    <div class="sech" style="margin:0;flex:none">topologies</div>
+    <span class="count" id="labcount"></span>
+    <div class="tools">
+      <label class="search"><span id="searchicon"></span><input class="uin" id="q" type="search" data-search placeholder="Filter by name, kind or path" aria-label="Filter labs by name, kind or path"><span class="kbd">/</span></label>
+      <span id="filterseg"></span>
+    </div>
+  </div>
+
+  <div class="labs" id="labs"><div class="empty plain"><span class="spin"></span>&nbsp; loading labs…</div></div>
+</main>
+
+<div class="console" id="console" hidden>
+  <div class="chead">
+    <span class="spin" id="cspin"></span>
+    <strong id="ctitle">—</strong>
+    <span class="cmd" id="ccmd"></span>
+    <span class="right">
+      <button id="cfollow" aria-pressed="true">follow</button>
+      <button id="cclose">close</button>
+    </span>
+  </div>
+  <div class="clog" id="clog"></div>
+</div>
+
+<div class="termwrap" id="termwrap" hidden>
+  <div class="termbox">
+    <div class="termhead">
+      <span class="who" id="term_who">—</span>
+      <span class="meta" id="term_meta"></span>
+      <span class="right">
+        <a id="term_tab" href="#" target="_blank" rel="noopener">new tab</a>
+        <button id="term_reload">reconnect</button>
+        <button id="term_close">close</button>
+      </span>
+    </div>
+    <iframe id="term_frame" title="Router CLI" allow="clipboard-write"></iframe>
+  </div>
+</div>
+
+<div class="scrim" id="scrim" hidden>
+  <div class="dlg" id="modal" role="dialog" aria-modal="true" aria-labelledby="mtitle">
+    <header><div class="dlg-ic danger" id="micon"></div><h3 id="mtitle">Confirm</h3></header>
+    <div class="body">
+      <p id="mbody"></p>
+      <div id="mextra"></div>
+    </div>
+    <footer>
+      <button class="ub quiet" id="mcancel">Cancel</button>
+      <button class="ub danger" id="mok">Confirm</button>
+    </footer>
+  </div>
+</div>
+
+<script src="ui.js"></script>
+<script src="lan-dialog.js"></script>
+<script>
+(function(){
+"use strict";
+
+var POLL_IDLE = 3000, POLL_BUSY = 1000;
+var state = null, expanded = new Set(), filter = "all";
+var job = null, jobLines = 0, follow = true, timer = null, failures = 0;
+var memHist = [], cpuHist = [];
+
+// ---------- helpers ----------
+function $(id){ return document.getElementById(id); }
+function el(tag, cls, txt){
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (txt !== undefined && txt !== null) e.textContent = txt;
+  return e;
+}
+function svgEl(t, a){ var e = document.createElementNS("http://www.w3.org/2000/svg", t); for (var k in a) e.setAttribute(k, a[k]); return e; }
+function gb(mb){
+  if (mb === null || mb === undefined) return "—";
+  return mb >= 1024 ? (mb/1024).toFixed(mb >= 10240 ? 0 : 1) + " GB" : mb + " MB";
+}
+function dur(s){
+  if (!s && s !== 0) return "—";
+  var d = Math.floor(s/86400), h = Math.floor(s%86400/3600), m = Math.floor(s%3600/60);
+  if (d) return d + "d " + h + "h";
+  if (h) return h + "h " + m + "m";
+  return m + "m";
+}
+function sevClass(pct){ return pct >= 90 ? "crit" : pct >= 75 ? "warn" : ""; }
+
+// ---------- app bar ----------
+var liveBox = el("span","live");
+var liveDot = el("span","led ok pulse"); liveDot.id = "livedot"; liveBox.appendChild(liveDot);
+var liveTxt = el("span",null,"live"); liveTxt.id = "livetxt"; liveBox.appendChild(liveTxt);
+UI.appbar($("appbar"), {active:"labs"});   // liveBox is kept off-screen: the poller still updates it
+$("searchicon").appendChild(UI.icon("search"));
+
+function newLabMenu(anchor){
+  UI.menu(anchor, [
+    {label:"Draw it in the builder", icon:"builder", href:"/builder.html"},
+    {label:"From a template", icon:"grid", href:"/catalog.html", hint:"catalogue"},
+    {label:"Import a zip or git repo", icon:"upload", href:"/catalog.html#import"}
+  ]);
+}
+var newBtn = UI.button("New lab", "primary", null, "plus");
+newBtn.setAttribute("aria-haspopup","menu");
+newBtn.addEventListener("click", function(){ newLabMenu(newBtn); });
+$("headtools").appendChild(newBtn);
+
+UI.commands([
+  {label:"New lab - draw it in the builder", icon:"builder", run:function(){ location.href = "/builder.html"; }},
+  {label:"New lab - from a template", icon:"grid", run:function(){ location.href = "/catalog.html"; }},
+  {label:"Show running labs", icon:"play", run:function(){ setFilter("running"); }},
+  {label:"Show all labs", icon:"labs", run:function(){ setFilter("all"); }},
+  {label:"Collapse every node table", icon:"list", run:function(){ expanded.clear(); if (state) redraw(); }}
+]);
+UI.keys([{keys:"Enter", label:"on a focused lab row: show / hide its nodes"}]);
+
+// ---------- host stats ----------
+function spark(hist, cls){
+  var w = 100, h = 30, n = hist.length;
+  var s = svgEl("svg", {"class":"spark " + (cls || ""), viewBox:"0 0 " + w + " " + h, preserveAspectRatio:"none"});
+  if (n < 2) return s;
+  var max = Math.max(10, Math.max.apply(null, hist) * 1.15);
+  var pts = hist.map(function(v, i){ return [(i / (n - 1)) * w, h - (v / max) * (h - 2) - 1]; });
+  var d = pts.map(function(p, i){ return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join("");
+  s.appendChild(svgEl("path", {"class":"a", d: d + "L" + w + " " + h + "L0 " + h + "Z"}));
+  s.appendChild(svgEl("path", {"class":"l", d: d}));
+  return s;
+}
+function renderStats(h){
+  var box = $("stats");
+  box.textContent = "";
+  var memPct = h.mem_pct || 0, diskPct = h.disk_pct || 0, cpuPct = h.cpu_pct || 0;
+  var freeMb = (h.mem_total_mb || 0) - (h.mem_used_mb || 0);
+  function meter(ic, k, side, v, unit, title){
+    var m = el("div","meter"); if (title) m.title = title;
+    var kk = el("div","k"); kk.appendChild(UI.icon(ic)); kk.appendChild(el("span",null,k)); kk.appendChild(el("span","side",side||""));
+    m.appendChild(kk);
+    var val = el("div","v", v); if (unit) val.appendChild(el("small", null, unit)); m.appendChild(val);
+    box.appendChild(m);
+    return m;
+  }
+  function bar(m, pct, full){
+    var b = el("div","bar" + (full ? " full" : "")), i = el("i", sevClass(pct)); i.style.width = Math.min(100, pct) + "%";
+    b.appendChild(i); m.appendChild(b);
+  }
+  var mm = meter("mem", "Memory", memPct + "%", gb(h.mem_used_mb), "/ " + gb(h.mem_total_mb), gb(freeMb) + " free");
+  bar(mm, memPct); mm.appendChild(spark(memHist, sevClass(memPct)));
+  var cm = meter("cpu", "CPU", h.cpu_count ? h.cpu_count + " cores" : "", cpuPct.toFixed(0) + "%", h.load ? "load " + h.load[0] : "",
+        h.load ? "load average " + h.load.join(" ") : "");
+  bar(cm, cpuPct); cm.appendChild(spark(cpuHist, sevClass(cpuPct)));
+  var dm = meter("disk", "Disk", diskPct + "% used", h.disk_free_gb + " GB", "free", h.disk_total_gb + " GB total");
+  bar(dm, diskPct, true);
+  var lm = meter("box", "Labs", (h.containers_running||0) + " containers", (h.labs_running||0) + " running", "/ " + (h.labs_total||0));
+  var sb = el("div","segbar");
+  for (var i = 0; i < Math.min(h.labs_total || 0, 24); i++) sb.appendChild(el("i", i < (h.labs_running||0) ? "on" : ""));
+  lm.appendChild(sb);
+  $("hostline").textContent = (h.hostname || "host") + "  ·  containerlab " + (h.clab_version || "?")
+    + "  ·  up " + dur(h.uptime_s) + "  ·  " + (h.cpu_count || "?") + " cores, " + gb(h.mem_total_mb) + " RAM";
+}
+
+// ---------- labs ----------
+function labSignature(s){
+  return JSON.stringify(s.labs.map(function(l){
+    return [l.id, l.running, l.running_count, l.healthy_count, JSON.stringify(l.lan||{}), !!s.busy,
+            (l.containers||[]).map(function(c){ return c.state+c.status+(c.cpu||"")+(c.mem||""); }).join("")];
+  })) + filter + query + JSON.stringify(Array.from(expanded));
+}
+
+var query = "";
+function badge(cls, text, title, ic){
+  var b = el("span","ubadge " + cls); if (ic) b.appendChild(UI.icon(ic));
+  b.appendChild(document.createTextNode(text)); if (title) b.title = title; return b;
+}
+function redraw(){ renderLabs(state); lastSig = labSignature(state); }
+function toggle(l){ if (expanded.has(l.id)) expanded.delete(l.id); else expanded.add(l.id); redraw(); }
+function setFilter(v){
+  filter = v;
+  $("filterseg").querySelectorAll("button").forEach(function(b, i){
+    b.setAttribute("aria-pressed", ["all","running","stopped"][i] === v ? "true" : "false"); });
+  if (state) redraw();
+}
+
+// A tiny drawing of the lab: builder positions when the topology has them,
+// otherwise the nodes on a circle. Purely decorative - the map is one click away.
+function thumb(l){
+  var W = 96, H = 60, s = svgEl("svg", {"class":"thumb", viewBox:"0 0 " + W + " " + H, "aria-hidden":"true"});
+  var nodes = l.nodes || [], n = nodes.length;
+  if (!n) return s;
+  var pos = {}, have = nodes.filter(function(x){ return x.pos && x.pos.length === 2; }).length === n;
+  if (have){
+    var xs = nodes.map(function(x){ return +x.pos[0]; }), ys = nodes.map(function(x){ return +x.pos[1]; });
+    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+    var sx = (W - 20) / Math.max(1, x1 - x0), sy = (H - 16) / Math.max(1, y1 - y0), sc = Math.min(sx, sy);
+    var ox = (W - (x1 - x0) * sc) / 2, oy = (H - (y1 - y0) * sc) / 2;
+    nodes.forEach(function(x){ pos[x.name] = [ox + (x.pos[0] - x0) * sc, oy + (x.pos[1] - y0) * sc]; });
+  } else {
+    var rx = n === 1 ? 0 : W / 2 - 12, ry = n === 1 ? 0 : H / 2 - 9;
+    nodes.forEach(function(x, i){
+      var a = -Math.PI / 2 + i * 2 * Math.PI / n;
+      pos[x.name] = [W / 2 + rx * Math.cos(a), H / 2 + ry * Math.sin(a)];
+    });
+  }
+  (l.links || []).forEach(function(k){
+    var a = pos[k.a], b = pos[k.b];
+    if (a && b) s.appendChild(svgEl("line", {x1:a[0], y1:a[1], x2:b[0], y2:b[1]}));
+  });
+  var r = n > 14 ? 2.6 : n > 8 ? 3.2 : 4;
+  nodes.forEach(function(x){
+    var p = pos[x.name];
+    s.appendChild(svgEl("circle", {cx:p[0], cy:p[1], r:r, "class":UI.kindClass(x.kind, x.image)}));
+  });
+  return s;
+}
+
+function renderLabs(s){
+  var host = s.host || {}, box = $("labs");
+  var q = query.trim().toLowerCase();
+  var labs = s.labs.filter(function(l){
+    if (filter !== "all" && (filter === "running") !== !!l.running) return false;
+    if (!q) return true;
+    return ((l.name||"") + " " + l.path + " " + Object.keys(l.kinds||{}).join(" ")).toLowerCase().indexOf(q) >= 0;
+  });
+  $("labcount").textContent = s.labs.length + " total · " + (host.labs_running || 0) + " running";
+
+  box.textContent = "";
+  if (!s.labs.length){
+    var first = el("div");
+    first.appendChild(el("div","empty plain","No topologies found yet. Start one:"));
+    var g = el("div","first");
+    [["builder","Draw it","drag routers onto a canvas, wire them up, get configs generated","/builder.html"],
+     ["catalog","Pick a template","SR-MPLS, SRv6, EVPN and more, ready to deploy","/catalog.html"],
+     ["upload","Import","a zip export or any git repo with a .clab.yml","/catalog.html#import"]].forEach(function(c){
+      var a = el("a"); a.href = c[3]; a.appendChild(UI.icon(c[0])); a.appendChild(el("b",null,c[1])); a.appendChild(el("span",null,c[2]));
+      g.appendChild(a);
+    });
+    first.appendChild(g); box.appendChild(first); return;
+  }
+  if (!labs.length){ box.appendChild(el("div","empty", q ? "no lab matches “" + query + "”" : "no " + filter + " labs")); return; }
+
+  var nameCount = {};
+  s.labs.forEach(function(l){ nameCount[l.name] = (nameCount[l.name]||0) + 1; });
+  var freeMb = (host.mem_total_mb || 0) - (host.mem_used_mb || 0);
+  var busy = !!s.busy;
+
+  labs.forEach(function(l, idx){
+    var partial = l.running && l.running_count < l.node_count;
+    var gone = l.parse_error === "topology file not found on disk";
+    var drawable = l.node_count > 0 && !l.parse_error;
+    var open = expanded.has(l.id) && l.node_count > 0;
+    var row = el("div","lab" + (l.running ? " run" : "") + (partial ? " part" : "") + (open ? " open" : ""));
+    row.style.animationDelay = Math.min(idx, 12) * 18 + "ms";
+    row.tabIndex = 0;
+    if (drawable){
+      row.addEventListener("click", function(e){
+        if (e.target.closest("a,button")) return;
+        toggle(l);
+      });
+      row.addEventListener("keydown", function(e){
+        if (e.target === row && (e.key === "Enter" || e.key === " ")){ e.preventDefault(); toggle(l); }
+      });
+      row.title = "click to " + (open ? "hide" : "show") + " the nodes";
+    }
+
+    row.appendChild(thumb(l));
+
+    // --- name, badges, kinds ---
+    var main = el("div","labmain"), nameLine = el("div","labname");
+    nameLine.appendChild(el("span","led " + (l.running ? (partial ? "warn" : "ok") : "")));
+    var nm = el("a", null, l.name || l.file);
+    nm.href = drawable ? "topology.html?lab=" + encodeURIComponent(l.id) : "edit.html?lab=" + encodeURIComponent(l.id);
+    nm.title = l.path;
+    nameLine.appendChild(nm);
+    if (partial) nameLine.appendChild(badge("warn", l.running_count + "/" + l.node_count + " up"));
+    else if (l.running){
+      var booting = (l.containers||[]).filter(function(c){ return c.status === "starting"; }).length;
+      if (booting) nameLine.appendChild(badge("info", booting + " booting", "waiting for the routers' health checks"));
+      else nameLine.appendChild(badge("ok", "running"));
+    }
+    if (l.parse_error) nameLine.appendChild(badge("crit", "can’t parse", l.parse_error, "warn"));
+    if (l.stale_containers) nameLine.appendChild(badge("warn", "left over from a reboot",
+      "Containers from a previous session exist but are stopped (the host rebooted?). "
+      + "Redeploy brings the lab back; a plain start would not restart them.", "warn"));
+    else if (l.stale_config) nameLine.appendChild(badge("warn", "changed since deploy",
+      "The topology or configs changed since the last deploy. Redeploy (deploy --reconfigure) loads them; "
+      + "a plain start would reuse clab-" + l.name + "/ and the old config.", "warn"));
+    if (nameCount[l.name] > 1) nameLine.appendChild(badge("", "name used by " + nameCount[l.name] + " files",
+      "Lab name “" + l.name + "” is claimed by " + nameCount[l.name] + " topology files - only one can run at a time."));
+    if (!l.running && freeMb > 0 && l.est_ram_mb > freeMb)
+      nameLine.appendChild(badge("warn", "needs " + gb(l.est_ram_mb), "only " + gb(freeMb) + " free on the host", "warn"));
+    var lanOn = l.lan && l.lan.enabled, lanLive = lanOn ? l.lan.active.length : 0;
+    if (lanLive) nameLine.appendChild(badge("ok", "LAN · " + lanLive, lanLive + " management address(es) live on your LAN", "lan"));
+    main.appendChild(nameLine);
+    var kinds = el("div","kinds");
+    Object.keys(l.kinds || {}).sort().forEach(function(k){
+      var img = ((l.nodes || []).filter(function(n){ return n.kind === k; })[0] || {}).image;
+      var t = el("span","tag " + UI.kindClass(k, img)); t.title = k;
+      t.appendChild(el("i")); t.appendChild(el("b", null, l.kinds[k] + "×"));
+      t.appendChild(document.createTextNode(UI.kindLabel(k, img)));
+      kinds.appendChild(t);
+    });
+    if (kinds.children.length) main.appendChild(kinds);
+    var sub = el("div","labsub", l.path);
+    sub.title = l.path + (l.mgmt_subnet ? "\nmgmt " + l.mgmt_subnet : "");
+    main.appendChild(sub);
+    row.appendChild(main);
+
+    // --- facts ---
+    var facts = el("div","facts");
+    function fact(v, k){ var d = el("div"); d.appendChild(el("b", null, v)); d.appendChild(el("span", null, k)); facts.appendChild(d); }
+    fact((l.running ? l.running_count + "/" : "") + l.node_count, "nodes");
+    fact(String(l.link_count), "links");
+    fact((l.running ? "" : "~") + gb(l.est_ram_mb), "ram");
+    row.appendChild(facts);
+
+    // --- actions: one main button, the map, everything else in the menu ---
+    var acts = el("div","acts");
+    var needsRe = l.stale_config || l.stale_containers;
+    var mainBtn;
+    if (l.running){
+      mainBtn = UI.button("Stop", "main halt", function(){
+        confirmThen("Stop " + (l.name||l.file) + "?",
+          "Destroys all " + l.node_count + " nodes. Anything configured on them since "
+          + "deploy and not saved to the topology is lost.",
+          "Stop lab", function(){ act(l, "destroy"); });
+      }, "stop");
+      mainBtn.title = "clab destroy";
+    } else {
+      mainBtn = UI.button(needsRe ? "Redeploy" : "Start", "main " + (needsRe ? "re" : "go"), function(){
+        var short = freeMb > 0 && l.est_ram_mb > freeMb;
+        if (short){
+          confirmThen("Not enough free memory",
+            (l.name||l.file) + " needs about " + gb(l.est_ram_mb) + " but only "
+            + gb(freeMb) + " is free. Deploying anyway will likely fail or destabilise running labs.",
+            "Start anyway", function(){ act(l, needsRe ? "redeploy" : "deploy"); });
+        } else act(l, needsRe ? "redeploy" : "deploy");
+      }, needsRe ? "redo" : "play");
+      mainBtn.title = needsRe ? "clab deploy --reconfigure" : "clab deploy";
+    }
+    mainBtn.disabled = busy || !!l.parse_error;
+    if (busy) mainBtn.title = "another action is running";
+    acts.appendChild(mainBtn);
+    if (drawable){
+      var mapA = el("a","ub quiet icon"); mapA.appendChild(UI.icon("map"));
+      mapA.href = "topology.html?lab=" + encodeURIComponent(l.id); mapA.title = "topology map";
+      acts.appendChild(mapA);
+    }
+    acts.appendChild(UI.moreButton(function(){
+      return [
+        drawable ? {label: expanded.has(l.id) ? "Hide nodes" : "Nodes and CLI", icon:"list", onClick:function(){ toggle(l); }} : null,
+        drawable ? {label:"Topology map", icon:"map", href:"topology.html?lab=" + encodeURIComponent(l.id)} : null,
+        drawable ? {label:"Convergence tests", icon:"bolt", href:"convergence.html?lab=" + encodeURIComponent(l.id)} : null,
+        !gone ? {label:"Edit files", icon:"file", href:"edit.html?lab=" + encodeURIComponent(l.id)} : null,
+        drawable ? {label:"LAN access…", icon:"lan", hint: lanOn ? (lanLive ? lanLive + " live" : "on") : "",
+          onClick:function(){ LanDialog.open(l, function(){ schedule(300); }); }} : null,
+        !gone ? {label:"Export as zip", icon:"download", href:"api/lab/export?lab=" + encodeURIComponent(l.id)} : null,
+        l.running ? {label:"Redeploy", icon:"redo", disabled:busy, onClick:function(){
+          confirmThen("Redeploy " + (l.name||l.file) + "?",
+            "This destroys the running lab and deploys it again from the topology file. "
+            + "All in-flight configuration on the nodes is lost.", "Redeploy", function(){ act(l, "redeploy"); }); }} : null,
+        {sep:1},
+        {label:"Delete…", icon:"trash", danger:true, disabled:busy, onClick:function(){ confirmDelete(l); }}
+      ];
+    }));
+    if (drawable){
+      var chev = UI.button("", "quiet chev", function(){ toggle(l); }, "chevron");
+      chev.title = open ? "hide nodes" : "nodes and CLI";
+      chev.setAttribute("aria-expanded", open ? "true" : "false");
+      acts.appendChild(chev);
+    }
+    row.appendChild(acts);
+    box.appendChild(row);
+
+    // --- node table ---
+    if (open){
+      var wrap = el("div","nodes"), t = el("table","utable");
+      var thead = el("thead"), hr = el("tr");
+      ["node","image","state","health","mgmt ipv4","lan","cpu","memory",""].forEach(function(h){
+        hr.appendChild(el("th",null,h));
+      });
+      thead.appendChild(hr); t.appendChild(thead);
+      var tb = el("tbody");
+      var byName = {};
+      (l.containers||[]).forEach(function(c){ byName[c.short] = c; });
+      l.nodes.forEach(function(n){
+        var c = byName[n.name] || {};
+        var tr = el("tr");
+        var nmTd = el("td","nm",n.name);
+        var kt = el("span","tag " + UI.kindClass(n.kind, n.image), UI.kindLabel(n.kind, n.image)); kt.title = n.kind;
+        nmTd.appendChild(kt);
+        tr.appendChild(nmTd);
+        tr.appendChild(el("td","dim",n.image));
+        var stTd = el("td");
+        if (c.state){
+          stTd.appendChild(el("span","pill " + (c.state === "running" ? "ok" : "crit"), c.state));
+        } else { stTd.className = "dim"; stTd.textContent = "—"; }
+        tr.appendChild(stTd);
+        var hTd = el("td");
+        if (/^(healthy|starting|unhealthy)$/.test(c.status || "")){
+          var hc = c.status === "healthy" ? "ok" : c.status === "starting" ? "warn" : "crit";
+          hTd.appendChild(el("span","pill " + hc, c.status));
+        } else { hTd.className = "dim"; hTd.textContent = "—"; hTd.title = "no health check"; }
+        tr.appendChild(hTd);
+        tr.appendChild(el("td", c.ipv4 ? null : "dim", c.ipv4 || n.mgmt_ipv4 || "—"));
+        var lanIp = l.lan && l.lan.nodes[n.name], lanUp = l.lan && l.lan.active.indexOf(n.name) >= 0;
+        var lanTd = el("td", lanUp ? "ok" : "dim", lanIp ? lanIp + (lanUp ? "" : " (off)") : "—");
+        var sshm = lanUp && l.lan.ssh ? l.lan.ssh[n.name] : null;
+        if (sshm === "gateway"){
+          lanTd.title = "no SSH server on this node - ssh reaches the dashboard's SSH gateway: "
+            + l.lan.gateway_login + ", lands in the node's CLI";
+          lanTd.appendChild(el("span", "dim", " · ssh gw"));
+        } else if (lanUp && (l.lan.unreachable || []).indexOf(n.name) >= 0){
+          lanTd.title = "the LAN address is live, but the node's management address does not answer";
+          lanTd.appendChild(el("span", "dim", " · unreachable"));
+          lanTd.style.color = "var(--warn)";
+        } else if (sshm === "none"){
+          lanTd.title = "the address is live, but nothing answers on port 22 yet";
+          lanTd.appendChild(el("span", "dim", " · no ssh yet"));
+        }
+        tr.appendChild(lanTd);
+        tr.appendChild(el("td", c.cpu ? null : "dim", c.cpu || "—"));
+        tr.appendChild(el("td", c.mem ? null : "dim", c.mem || gb(n.est_ram_mb) + " est"));
+        var cliTd = el("td"); cliTd.style.textAlign = "right";
+        if (c.name && c.state === "running"){
+          var cli = UI.button("CLI", "sm", function(){
+            openTerm(c.name, n.name + " · " + l.name, (c.ipv4 || "") + " · " + n.kind);
+          }, "terminal");
+          cli.title = "open " + c.name + " in the browser";
+          cliTd.appendChild(cli);
+        }
+        tr.appendChild(cliTd);
+        tb.appendChild(tr);
+      });
+      t.appendChild(tb); wrap.appendChild(t); box.appendChild(wrap);
+    }
+  });
+}
+
+// ---------- web terminal ----------
+// ttyd sits behind /term/ and takes the container name in ?arg=. The server
+// validates that name against the running containers before it execs ssh, and
+// resolves the credentials from the topology, so nothing sensitive is in here.
+function termUrl(container){
+  return "term/?arg=" + encodeURIComponent(container);
+}
+function openTerm(container, who, meta){
+  $("term_who").textContent = who;
+  $("term_meta").textContent = meta || "";
+  $("term_tab").href = termUrl(container);
+  $("term_frame").src = termUrl(container);
+  $("termwrap").hidden = false;
+  $("termwrap").dataset.container = container;
+}
+function closeTerm(){
+  $("termwrap").hidden = true;
+  $("term_frame").src = "about:blank";   // drop the session
+}
+$("term_close").addEventListener("click", closeTerm);
+$("term_reload").addEventListener("click", function(){
+  var c = $("termwrap").dataset.container;
+  if (c) $("term_frame").src = termUrl(c);
+});
+$("termwrap").addEventListener("click", function(e){
+  if (e.target === $("termwrap")) closeTerm();
+});
+
+// ---------- confirm modal ----------
+var pending = null;
+$("micon").appendChild(UI.icon("warn"));
+function confirmThen(title, bodyTxt, okLabel, fn, extra){
+  $("mtitle").textContent = title;
+  $("mbody").textContent = bodyTxt;
+  $("mok").textContent = okLabel;
+  $("mok").disabled = false;
+  $("mextra").textContent = "";
+  $("modal").classList.toggle("wide", !!extra);
+  if (extra) $("mextra").appendChild(extra);
+  pending = fn;
+  $("scrim").hidden = false;
+  $("mok").focus();
+}
+function closeModal(){ $("scrim").hidden = true; pending = null; $("mextra").textContent = ""; }
+
+// Delete asks the server what it would move - the server decides, not us -
+// and makes you type the lab name, which the server checks again.
+function confirmDelete(l){
+  var name = l.name || l.file;
+  fetch("api/delete-plan?lab=" + encodeURIComponent(l.id), {cache:"no-store"})
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+    .then(function(res){
+      if (!res.ok){ alert(res.j.error || "could not plan the delete"); return; }
+      var p = res.j, box = el("div");
+      box.appendChild(el("label", null, "These move to " + p.trash_dir + ":"));
+      var ul = el("ul","plan");
+      p.moves.forEach(function(m){
+        ul.appendChild(el("li", null, m + (p.mode === "dir" ? "/  (whole directory)" : "")));
+      });
+      box.appendChild(ul);
+      if (p.shared_with.length)
+        box.appendChild(el("div","note warn",
+          "the directory also holds " + p.shared_with.join(", ")
+          + " — only this lab's files are moved, the rest stays"));
+      var f = el("div","field");
+      var lab = el("label", null, "Type " + name + " to confirm");
+      var inp = el("input","mono"); inp.type = "text"; inp.autocomplete = "off"; inp.spellcheck = false;
+      lab.htmlFor = inp.id = "mconfirm";
+      f.appendChild(lab); f.appendChild(inp); box.appendChild(f);
+
+      confirmThen("Delete " + name + "?",
+        (p.will_destroy ? "The lab has containers, so it is destroyed first — anything "
+          + "configured on the nodes and not saved is lost. " : "")
+        + "Its files are " + (p.will_destroy ? "then " : "") + "moved to the trash, not erased; a RESTORE.txt beside "
+        + "them has the commands to put them back.",
+        "Delete lab", function(){ act(l, "delete", {confirm_name: inp.value}); }, box);
+      $("mok").disabled = true;
+      inp.addEventListener("input", function(){ $("mok").disabled = inp.value !== name; });
+      inp.addEventListener("keydown", function(e){
+        if (e.key === "Enter" && inp.value === name) $("mok").click();
+      });
+      inp.focus();
+    })
+    .catch(function(err){ alert("request failed: " + err); });
+}
+$("mcancel").addEventListener("click", closeModal);
+$("scrim").addEventListener("click", function(e){ if (e.target === $("scrim")) closeModal(); });
+$("mok").addEventListener("click", function(){ var f = pending; closeModal(); if (f) f(); });
+document.addEventListener("keydown", function(e){
+  if (e.key !== "Escape") return;
+  if (!$("termwrap").hidden) closeTerm(); else closeModal();
+});
+
+// ---------- actions ----------
+function act(lab, action, extra){
+  var body = {lab_id: lab.id, action: action};
+  if (extra) Object.keys(extra).forEach(function(k){ body[k] = extra[k]; });
+  fetch("api/action", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(body)
+  }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+    .then(function(res){
+      if (!res.ok){ alert(res.j.error || "action failed"); return; }
+      job = res.j.job_id; jobLines = 0; follow = true;
+      $("clog").textContent = "";
+      $("console").hidden = false;
+      $("cspin").style.display = "";
+      $("ctitle").textContent = action + " · " + (lab.name || lab.file);
+      pollJob();
+      schedule(POLL_BUSY);
+    })
+    .catch(function(err){ alert("request failed: " + err); });
+}
+
+$("cclose").addEventListener("click", function(){ $("console").hidden = true; });
+$("cfollow").addEventListener("click", function(){
+  follow = !follow;
+  $("cfollow").setAttribute("aria-pressed", follow ? "true" : "false");
+  if (follow) $("clog").scrollTop = $("clog").scrollHeight;
+});
+
+function pollJob(){
+  if (!job) return;
+  fetch("api/job/" + job + "?since=" + jobLines)
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j.error) return;
+      $("ccmd").textContent = j.cmd || "";
+      var log = $("clog");
+      (j.lines || []).forEach(function(line){
+        var cls = line.indexOf("$ ") === 0 ? "cmdline"
+                : /exited with code 0/.test(line) ? "done"
+                : /(error|ERRO|failed|FATA)/.test(line) ? "err" : null;
+        var d = el("div", cls, line);
+        log.appendChild(d);
+      });
+      jobLines = j.total_lines;
+      if (follow) log.scrollTop = log.scrollHeight;
+      if (!j.running){
+        $("cspin").style.display = "none";
+        $("ctitle").textContent = j.action + " · " + j.lab_name
+          + (j.rc === 0 ? " — done" : " — failed (rc " + j.rc + ")");
+        UI.toast(j.action + " " + j.lab_name + (j.rc === 0 ? " finished" : " failed (rc " + j.rc + ")"), j.rc === 0 ? "ok" : "crit");
+        job = null;
+        schedule(POLL_IDLE);
+      } else {
+        setTimeout(pollJob, 900);
+      }
+    })
+    .catch(function(){ setTimeout(pollJob, 2000); });
+}
+
+// ---------- polling ----------
+var lastSig = "";
+function tick(){
+  fetch("api/state", {cache:"no-store"})
+    .then(function(r){ return r.json(); })
+    .then(function(s){
+      failures = 0;
+      liveDot.className = "led ok pulse"; liveBox.classList.remove("stale");
+      liveTxt.textContent = s.busy ? "live · job running" : "live";
+      state = s;
+      var h = s.host || {};
+      memHist.push(h.mem_pct || 0); cpuHist.push(h.cpu_pct || 0);
+      if (memHist.length > 60){ memHist.shift(); cpuHist.shift(); }
+      renderStats(h);
+      var sig = labSignature(s);
+      if (sig !== lastSig){ renderLabs(s); lastSig = sig; }
+      schedule(s.busy ? POLL_BUSY : POLL_IDLE);
+    })
+    .catch(function(){
+      failures++;
+      liveDot.className = "led crit"; liveBox.classList.add("stale");
+      liveTxt.textContent = "disconnected";
+      schedule(Math.min(15000, 2000 * failures));
+    });
+}
+function schedule(ms){ clearTimeout(timer); timer = setTimeout(tick, ms); }
+
+$("filterseg").appendChild(UI.seg([["all","All"],["running","Running"],["stopped","Stopped"]], filter,
+  function(v){ filter = v; if (state) redraw(); }));
+$("q").addEventListener("input", function(){
+  query = $("q").value; if (state) redraw();
+});
+$("q").addEventListener("keydown", function(e){ if (e.key === "Escape" && $("q").value){ e.stopPropagation(); $("q").value = ""; query = ""; if (state) redraw(); } });
+
+document.addEventListener("visibilitychange", function(){
+  if (!document.hidden) schedule(0);
+});
+
+tick();
+})();
+</script>
+</body>
+</html>

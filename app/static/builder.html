@@ -1,0 +1,1361 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Builder · Containerlab</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script>try{if(localStorage.getItem("clabd-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
+<link rel="stylesheet" href="ui.css">
+<style>
+html,body{height:100%}
+body{overflow:hidden}
+
+/* ---------- chrome ---------- */
+.app{display:flex;flex-direction:column;height:100%}
+.namewrap{display:flex;align-items:center;gap:8px;margin-left:4px}
+.namewrap label{font:600 10px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.namewrap input{width:170px;font-family:var(--font-mono);font-size:12.5px;height:30px}
+.namewrap .err{color:var(--crit);font:11px var(--font-mono)}
+.savegrp{display:inline-flex}
+.savegrp .ub.primary:first-child{border-top-right-radius:0;border-bottom-right-radius:0}
+.savegrp .ub.primary + .ub.primary{border-top-left-radius:0;border-bottom-left-radius:0;width:28px;padding:0;
+  border-left:1px solid color-mix(in srgb,var(--on-accent) 25%,transparent)}
+.main{display:flex;flex:1;min-height:0}
+
+/* ---------- side panels ---------- */
+.panel{flex:none;background:var(--surface);overflow-y:auto;display:flex;flex-direction:column}
+.panel.left{border-right:1px solid var(--line);width:252px}
+.panel.right{border-left:1px solid var(--line);width:318px}
+.sec{padding:14px 16px;border-bottom:1px solid var(--line)}
+.sec h2{font:600 10.5px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;
+  display:flex;align-items:center;gap:8px}
+.sec h2 .cnt{margin-left:auto;letter-spacing:0;text-transform:none;font-weight:500;color:var(--ink-2)}
+.sec .hint{margin:8px 0 0}
+.panel.left .sec{border-bottom:0}
+.palsearch{display:flex;margin:0 0 10px}
+.palsearch input{width:100%}
+
+/* collapsible settings */
+details.fold>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary svg{width:15px;height:15px;color:var(--accent)}
+details.fold>summary::after{content:"";width:6px;height:6px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);
+  transform:rotate(-45deg);margin-left:auto;transition:transform .15s}
+details.fold[open]>summary::after{transform:rotate(45deg)}
+details.fold>summary h2{margin:0}
+details.fold>summary:hover h2{color:var(--ink)}
+details.fold[open]>summary{margin-bottom:12px}
+details.more>summary{font-size:12px;color:var(--accent-ink);cursor:pointer;margin-top:6px}
+
+/* palette */
+.pal{display:flex;flex-direction:column;gap:3px}
+.pgroup{font:600 10px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  padding:10px 4px 4px;display:flex;align-items:center;gap:8px}
+.pgroup::after{content:"";flex:1;height:1px;background:var(--line)}
+.pgroup:first-child{padding-top:2px}
+.pal details.other>summary{font-size:12px;color:var(--muted);cursor:pointer;padding:12px 4px 4px}
+.pal details.other>summary:hover{color:var(--ink)}
+.pcard{position:relative;border:1px solid transparent;border-radius:var(--r);padding:6px 8px;cursor:grab;
+  display:flex;align-items:center;gap:10px;min-width:0;transition:background .12s,border-color .12s}
+.pcard:hover{background:var(--surface-2);border-color:var(--line-strong)}
+.pcard:active{cursor:grabbing}
+.pcard[data-off="1"]{opacity:.5;cursor:not-allowed}
+.pcard .head{width:34px;height:34px;flex:none;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  background:var(--surface-2);border:1px solid var(--line)}
+.pcard:hover .head{background:var(--surface)}
+.pcard .head svg{flex:none;color:var(--muted)}
+.pcard.k-xe .head svg{color:var(--xe)} .pcard.k-xr .head svg{color:var(--xr)} .pcard.k-nx .head svg{color:var(--nx)}
+.pcard.k-lin .head svg{color:var(--lin)} .pcard.k-frr .head svg{color:var(--frr)} .pcard.k-srl .head svg{color:var(--srl)}
+.pcard.k-xe .head{background:var(--xe-soft);border-color:transparent} .pcard.k-xr .head{background:var(--xr-soft);border-color:transparent}
+.pcard.k-nx .head{background:var(--nx-soft);border-color:transparent} .pcard.k-lin .head{background:var(--lin-soft);border-color:transparent}
+.pcard.k-frr .head{background:var(--frr-soft);border-color:transparent} .pcard.k-srl .head{background:var(--srl-soft);border-color:transparent}
+.pcard .txt{min-width:0;flex:1}
+.pcard .os{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
+.pcard .os small{font:500 10px var(--font-mono);color:var(--muted);margin-left:auto}
+.pcard .img{font:10.5px var(--font-mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcard .note-dot{width:6px;height:6px;border-radius:50%;background:var(--warn);flex:none;box-shadow:0 0 6px var(--warn)}
+.pcard .grip{position:absolute;right:6px;top:50%;transform:translateY(-50%);opacity:0;color:var(--muted);font:12px var(--font-mono)}
+
+/* form rows */
+.row{display:flex;flex-direction:column;gap:5px;margin-bottom:11px;min-width:0}
+.row label{font:600 10px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.row input,.row select{width:100%;font-family:var(--font-mono);font-size:12.5px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.err{color:var(--crit);font-size:11px;margin-top:3px}
+.check{display:flex;align-items:center;gap:9px;margin-bottom:9px;font-size:13px;cursor:pointer;padding:7px 9px;
+  border-radius:var(--r);border:1px solid var(--line);background:var(--surface-2)}
+.check:hover{border-color:var(--line-strong)}
+.check:has(input:checked){border-color:color-mix(in srgb,var(--accent) 55%,transparent);background:var(--accent-soft)}
+.check input{margin:0}
+.check.off{opacity:.5;cursor:not-allowed}
+.why{font-size:11.5px;color:var(--warn);margin:-4px 0 10px;line-height:1.4}
+.why[hidden]{display:none}
+.panel input:disabled,.panel select:disabled{opacity:.5;cursor:not-allowed}
+
+/* inspector */
+.insp-h{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.insp-h .ic{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none;
+  background:var(--surface-2);border:1px solid var(--line)}
+.insp-h .ic svg{width:28px;height:28px}
+.insp-h.k-xe .ic{color:var(--xe);background:var(--xe-soft)} .insp-h.k-xr .ic{color:var(--xr);background:var(--xr-soft)}
+.insp-h.k-nx .ic{color:var(--nx);background:var(--nx-soft)} .insp-h.k-lin .ic{color:var(--lin);background:var(--lin-soft)}
+.insp-h.k-frr .ic{color:var(--frr);background:var(--frr-soft)} .insp-h.k-srl .ic{color:var(--srl);background:var(--srl-soft)}
+.insp-h .ic.lnk{color:var(--accent)}
+.insp-h b{display:block;font:600 15px var(--font-display);letter-spacing:-.01em}
+.insp-h span{display:block;font:11px var(--font-mono);color:var(--muted)}
+.insp-empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:10px 6px 4px;color:var(--muted);font-size:12.5px}
+.insp-empty svg{width:28px;height:28px;color:var(--line-strong)}
+.lkends{display:flex;align-items:center;gap:8px;font:600 13px var(--font-mono);margin:4px 0 8px}
+.lkends i{flex:1;height:1px;background:var(--line-strong);position:relative}
+.insp-foot{display:flex;gap:8px;margin-top:12px}
+
+/* summary */
+.sumgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.sumgrid div{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px}
+.sumgrid b{display:block;font:600 18px var(--font-mono)}
+.sumgrid span{font:500 9.5px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+#summary .kinds{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+#summary .warnline{font-size:12px;color:var(--warn)}
+
+/* ---------- canvas ---------- */
+.stage{flex:1;position:relative;background:var(--canvas);min-width:0;overflow:hidden}
+.stage::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 55%,color-mix(in srgb,var(--canvas) 70%,#000 30%) 140%);opacity:.5}
+#svg{width:100%;height:100%;display:block;touch-action:none}
+#grid circle{fill:var(--line-strong);opacity:.55}
+.node rect.box{fill:transparent;stroke:none;cursor:grab}
+.node:hover rect.box{fill:var(--surface-2);fill-opacity:.6}
+.node.sel rect.box{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.4;stroke-dasharray:5 3}
+.node rect.lblbg{fill:var(--canvas);fill-opacity:.9;pointer-events:none}
+.node .ico{pointer-events:none}
+.node.k-xe .ico{color:var(--xe)} .node.k-xr .ico{color:var(--xr)} .node.k-lin .ico{color:var(--lin)}
+.node.k-nx .ico{color:var(--nx)} .node.k-frr .ico{color:var(--frr)} .node.k-srl .ico{color:var(--srl)}
+.node.sel .ico{filter:drop-shadow(0 0 6px color-mix(in srgb,var(--accent) 55%,transparent))}
+.node text.nm{font:600 13px var(--font-mono);fill:var(--ink);pointer-events:none}
+.node.sel text.nm{fill:var(--accent-ink)}
+.node text.kd{font:9.5px var(--font-mono);fill:var(--muted);pointer-events:none}
+.node circle.handle{fill:var(--accent);stroke:var(--canvas);stroke-width:2.5;cursor:crosshair;opacity:0;transition:opacity .12s}
+.node:hover circle.handle,.node.sel circle.handle{opacity:1}
+.node circle.handle:hover{filter:drop-shadow(0 0 5px var(--accent))}
+.link{stroke:var(--line-strong);stroke-width:2.2;cursor:pointer;stroke-linecap:round}
+.link:hover{stroke:var(--muted)}
+.link.sel{stroke:var(--accent);stroke-width:3.4;filter:drop-shadow(0 0 4px color-mix(in srgb,var(--accent) 50%,transparent))}
+.link-hit{stroke:transparent;stroke-width:14;cursor:pointer;fill:none}
+.linklbl{font:9.5px var(--font-mono);fill:var(--ink-2);pointer-events:none;paint-order:stroke;stroke:var(--canvas);stroke-width:4px}
+.ghost{stroke:var(--accent);stroke-width:2.2;stroke-dasharray:5 4;pointer-events:none}
+.stage.dropzone{box-shadow:inset 0 0 0 2px var(--accent),inset 0 0 40px color-mix(in srgb,var(--accent) 18%,transparent)}
+
+.hintbox{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;
+  width:min(420px,86%);padding:26px 24px;border:1.5px dashed var(--line-strong);border-radius:16px;
+  background:color-mix(in srgb,var(--surface) 70%,transparent);color:var(--muted);z-index:1}
+.hintbox svg{width:34px;height:34px;color:var(--accent);margin-bottom:8px}
+.hintbox b{display:block;font:600 16px var(--font-display);color:var(--ink);margin-bottom:10px}
+.hintbox ol{text-align:left;margin:0 auto;padding-left:20px;font-size:12.5px;line-height:1.8;max-width:320px}
+.hintbox .dotk{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--accent);vertical-align:0}
+
+/* floating canvas toolbar */
+.ctools{position:absolute;left:14px;top:14px;z-index:4;display:flex;align-items:center;gap:4px;padding:4px;
+  background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border:1px solid var(--line-strong);border-radius:11px;box-shadow:var(--shadow-sm)}
+.ctools .cnt{font:500 11.5px var(--font-mono);color:var(--ink-2);padding:0 10px 0 8px;white-space:nowrap}
+.ctools .cnt b{color:var(--accent-ink)}
+.ctools .vsep{width:1px;height:20px;background:var(--line)}
+.ctips{position:absolute;right:14px;bottom:14px;z-index:4;display:flex;gap:12px;font:11px var(--font-mono);color:var(--muted);
+  padding:6px 10px;border-radius:9px;background:color-mix(in srgb,var(--surface) 80%,transparent);border:1px solid var(--line)}
+.ctips span{display:inline-flex;align-items:center;gap:5px}
+
+/* edit mode banner: a strip between the app bar and the workspace */
+.editbanner{display:flex;gap:12px;align-items:center;padding:7px 14px 7px 16px;font-size:12.5px;flex:none;
+  background:var(--accent-soft);color:var(--ink-2);border-bottom:1px solid color-mix(in srgb,var(--accent) 40%,transparent)}
+.editbanner::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none;box-shadow:0 0 8px var(--accent)}
+.editbanner.copy{background:var(--warn-soft);border-bottom-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+.editbanner.copy::before{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+.editbanner[hidden]{display:none}
+.editbanner span{flex:1;min-width:0}
+.editbanner a{color:var(--accent-ink);font-weight:600;white-space:nowrap}
+.editbanner.copy a{color:var(--warn)}
+.editbanner button{flex:none}
+
+/* ---------- preview / result sheet ---------- */
+.sheet{background:var(--surface);border:1px solid var(--line-strong);border-radius:14px;box-shadow:var(--shadow);
+  width:min(1040px,100%);max-height:88vh;display:flex;flex-direction:column;overflow:hidden;animation:rise .16s ease-out}
+.sheet header{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.sheet header .dlg-ic{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  background:var(--accent-soft);color:var(--accent-ink);flex:none}
+.sheet header .dlg-ic svg{width:17px;height:17px}
+.sheet header h3{font:600 16px var(--font-display);margin:0;letter-spacing:-.01em}
+.sheet header .spacer{margin-left:auto}
+.sheet .body{overflow:auto;padding:0;flex:1;min-height:0}
+.sheet .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);padding:0 12px;overflow-x:auto;flex:none}
+.sheet .tabs:empty{display:none}
+.sheet .tabs button{flex:none;background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:9px 10px 8px;cursor:pointer;
+  font:500 12px var(--font-mono);color:var(--muted)}
+.sheet .tabs button:hover{color:var(--ink)}
+.sheet .tabs button[aria-selected="true"]{color:var(--accent-ink);border-bottom-color:var(--accent);font-weight:600}
+.sheet pre{margin:0;padding:16px 20px;background:var(--console-bg);color:var(--console-ink);min-height:100%;
+  font:12px/1.65 var(--font-mono);overflow:auto;white-space:pre;tab-size:4}
+.sheet .note{margin:12px 18px}
+.sheet footer{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex:none}
+.sheet footer:empty{display:none}
+
+/* ---------- narrow screens: stack the panels under the canvas ---------- */
+@media (max-width:900px){
+  body{overflow:auto}
+  .app{height:auto;min-height:100%}
+  .main{flex-direction:column}
+  .panel.left,.panel.right{width:auto;border:0;border-top:1px solid var(--line);overflow:visible}
+  .panel.left{order:2;max-height:none}
+  .stage{order:1;flex:none;height:62vh;min-height:360px}
+  .panel.right{order:3}
+  .pal{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+  .pgroup{grid-column:1/-1}
+  .pal details.other{grid-column:1/-1}
+  .namewrap label{display:none}
+  .namewrap input{width:110px}
+  .editbanner{flex-wrap:wrap;font-size:11.5px}
+  .ctips{display:none}
+  .abtxt{display:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header id="appbar"></header>
+  <div id="abparts" hidden>
+    <div class="namewrap" id="namewrap">
+      <label for="labname">name</label>
+      <input id="labname" class="uin" value="lab1" size="14" spellcheck="false" aria-label="lab name">
+      <span id="nameerr" class="err"></span>
+    </div>
+    <div id="abbtns" style="display:flex;gap:6px;align-items:center">
+      <button class="ub" id="btnpreview" title="show the generated files without writing anything (P)"></button>
+      <span class="savegrp">
+        <button class="ub primary" id="btnsave" title="write the topology and configs (Ctrl+S)"></button>
+        <button class="ub primary" id="btnsavemenu" title="more save options" aria-haspopup="menu"></button>
+      </span>
+    </div>
+  </div>
+
+  <div class="editbanner" id="editbanner" hidden></div>
+
+  <div class="main">
+    <!-- ---------------- palette ---------------- -->
+    <aside class="panel left">
+      <div class="sec">
+        <h2>Node types <span class="cnt" id="palcount"></span></h2>
+        <div class="palsearch search"><span id="palsicon"></span><input class="uin" id="palq" type="search" data-search placeholder="Filter images" aria-label="filter node types"></div>
+        <div class="pal" id="palette"><div class="hint"><span class="spin"></span>&nbsp; loading images…</div></div>
+      </div>
+    </aside>
+
+    <!-- ---------------- canvas ---------------- -->
+    <div class="stage" id="stage">
+      <svg id="svg">
+        <defs>
+          <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+            <circle cx="12" cy="12" r="1.1"/>
+          </pattern>
+        </defs>
+        <rect id="bg" width="100%" height="100%" fill="url(#grid)"/>
+        <g id="glinks"></g>
+        <g id="gghost"></g>
+        <g id="gnodes"></g>
+      </svg>
+      <div class="ctools" id="ctools">
+        <span class="cnt" id="ccount"></span>
+        <span class="vsep"></span>
+        <button class="ub quiet sm" id="btnclear" title="remove every node and link"></button>
+      </div>
+      <div class="hintbox" id="hintbox">
+        <div id="hinticon"></div>
+        <b>Draw your lab</b>
+        <ol>
+          <li>Drag a node type from the left onto the canvas (or double-click it).</li>
+          <li>Drag the <span class="dotk"></span> dot on a node onto another node to link them.</li>
+          <li>Pick addressing, IGP and services on the right, then <b style="display:inline;font:inherit;color:var(--accent-ink)">Preview</b> or <b style="display:inline;font:inherit;color:var(--accent-ink)">Save</b>.</li>
+        </ol>
+      </div>
+      <div class="ctips"><span><kbd>Del</kbd> remove</span><span><kbd>Esc</kbd> deselect</span><span><kbd>Ctrl</kbd><kbd>S</kbd> save</span></div>
+    </div>
+
+    <!-- ---------------- inspector ---------------- -->
+    <aside class="panel right">
+      <div class="sec" id="inspector">
+        <h2>Selection</h2>
+        <p class="hint">Nothing selected. Click a node or a link.</p>
+      </div>
+
+      <details class="sec fold">
+        <summary><span data-ic="lan"></span><h2>Addressing</h2></summary>
+        <div class="row">
+          <label for="f_link">point-to-point pool</label>
+          <input id="f_link" class="uin" value="10.10.0.0/16" spellcheck="false">
+        </div>
+        <div class="row2">
+          <div class="row">
+            <label for="f_prefix">link length</label>
+            <select id="f_prefix" class="uin"><option value="30">/30</option><option value="31">/31</option></select>
+          </div>
+          <div class="row">
+            <label for="f_mtu">interface mtu</label>
+            <input id="f_mtu" class="uin" value="1500" inputmode="numeric">
+          </div>
+        </div>
+        <div class="row">
+          <label for="f_lo">loopback pool</label>
+          <input id="f_lo" class="uin" value="10.0.0.0/24" spellcheck="false">
+        </div>
+        <div class="row">
+          <label for="f_mgmt">management subnet</label>
+          <input id="f_mgmt" class="uin" value="172.25.25.0/24" spellcheck="false">
+        </div>
+        <p class="hint">Each link takes the next subnet from the pool; each node takes
+        the next loopback. Both ends of every link are addressed automatically.</p>
+      </details>
+
+      <details class="sec fold" open>
+        <summary><span data-ic="route"></span><h2>Routing</h2></summary>
+        <div class="row">
+          <label for="f_igp">IGP</label>
+          <select id="f_igp" class="uin">
+            <option value="isis">IS-IS</option>
+            <option value="ospf">OSPF</option>
+            <option value="none">none — addressing only</option>
+          </select>
+        </div>
+        <div id="isisopts">
+          <div class="row2">
+            <div class="row">
+              <label for="f_area">IS-IS area</label>
+              <input id="f_area" class="uin" value="49.0001" spellcheck="false">
+            </div>
+            <div class="row">
+              <label for="f_tag">process tag</label>
+              <input id="f_tag" class="uin" value="CORE" spellcheck="false">
+            </div>
+          </div>
+          <p class="hint">level-2-only, wide metrics, point-to-point on every
+          router-to-router link. The NET is derived from each node's index.</p>
+        </div>
+        <div id="ospfopts" hidden>
+          <div class="row2">
+            <div class="row">
+              <label for="f_pid">process id</label>
+              <input id="f_pid" class="uin" value="1" inputmode="numeric">
+            </div>
+            <div class="row">
+              <label for="f_oarea">area</label>
+              <input id="f_oarea" class="uin" value="0" spellcheck="false">
+            </div>
+          </div>
+          <p class="hint">router-id from Loopback0, point-to-point network type,
+          loopback and host-facing links passive.</p>
+        </div>
+      </details>
+
+      <details class="sec fold" open>
+        <summary><span data-ic="layers"></span><h2>Services</h2></summary>
+        <label class="check" id="c_sr"><input type="checkbox" id="f_sr"> Segment Routing (SR-MPLS)</label>
+        <p class="why" id="w_sr" hidden>SR is generated for IS-IS only — pick IS-IS above.</p>
+        <div class="row2" id="srgbrow">
+          <div class="row">
+            <label for="f_srlo">SRGB start</label>
+            <input id="f_srlo" class="uin" value="16000" inputmode="numeric">
+          </div>
+          <div class="row">
+            <label for="f_srhi">SRGB end</label>
+            <input id="f_srhi" class="uin" value="23999" inputmode="numeric">
+          </div>
+        </div>
+        <div class="row">
+          <label for="f_bgp">BGP</label>
+          <select id="f_bgp" class="uin">
+            <option value="off">off</option>
+            <option value="full-mesh">iBGP full mesh</option>
+            <option value="rr">iBGP via route reflector(s)</option>
+          </select>
+        </div>
+        <p class="why" id="w_rr" hidden>Give at least one core node the role RR.</p>
+        <div class="row">
+          <label for="f_asn">core AS</label>
+          <input id="f_asn" class="uin" value="65000" inputmode="numeric">
+        </div>
+        <label class="check" id="c_vpn"><input type="checkbox" id="f_vpn"> MP-BGP L3VPN (VPNv4)</label>
+        <p class="why" id="w_vpn" hidden></p>
+        <details class="more"><summary>How roles and services work</summary><p class="hint">Roles come from each node (click it): P and PE form the core
+        IGP, RR reflects iBGP, CE sits in its own AS. PE–CE links run eBGP — inside
+        the CE's VRF when L3VPN is on. Links between different ASes run eBGP; CEs
+        advertise their loopback. Prefix-SID index = node number.</p></details>
+      </details>
+
+      <details class="sec fold" open>
+        <summary><span data-ic="info"></span><h2>Summary</h2></summary>
+        <div id="summary" class="hint">—</div>
+      </details>
+    </aside>
+  </div>
+</div>
+
+<!-- ---------------- preview / result sheet ---------------- -->
+<div class="scrim" id="scrim" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sh_title">
+    <header>
+      <span class="dlg-ic" id="sh_icon"></span>
+      <h3 id="sh_title">Preview</h3>
+      <span class="spacer"></span>
+      <button class="ub quiet icon" id="sh_close" title="close (Esc)"></button>
+    </header>
+    <div class="tabs" id="sh_tabs" role="tablist"></div>
+    <div class="body" id="sh_body"></div>
+    <footer id="sh_foot"></footer>
+  </div>
+</div>
+
+<script src="node-icons.js"></script>
+<script src="ui.js"></script>
+<script>
+(function(){
+  var parts = document.getElementById("abparts");
+  UI.appbar(document.getElementById("appbar"), {active:"builder", crumbs:[{label:"Labs", href:"/"}, {label:"Builder"}],
+    after: document.getElementById("namewrap"), right: document.getElementById("abbtns")});
+  parts.remove();
+  function fill(id, ic, txt){
+    var b = document.getElementById(id); b.appendChild(UI.icon(ic));
+    if (txt){ var s = document.createElement("span"); s.className = "abtxt"; s.textContent = txt; b.appendChild(s); }
+  }
+  fill("btnpreview", "file", "Preview");
+  fill("btnsave", "download", "Save");
+  fill("btnsavemenu", "chevron");
+  fill("btnclear", "trash", "Clear");
+  fill("sh_close", "x");
+  document.getElementById("palsicon").appendChild(UI.icon("search"));
+  document.getElementById("hinticon").appendChild(UI.icon("builder"));
+  document.querySelectorAll("[data-ic]").forEach(function(s){ s.replaceWith(UI.icon(s.getAttribute("data-ic"))); });
+})();
+</script>
+<script>
+(function(){
+"use strict";
+
+var NW = 132, NH = 80;                      // node footprint: icon + two label lines
+var ICON = 44, IY = 2;                       // icon size and top offset in the footprint
+var svg = document.getElementById("svg");
+var gNodes = document.getElementById("gnodes");
+var gLinks = document.getElementById("glinks");
+var gGhost = document.getElementById("gghost");
+var stage  = document.getElementById("stage");
+
+var images = [];
+var model = load() || {nodes: [], links: []};
+var sel = null;                              // {type:"node"|"link", id}
+var seq = 1, linkSeq = 1;
+var lastPreview = null;
+
+function $(id){ return document.getElementById(id); }
+function el(tag, cls, txt){
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (txt !== undefined) e.textContent = txt;
+  return e;
+}
+function svgEl(tag, attrs){
+  var e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (var k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+function toast(msg, ms){
+  UI.toast(msg, /(must|taken|drop the|not picked|error|fail)/i.test(msg) ? "warn" : "info", ms);
+}
+function kindClass(kind){
+  return kind === "cisco_xrd_vrouter" ? "k-xr"
+       : kind === "cisco_n9kv" ? "k-nx"
+       : kind === "frr" ? "k-frr"
+       : kind === "nokia_srlinux" ? "k-srl"
+       : kind === "linux" ? "k-lin" : "k-xe";
+}
+function kindTag(kind){
+  return kind === "cisco_xrd_vrouter" ? ["xr","IOS-XR"]
+       : kind === "cisco_n9kv" ? ["nx","NX-OS"]
+       : kind === "frr" ? ["frr","FRR"]
+       : kind === "nokia_srlinux" ? ["srl","SR Linux"]
+       : kind === "linux" ? ["lin","Linux"] : ["xe","IOS-XE"];
+}
+
+// ---------- roles (mirror builder.py: guess_role and the AS assignment) ----------
+function guessRole(name){
+  return /^ce/.test(name) ? "CE" : /^pe/.test(name) ? "PE" : /^rr/.test(name) ? "RR" : "P";
+}
+function roleOf(n){ return n.role || guessRole(n.name); }
+function isRouter(n){ return n.kind !== "linux"; }
+function bgpOn(){ return $("f_bgp").value !== "off"; }
+function coreAsn(){ return parseInt($("f_asn").value, 10) || 65000; }
+// effective AS per node id: explicit value, else core AS, else 65101.. for CEs
+function asMap(){
+  var core = coreAsn(), used = {}, out = {}, next = 65101;
+  model.nodes.forEach(function(n){ if (n.asn){ out[n.id] = n.asn; used[n.asn] = 1; } });
+  model.nodes.forEach(function(n){
+    if (out[n.id]) return;
+    if (roleOf(n) === "CE"){
+      while (used[next] || next === core) next++;
+      out[n.id] = next; used[next] = 1;
+    } else out[n.id] = core;
+  });
+  return out;
+}
+
+// Services depend on each other: SR needs IS-IS, L3VPN needs BGP and SR.
+function syncServices(){
+  var isis = $("f_igp").value === "isis";
+  var sr = $("f_sr"), vpn = $("f_vpn");
+  sr.disabled = !isis;
+  if (!isis) sr.checked = false;
+  $("c_sr").classList.toggle("off", !isis);
+  $("w_sr").hidden = isis;
+  $("srgbrow").style.display = sr.checked ? "" : "none";
+  var bgp = bgpOn();
+  $("f_asn").disabled = !bgp;
+  var vpnOk = bgp && sr.checked;
+  vpn.disabled = !vpnOk;
+  if (!vpnOk) vpn.checked = false;
+  $("c_vpn").classList.toggle("off", !vpnOk);
+  $("w_vpn").hidden = vpnOk;
+  $("w_vpn").textContent = !bgp ? "L3VPN needs BGP — pick full mesh or route reflectors."
+                         : "L3VPN needs an MPLS transport — turn on Segment Routing.";
+  var noRR = $("f_bgp").value === "rr" && !model.nodes.some(function(n){
+    return isRouter(n) && roleOf(n) === "RR"; });
+  $("w_rr").hidden = !noRR;
+}
+
+// ---------- persistence ----------
+function save(){
+  model.name = $("labname").value.trim();
+  model.link_subnet = $("f_link").value.trim();
+  model.link_prefix = parseInt($("f_prefix").value, 10);
+  model.loopback_subnet = $("f_lo").value.trim();
+  model.mgmt_subnet = $("f_mgmt").value.trim();
+  model.mtu = parseInt($("f_mtu").value, 10) || 1500;
+  model.igp = $("f_igp").value;
+  model.isis_area = $("f_area").value.trim();
+  model.isis_tag = $("f_tag").value.trim();
+  model.ospf_pid = $("f_pid").value.trim();
+  model.ospf_area = $("f_oarea").value.trim();
+  model.services = {
+    sr: $("f_sr").checked,
+    srgb: [parseInt($("f_srlo").value, 10) || 16000, parseInt($("f_srhi").value, 10) || 23999],
+    bgp: $("f_bgp").value,
+    core_asn: parseInt($("f_asn").value, 10) || 65000,
+    l3vpn: $("f_vpn").checked
+  };
+  try { localStorage.setItem("clab-builder", JSON.stringify(model)); } catch(e){}
+}
+function load(){
+  try { return JSON.parse(localStorage.getItem("clab-builder") || "null"); }
+  catch(e){ return null; }
+}
+function applyModelToForm(){
+  if (model.name) $("labname").value = model.name;
+  if (model.link_subnet) $("f_link").value = model.link_subnet;
+  if (model.link_prefix) $("f_prefix").value = model.link_prefix;
+  if (model.loopback_subnet) $("f_lo").value = model.loopback_subnet;
+  if (model.mgmt_subnet) $("f_mgmt").value = model.mgmt_subnet;
+  if (model.mtu) $("f_mtu").value = model.mtu;
+  if (model.igp) $("f_igp").value = model.igp;
+  if (model.isis_area) $("f_area").value = model.isis_area;
+  if (model.isis_tag) $("f_tag").value = model.isis_tag;
+  if (model.ospf_pid) $("f_pid").value = model.ospf_pid;
+  if (model.ospf_area) $("f_oarea").value = model.ospf_area;
+  var sv = model.services || {};
+  $("f_sr").checked = !!sv.sr;
+  if (sv.srgb){ $("f_srlo").value = sv.srgb[0]; $("f_srhi").value = sv.srgb[1]; }
+  if (sv.bgp) $("f_bgp").value = sv.bgp;
+  if (sv.core_asn) $("f_asn").value = sv.core_asn;
+  $("f_vpn").checked = !!sv.l3vpn;
+  (model.nodes || []).forEach(function(n){
+    var m = /^[a-z]+(\d+)$/.exec(n.name);
+    if (m) seq = Math.max(seq, parseInt(m[1], 10) + 1);
+  });
+  linkSeq = (model.links || []).length + 1;
+}
+
+// ---------- palette ----------
+// Grouped by vendor; a filter box narrows it. Images without a template sit
+// in a collapsed "other" group and cannot be dragged.
+var VGROUP = {Cisco:"Cisco", Nokia:"Nokia", FRRouting:"Open source"};
+function vendorGroup(im){
+  if (VGROUP[im.vendor]) return VGROUP[im.vendor];
+  return im.kind === "linux" ? "Hosts & tools" : (im.vendor && im.vendor !== "-" ? im.vendor : "Hosts & tools");
+}
+function loadImages(){
+  fetch("api/images").then(function(r){ return r.json(); }).then(function(d){
+    var ORDER = {cisco_c8000v:1, cisco_csr1000v:2, cisco_xrd_vrouter:3, cisco_n9kv:4, nokia_srlinux:5, frr:6, linux:9};
+    images = (d.images || []).slice().sort(function(a, b){
+      return (ORDER[a.kind] || 20) - (ORDER[b.kind] || 20) || a.image.localeCompare(b.image); });
+    renderPalette();
+  }).catch(function(){
+    $("palette").textContent = "";
+    $("palette").appendChild(el("div","hint","could not load the image list"));
+  });
+}
+function renderPalette(){
+  var pal = $("palette"); pal.textContent = "";
+  var q = ($("palq").value || "").trim().toLowerCase();
+  var other = null, lastGroup = null, shown = 0;
+  var sup = images.filter(function(i){ return i.supported; }).length;
+  $("palcount").textContent = sup + " usable";
+  images.forEach(function(im){
+    var hay = (im.image + " " + (im.os || "") + " " + (im.vendor || "") + " " + (im.kind || "") + " "
+               + (im.supported ? kindTag(im.kind)[1] : "")).toLowerCase();
+    if (q && hay.indexOf(q) < 0) return;
+    shown++;
+    var card = el("div","pcard " + (im.supported ? kindClass(im.kind) : ""));
+    card.dataset.image = im.image;
+    card.dataset.kind = im.kind || "";
+    if (!im.supported) card.dataset.off = "1"; else card.draggable = true;
+    if (window.NodeIcons){
+      var t = NodeIcons.classify({name: "", kind: im.kind || "", image: im.image});
+      var sv = svgEl("svg", {width: 26, height: 26, viewBox: "0 0 48 48", "aria-hidden": "true"});
+      sv.appendChild(NodeIcons.svg(t, {size: 48}));
+      var hd = el("span","head"); hd.appendChild(sv); card.appendChild(hd);
+    }
+    var tx = el("div","txt");
+    var os = el("div","os", im.supported ? kindTag(im.kind)[1] : (im.repo.split("/").pop()));
+    if (im.supported && im.ram_mb) os.appendChild(el("small", null, im.ram_mb >= 1024 ? Math.round(im.ram_mb/1024) + "G" : im.ram_mb + "M"));
+    tx.appendChild(os);
+    tx.appendChild(el("div","img", im.repo.split("/").pop() + ":" + im.tag));
+    card.appendChild(tx);
+    if (im.note) card.appendChild(el("span","note-dot"));
+    card.title = im.image + "\n" + (im.supported
+      ? (im.configurable ? "startup config generated" : im.addressing_only ? "addresses only, no routing" : "no config")
+      : "no template for this image") + (im.note ? "\n\n" + im.note : "")
+      + (im.supported ? "\n\ndrag onto the canvas, or double-click" : "");
+    if (im.supported){
+      card.addEventListener("dragstart", function(e){
+        e.dataTransfer.setData("text/plain", JSON.stringify({image: im.image, kind: im.kind}));
+        e.dataTransfer.effectAllowed = "copy";
+      });
+      card.addEventListener("dblclick", function(){
+        var r = stage.getBoundingClientRect();
+        addNode(im.kind, im.image, r.width/2 - NW/2, r.height/2 - NH/2);
+      });
+      var g = vendorGroup(im);
+      if (g !== lastGroup){ pal.appendChild(el("div","pgroup", g)); lastGroup = g; }
+      pal.appendChild(card);
+    } else {
+      if (!other){ other = document.createElement("details"); other.className = "other";
+        other.appendChild(el("summary", null, "")); if (q) other.open = true; }
+      other.appendChild(card);
+    }
+  });
+  if (other){
+    other.firstChild.textContent = "Other images (" + (other.children.length - 1) + ") — no template";
+    pal.appendChild(other);
+  }
+  if (!images.length) pal.appendChild(el("div","hint","no docker images found"));
+  else if (!shown) pal.appendChild(el("div","hint","no image matches “" + q + "”"));
+}
+
+// ---------- model ops ----------
+function nodeById(id){
+  for (var i=0;i<model.nodes.length;i++) if (model.nodes[i].id === id) return model.nodes[i];
+  return null;
+}
+function nextName(kind){
+  var p = kind === "linux" ? "h" : "r";
+  var used = {};
+  model.nodes.forEach(function(n){ used[n.name] = 1; });
+  var i = 1;
+  while (used[p + i]) i++;
+  return p + i;
+}
+function addNode(kind, image, x, y){
+  var n = {id: "n" + (seq++), name: nextName(kind), kind: kind, image: image,
+           x: Math.max(4, Math.round(x)), y: Math.max(4, Math.round(y))};
+  model.nodes.push(n);
+  sel = {type:"node", id:n.id};
+  render(); save();
+  return n;
+}
+function delNode(id){
+  model.nodes = model.nodes.filter(function(n){ return n.id !== id; });
+  model.links = model.links.filter(function(l){ return l.a !== id && l.b !== id; });
+  sel = null; render(); save();
+}
+function addLink(a, b){
+  if (a === b) return;
+  model.links.push({id: "l" + (linkSeq++), a: a, b: b});
+  render(); save();
+}
+function delLink(id){
+  model.links = model.links.filter(function(l){ return l.id !== id; });
+  sel = null; render(); save();
+}
+
+// ---------- rendering ----------
+// links meet at the icon's centre, not the middle of the label block
+function centre(n){ return {x: n.x + NW/2, y: n.y + IY + ICON/2}; }
+function iconType(n){
+  if (n.icon) return n.icon;
+  return window.NodeIcons ? NodeIcons.classify({name: n.name, kind: n.kind, image: n.image}) : "router";
+}
+
+function render(){
+  gNodes.textContent = ""; gLinks.textContent = "";
+  $("hintbox").style.display = model.nodes.length ? "none" : "";
+  syncServices();          // RR warning depends on node roles
+
+  // links first so nodes paint over them
+  var pairSeen = {}, pairTotal = {};
+  model.links.forEach(function(l){
+    var k = [l.a, l.b].sort().join("|"); pairTotal[k] = (pairTotal[k] || 0) + 1;
+  });
+  model.links.forEach(function(l){
+    var a = nodeById(l.a), b = nodeById(l.b);
+    if (!a || !b) return;
+    var ca = centre(a), cb = centre(b);
+    var key = [l.a, l.b].sort().join("|");
+    pairSeen[key] = (pairSeen[key] || 0) + 1;
+    // fan parallel links out symmetrically; measure the normal from the
+    // lower id so a->b and b->a links bend to opposite sides, not the same one
+    var off = (pairSeen[key] - 1 - (pairTotal[key] - 1) / 2) * 14;
+    var mx = (ca.x + cb.x)/2, my = (ca.y + cb.y)/2;
+    var flip = l.a > l.b ? -1 : 1;
+    var dx = (cb.x - ca.x) * flip, dy = (cb.y - ca.y) * flip;
+    var len = Math.sqrt(dx*dx + dy*dy) || 1;
+    var nx = -dy/len * off, ny = dx/len * off;
+
+    var d = "M" + ca.x + "," + ca.y + " Q" + (mx+nx*2) + "," + (my+ny*2)
+          + " " + cb.x + "," + cb.y;
+    var hit = svgEl("path", {d: d, class: "link-hit"});
+    var line = svgEl("path", {d: d, class: "link" + (sel && sel.type==="link" && sel.id===l.id ? " sel" : ""), fill: "none"});
+    hit.addEventListener("click", function(e){ e.stopPropagation(); sel = {type:"link", id:l.id}; render(); });
+    line.addEventListener("click", function(e){ e.stopPropagation(); sel = {type:"link", id:l.id}; render(); });
+    gLinks.appendChild(line); gLinks.appendChild(hit);
+
+    if (l.subnet){
+      var t = svgEl("text", {x: mx+nx, y: my+ny-5, class: "linklbl", "text-anchor": "middle"});
+      t.textContent = l.subnet;
+      gLinks.appendChild(t);
+    }
+  });
+
+  var ases = asMap();
+  model.nodes.forEach(function(n){
+    var g = svgEl("g", {class: "node " + kindClass(n.kind)
+      + (sel && sel.type==="node" && sel.id===n.id ? " sel" : ""),
+      transform: "translate(" + n.x + "," + n.y + ")"});
+    g.appendChild(svgEl("rect", {class:"box", width:NW, height:NH, rx:8}));
+    var kdTxt = kindTag(n.kind)[1];
+    if (bgpOn() && isRouter(n)) kdTxt += " · " + roleOf(n) + " · AS" + ases[n.id];
+    else if ($("f_sr").checked && isRouter(n)) kdTxt += " · " + roleOf(n);
+    // mask the links that run under the labels; width follows the longer line
+    var lw = Math.min(NW, Math.max(n.name.length * 8.2, kdTxt.length * 5.9) + 12);
+    g.appendChild(svgEl("rect", {class:"lblbg", x:(NW-lw)/2, y:IY+ICON+2, width:lw, height:NH-ICON-IY-2, rx:4}));
+    if (window.NodeIcons){
+      var ic = NodeIcons.svg(iconType(n), {size: ICON, x: (NW-ICON)/2, y: IY,
+                                           title: NodeIcons.label(iconType(n))});
+      ic.setAttribute("class", ic.getAttribute("class") + " ico");
+      g.appendChild(ic);
+    }
+    var nm = svgEl("text", {class:"nm", x:NW/2, y:IY+ICON+16, "text-anchor":"middle"});
+    nm.textContent = n.name;
+    g.appendChild(nm);
+    var kd = svgEl("text", {class:"kd", x:NW/2, y:IY+ICON+30, "text-anchor":"middle"});
+    kd.textContent = kdTxt;
+    g.appendChild(kd);
+    var h = svgEl("circle", {class:"handle", cx:NW/2 + ICON/2 + 6, cy:IY + ICON/2, r:6});
+    g.appendChild(h);
+
+    g.addEventListener("pointerdown", function(e){ startDrag(e, n, false); });
+    h.addEventListener("pointerdown", function(e){ e.stopPropagation(); startDrag(e, n, true); });
+    gNodes.appendChild(g);
+  });
+
+  renderInspector();
+  renderSummary();
+}
+
+function renderSummary(){
+  var kinds = {};
+  model.nodes.forEach(function(n){ kinds[n.kind] = (kinds[n.kind]||0)+1; });
+  var box = $("summary"); box.textContent = "";
+  var g = el("div","sumgrid");
+  [[model.nodes.length, "nodes"], [model.links.length, "links"]].forEach(function(x){
+    var d = el("div"); d.appendChild(el("b", null, String(x[0]))); d.appendChild(el("span", null, x[1])); g.appendChild(d);
+  });
+  box.appendChild(g);
+  var ks = el("div","kinds");
+  Object.keys(kinds).sort().forEach(function(k){
+    var t = el("span","tag " + kindClass(k)); t.title = k;
+    t.appendChild(el("i")); t.appendChild(el("b", null, kinds[k] + "×")); t.appendChild(document.createTextNode(kindTag(k)[1]));
+    ks.appendChild(t);
+  });
+  if (ks.children.length) box.appendChild(ks);
+  var unlinked = model.nodes.filter(function(n){
+    return !model.links.some(function(l){ return l.a===n.id || l.b===n.id; });
+  });
+  if (unlinked.length)
+    box.appendChild(el("div","warnline", unlinked.length + " node(s) with no link: "
+      + unlinked.map(function(n){return n.name;}).join(", ")));
+  var c = $("ccount"); c.textContent = "";
+  c.appendChild(el("b", null, String(model.nodes.length))); c.appendChild(document.createTextNode(" nodes · "));
+  c.appendChild(el("b", null, String(model.links.length))); c.appendChild(document.createTextNode(" links"));
+  $("btnclear").disabled = !model.nodes.length;
+}
+
+function renderInspector(){
+  var box = $("inspector"); box.textContent = "";
+  box.appendChild(el("h2", null, "Selection"));
+  if (!sel){
+    var em = el("div","insp-empty"); em.appendChild(UI.icon("map"));
+    em.appendChild(el("div", null, "Nothing selected. Click a node or a link."));
+    box.appendChild(em);
+    return;
+  }
+  if (sel.type === "node"){
+    var n = nodeById(sel.id);
+    if (!n){ sel = null; return renderInspector(); }
+    var ih = el("div","insp-h " + kindClass(n.kind)), ic = el("div","ic");
+    if (window.NodeIcons){
+      var isv = svgEl("svg", {viewBox:"0 0 48 48", "aria-hidden":"true"}); isv.appendChild(NodeIcons.svg(iconType(n), {size:48}));
+      ic.appendChild(isv);
+    }
+    ih.appendChild(ic);
+    var it = el("div"); it.appendChild(el("b", null, n.name)); it.appendChild(el("span", null, kindTag(n.kind)[1] + " · " + n.kind));
+    ih.appendChild(it); box.appendChild(ih);
+    var r1 = el("div","row");
+    r1.appendChild(el("label", null, "name"));
+    var inp = document.createElement("input");
+    inp.className = "uin";
+    inp.value = n.name; inp.spellcheck = false;
+    inp.addEventListener("change", function(){
+      var v = inp.value.trim().toLowerCase();
+      if (!/^[a-z][a-z0-9-]{0,30}$/.test(v)){ toast("name must be [a-z][a-z0-9-]"); inp.value = n.name; return; }
+      if (model.nodes.some(function(o){ return o !== n && o.name === v; })){
+        toast("that name is taken"); inp.value = n.name; return;
+      }
+      n.name = v; render(); save();
+    });
+    r1.appendChild(inp); box.appendChild(r1);
+
+    var r2 = el("div","row");
+    r2.appendChild(el("label", null, "image"));
+    var selimg = document.createElement("select"); selimg.className = "uin";
+    images.filter(function(i){ return i.supported; }).forEach(function(i){
+      var o = document.createElement("option");
+      o.value = i.image; o.textContent = i.image;
+      o.dataset.kind = i.kind;
+      if (i.image === n.image) o.selected = true;
+      selimg.appendChild(o);
+    });
+    selimg.addEventListener("change", function(){
+      n.image = selimg.value;
+      n.kind = selimg.options[selimg.selectedIndex].dataset.kind;
+      render(); save();
+    });
+    r2.appendChild(selimg); box.appendChild(r2);
+
+
+    if (window.NodeIcons){
+      var ri = el("div","row");
+      ri.appendChild(el("label", null, "icon"));
+      var is = document.createElement("select"); is.className = "uin";
+      var auto = NodeIcons.classify({name: n.name, kind: n.kind, image: n.image});
+      [["", "auto — " + NodeIcons.label(auto)]].concat(NodeIcons.TYPES.map(function(t){
+        return [t, NodeIcons.label(t)]; })).forEach(function(p){
+        var o = document.createElement("option"); o.value = p[0]; o.textContent = p[1];
+        if ((n.icon || "") === p[0]) o.selected = true;
+        is.appendChild(o);
+      });
+      is.addEventListener("change", function(){ n.icon = is.value || undefined; render(); save(); });
+      ri.appendChild(is); box.appendChild(ri);
+    }
+
+    if (isRouter(n)){
+      var r3 = el("div","row");
+      r3.appendChild(el("label", null, "role"));
+      var rs = document.createElement("select"); rs.className = "uin";
+      [["", "auto — " + guessRole(n.name) + " (from name)"], ["P","P — core"], ["PE","PE — provider edge"],
+       ["RR","RR — route reflector"], ["CE","CE — customer edge"]].forEach(function(p){
+        var o = document.createElement("option"); o.value = p[0]; o.textContent = p[1];
+        if ((n.role || "") === p[0]) o.selected = true;
+        rs.appendChild(o);
+      });
+      rs.addEventListener("change", function(){ n.role = rs.value || undefined; syncServices(); render(); save(); });
+      r3.appendChild(rs); box.appendChild(r3);
+
+      var on = bgpOn(), ases = asMap();
+      var r4 = el("div","row2");
+      var ra = el("div","row");
+      ra.appendChild(el("label", null, "BGP AS"));
+      var ai = document.createElement("input"); ai.className = "uin";
+      ai.inputMode = "numeric"; ai.value = n.asn || ""; ai.placeholder = String(ases[n.id]);
+      ai.disabled = !on;
+      ai.addEventListener("change", function(){
+        var v = ai.value.trim();
+        if (v && !/^\d{1,10}$/.test(v)){ toast("AS must be a number"); ai.value = n.asn || ""; return; }
+        n.asn = v ? parseInt(v, 10) : undefined; render(); save();
+      });
+      ra.appendChild(ai); r4.appendChild(ra);
+      if (roleOf(n) === "CE"){
+        var rv = el("div","row");
+        rv.appendChild(el("label", null, "VRF"));
+        var vi = document.createElement("input"); vi.className = "uin";
+        vi.value = n.vrf || ""; vi.placeholder = "CUST-A"; vi.spellcheck = false;
+        vi.disabled = !(on && $("f_vpn").checked);
+        vi.addEventListener("change", function(){
+          var v = vi.value.trim();
+          if (v && !/^[A-Za-z][A-Za-z0-9_-]{0,31}$/.test(v)){ toast("VRF: letters, digits, _ and -"); vi.value = n.vrf || ""; return; }
+          n.vrf = v || undefined; save();
+        });
+        rv.appendChild(vi); r4.appendChild(rv);
+      }
+      box.appendChild(r4);
+      if (!on) box.appendChild(el("p","hint","AS and VRF apply once BGP is turned on under Services."));
+      else if (roleOf(n) === "CE")
+        box.appendChild(el("p","hint", $("f_vpn").checked
+          ? "The PE puts this CE's link into the VRF; CEs sharing a VRF name can reach each other."
+          : "eBGP to the provider in the global table (L3VPN is off)."));
+    }
+
+    var links = model.links.filter(function(l){ return l.a===n.id || l.b===n.id; });
+    box.appendChild(el("p","hint", links.length + " link(s) — interfaces are assigned in link order"));
+
+    var foot = el("div","insp-foot");
+    var del = UI.button("Delete node", "danger sm", function(){ delNode(n.id); }, "trash");
+    del.title = "Delete / Backspace";
+    foot.appendChild(del); box.appendChild(foot);
+  } else {
+    var l = model.links.filter(function(x){ return x.id===sel.id; })[0];
+    if (!l){ sel = null; return renderInspector(); }
+    var a = nodeById(l.a), b = nodeById(l.b);
+    var lh = el("div","insp-h"), lic = el("div","ic lnk"); lic.appendChild(UI.icon("link")); lh.appendChild(lic);
+    var lt = el("div"); lt.appendChild(el("b", null, "Link")); lt.appendChild(el("span", null, l.subnet || "subnet assigned on preview / save"));
+    lh.appendChild(lt); box.appendChild(lh);
+    var ends = el("div","lkends");
+    ends.appendChild(el("span", null, a ? a.name : "?")); ends.appendChild(el("i")); ends.appendChild(el("span", null, b ? b.name : "?"));
+    box.appendChild(ends);
+    box.appendChild(el("p","hint","Interfaces are assigned in link order on each node."));
+    var lf = el("div","insp-foot");
+    var d2 = UI.button("Delete link", "danger sm", function(){ delLink(l.id); }, "trash");
+    d2.title = "Delete / Backspace";
+    lf.appendChild(d2); box.appendChild(lf);
+  }
+}
+
+// ---------- dragging ----------
+var drag = null;
+function stagePoint(e){
+  var r = stage.getBoundingClientRect();
+  return {x: e.clientX - r.left, y: e.clientY - r.top};
+}
+function startDrag(e, n, linking){
+  e.preventDefault();
+  var p = stagePoint(e);
+  drag = {node: n, linking: linking, dx: p.x - n.x, dy: p.y - n.y, moved: false};
+  sel = {type:"node", id:n.id};
+  svg.setPointerCapture(e.pointerId);
+  render();
+}
+svg.addEventListener("pointermove", function(e){
+  if (!drag) return;
+  var p = stagePoint(e);
+  drag.moved = true;
+  if (drag.linking){
+    gGhost.textContent = "";
+    var c = centre(drag.node);
+    gGhost.appendChild(svgEl("line", {x1:c.x, y1:c.y, x2:p.x, y2:p.y, class:"ghost"}));
+  } else {
+    drag.node.x = Math.max(0, p.x - drag.dx);
+    drag.node.y = Math.max(0, p.y - drag.dy);
+    render();
+  }
+});
+svg.addEventListener("pointerup", function(e){
+  if (!drag) return;
+  var p = stagePoint(e);
+  gGhost.textContent = "";
+  if (drag.linking){
+    var target = null;
+    model.nodes.forEach(function(n){
+      if (n !== drag.node && p.x >= n.x && p.x <= n.x+NW && p.y >= n.y && p.y <= n.y+NH) target = n;
+    });
+    if (target) addLink(drag.node.id, target.id);
+    else toast("drop the link on another node");
+  } else if (drag.moved) { save(); }
+  drag = null;
+  render();
+});
+document.getElementById("bg").addEventListener("click", function(){ sel = null; render(); });
+
+// drop from palette
+stage.addEventListener("dragover", function(e){ e.preventDefault(); stage.classList.add("dropzone"); });
+stage.addEventListener("dragleave", function(){ stage.classList.remove("dropzone"); });
+stage.addEventListener("drop", function(e){
+  e.preventDefault(); stage.classList.remove("dropzone");
+  var data;
+  try { data = JSON.parse(e.dataTransfer.getData("text/plain")); } catch(err){ return; }
+  if (!data || !data.kind) return;
+  var p = stagePoint(e);
+  addNode(data.kind, data.image, p.x - NW/2, p.y - NH/2);
+});
+
+document.addEventListener("keydown", function(e){
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === "s" || e.key === "S")){
+    e.preventDefault(); if ($("scrim").hidden && !document.querySelector(".scrim:not(#scrim)")) doSave(false); return;
+  }
+  // a ticked checkbox keeps focus; only text fields and selects own the keys
+  if ((e.target.tagName === "INPUT" && !/^(checkbox|radio)$/.test(e.target.type))
+      || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
+  if (document.querySelector(".scrim:not(#scrim),.cmdk")) return;       // a UI dialog or the palette owns the keys
+  if (e.key === "p" && !e.ctrlKey && !e.metaKey && !e.altKey && $("scrim").hidden){ e.preventDefault(); doPreview(); return; }
+  if ((e.key === "Delete" || e.key === "Backspace") && sel){
+    e.preventDefault();
+    if (sel.type === "node") delNode(sel.id); else delLink(sel.id);
+  }
+  if (e.key === "Escape"){ if (!$("scrim").hidden) closeSheet(); else { sel = null; render(); } }
+});
+
+// ---------- spec + server ----------
+function buildSpec(){
+  save();
+  return {
+    name: model.name, igp: model.igp,
+    link_subnet: model.link_subnet, link_prefix: model.link_prefix,
+    loopback_subnet: model.loopback_subnet, mgmt_subnet: model.mgmt_subnet,
+    mtu: model.mtu, isis_area: model.isis_area, isis_tag: model.isis_tag,
+    ospf_pid: model.ospf_pid, ospf_area: model.ospf_area,
+    services: model.services,
+    nodes: model.nodes.map(function(n){
+      var o = {id:n.id, name:n.name, kind:n.kind, image:n.image, x:n.x, y:n.y};
+      if (n.role) o.role = n.role;
+      if (n.asn) o.asn = n.asn;
+      if (n.vrf) o.vrf = n.vrf;
+      if (n.icon) o.icon = n.icon;
+      return o;
+    }),
+    links: model.links.map(function(l){ return {a:l.a, b:l.b}; })
+  };
+}
+
+function post(body){
+  return fetch("api/topology", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(body)
+  }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, status:r.status, j:j}; }); });
+}
+
+function doPreview(){
+  if (!model.nodes.length) return toast("add some nodes first");
+  post({preview:true, spec:buildSpec()}).then(function(res){
+    if (!res.ok){ showError(res.j.error); return; }
+    lastPreview = res.j;
+    // paint subnet labels onto the canvas
+    var map = {};
+    (res.j.summary.links || []).forEach(function(l, i){ map[i] = l.subnet; });
+    model.links.forEach(function(l, i){ l.subnet = map[i]; });
+    render();
+    showSheet("Preview — " + res.j.summary.name, res.j, false);
+  }).catch(function(e){ showError(String(e)); });
+}
+
+// deploy: start the lab straight after a successful save ("Save & deploy")
+function doSave(overwrite, deploy){
+  if (!model.nodes.length) return toast("add some nodes first");
+  if (!overwrite && editing && editing.inPlace && $("labname").value.trim() === editing.name){
+    UI.confirm("Save your changes to " + editing.name + "?", "The topology and every config are "
+                 + "regenerated from this drawing. The current files are kept in the lab's history, "
+                 + "so this can be undone from the edit page.", {ok: deploy ? "Save & deploy" : "Save", icon:"download"})
+      .then(function(ok){ if (ok) doSave(true, deploy); });
+    return;
+  }
+  post({preview:false, overwrite: !!overwrite, spec:buildSpec()}).then(function(res){
+    if (res.status === 409 && res.j.exists){
+      UI.confirm("Lab already exists", res.j.error + "\n\nOverwrite it?", {ok:"Overwrite", danger:true})
+        .then(function(ok){ if (ok) doSave(true, deploy); });
+      return;
+    }
+    if (!res.ok){ showError(res.j.error); return; }
+    setEditing({labId: res.j.lab_id, name: res.j.summary.name, inPlace: true});
+    showSaved(res.j, deploy);
+  }).catch(function(e){ showError(String(e)); });
+}
+
+function sheetIcon(name, cls){
+  var i = $("sh_icon"); i.textContent = ""; i.appendChild(UI.icon(name));
+  i.style.background = cls ? "var(--" + cls + "-soft)" : ""; i.style.color = cls ? "var(--" + cls + ")" : "";
+}
+function sbtn(label, cls, fn, ic){ return UI.button(label, cls, fn, ic); }
+function showError(msg){
+  var body = $("sh_body"); body.textContent = "";
+  sheetIcon("warn", "crit");
+  $("sh_title").textContent = "Cannot generate";
+  $("sh_tabs").textContent = "";
+  body.appendChild(el("div","note crit", msg || "unknown error"));
+  $("sh_foot").textContent = "";
+  $("sh_foot").appendChild(sbtn("Close", "", closeSheet));
+  $("scrim").hidden = false;
+}
+
+function showSheet(title, data, saved){
+  sheetIcon("file");
+  $("sh_title").textContent = title;
+  var tabs = $("sh_tabs"); tabs.textContent = "";
+  var body = $("sh_body"); body.textContent = "";
+  var foot = $("sh_foot"); foot.textContent = "";
+
+  (data.warnings || []).forEach(function(w){
+    body.appendChild(el("div","note warn", w));
+  });
+
+  var names = Object.keys(data.files).sort(function(a, b){
+    function rank(x){ return x === "ADDRESSING.txt" ? 0 : /\.clab\.yml$/.test(x) ? 1 : 2; }
+    return rank(a) - rank(b) || (a < b ? -1 : a > b ? 1 : 0);
+  });
+  var panes = {};
+  names.forEach(function(nm, i){
+    var b = el("button", null, nm); b.type = "button";
+    b.setAttribute("role","tab");
+    b.setAttribute("aria-selected", i===0 ? "true" : "false");
+    b.addEventListener("click", function(){
+      names.forEach(function(o){
+        panes[o].hidden = o !== nm;
+        tabs.querySelectorAll("button")[names.indexOf(o)]
+            .setAttribute("aria-selected", o === nm ? "true" : "false");
+      });
+    });
+    tabs.appendChild(b);
+    var pre = el("pre", null, data.files[nm]);
+    pre.hidden = i !== 0;
+    panes[nm] = pre;
+    body.appendChild(pre);
+  });
+
+  foot.appendChild(sbtn("Close", "quiet", closeSheet));
+  if (!saved){
+    foot.appendChild(sbtn("Save & deploy", "", function(){ closeSheet(); doSave(false, true); }, "play"));
+    foot.appendChild(sbtn("Generate & save", "primary", function(){ closeSheet(); doSave(false); }, "download"));
+  }
+  $("scrim").hidden = false;
+}
+
+function showSaved(res, autoStart){
+  sheetIcon("check", "ok");
+  $("sh_title").textContent = "Saved";
+  $("sh_tabs").textContent = "";
+  var body = $("sh_body"); body.textContent = "";
+  var foot = $("sh_foot"); foot.textContent = "";
+  body.appendChild(el("div","note ok","Written to " + res.target_dir));
+  if (res.history)
+    body.appendChild(el("div","note", "The previous files were kept in "
+      + res.target_dir + "/.clabd-history (version " + res.history + ") — open the lab's edit "
+      + "page and use history on any file to compare or bring an older version back."));
+  (res.warnings || []).forEach(function(w){ body.appendChild(el("div","note warn", w)); });
+  var list = el("pre", null, (res.written || []).join("\n"));
+  body.appendChild(list);
+
+  foot.appendChild(sbtn("Close", "quiet", closeSheet));
+  foot.appendChild(sbtn("Open in labs", "", function(){ window.location.href = "/"; }, "labs"));
+  if (res.lab_id) foot.appendChild(sbtn("Topology map", "", function(){
+    window.location.href = "topology.html?lab=" + encodeURIComponent(res.lab_id); }, "map"));
+
+  var start = sbtn("Start lab now", "primary", function(){
+    start.disabled = true; start.textContent = "starting…";
+    waitForLab(res.lab_id, 0, start);
+  }, "play");
+  foot.appendChild(start);
+  $("scrim").hidden = false;
+  if (autoStart) start.click();
+}
+
+// the collector needs a moment to notice the new file before it can be acted on
+function waitForLab(labId, tries, btn){
+  fetch("api/state").then(function(r){ return r.json(); }).then(function(s){
+    var found = (s.labs || []).some(function(l){ return l.id === labId; });
+    if (found){
+      fetch("api/action", {method:"POST", headers:{"Content-Type":"application/json"},
+        // --reconfigure: the lab directory may hold configs from a previous
+        // generation, and a plain deploy would reuse them.
+        body: JSON.stringify({lab_id: labId, action: "redeploy"})})
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          if (j.error){ toast(j.error, 5000); btn.disabled = false; btn.textContent = "Start lab now"; }
+          else window.location.href = "/";
+        });
+    } else if (tries < 8){
+      setTimeout(function(){ waitForLab(labId, tries+1, btn); }, 1500);
+    } else {
+      toast("lab not picked up yet — open the labs view and start it there", 5000);
+      btn.disabled = false; btn.textContent = "Start lab now";
+    }
+  });
+}
+
+function closeSheet(){ $("scrim").hidden = true; }
+$("sh_close").addEventListener("click", closeSheet);
+$("scrim").addEventListener("click", function(e){ if (e.target === $("scrim")) closeSheet(); });
+
+// ---------- editing an existing lab ----------
+// builder.html?edit=<lab id> reopens a lab. Builder-made labs are saved back
+// in place (the server keeps the previous files in .clabd-history first);
+// any other lab can only be opened as a copy, because saving regenerates
+// every config and would wipe hand-written ones.
+var editing = null;           // {labId, name, inPlace}
+try { editing = JSON.parse(sessionStorage.getItem("clab-builder-editing") || "null"); } catch(e){}
+
+function setEditing(e){
+  editing = e;
+  try {
+    if (e) sessionStorage.setItem("clab-builder-editing", JSON.stringify(e));
+    else sessionStorage.removeItem("clab-builder-editing");
+  } catch(err){}
+  editBanner();
+}
+function editBanner(){
+  var b = $("editbanner"); b.textContent = "";
+  if (!editing){ b.hidden = true; return; }
+  b.hidden = false;
+  var name = $("labname").value.trim();
+  var same = editing.inPlace && name === editing.name;
+  b.className = "editbanner" + (same ? "" : " copy");
+  var t = el("span");
+  if (same){
+    t.textContent = "Editing " + editing.name + " — saving overwrites it. The previous files are "
+      + "kept in its history (edit page › history), and every config is regenerated from this drawing.";
+  } else if (editing.inPlace){
+    t.textContent = "Renamed from " + editing.name + " — saving creates a new lab " + name
+      + "; " + editing.name + " stays as it is.";
+  } else {
+    t.textContent = "Copy of " + editing.name + " — saving creates the new lab " + name
+      + " with freshly generated configs. The original lab and its hand-written configs are not touched.";
+  }
+  b.appendChild(t);
+  var a = document.createElement("a");
+  a.href = "edit.html?lab=" + encodeURIComponent(editing.labId);
+  a.textContent = "edit " + editing.name + "'s files instead";
+  b.appendChild(a);
+  var x = UI.button("Stop editing", "sm", null, "x");
+  x.title = "keep the drawing as a new, unrelated topology";
+  x.addEventListener("click", function(){ setEditing(null); });
+  b.appendChild(x);
+}
+
+function loadForEdit(labId){
+  fetch("api/builder-spec?lab=" + encodeURIComponent(labId), {cache:"no-store"})
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+    .then(function(res){
+      try { history.replaceState(null, "", "builder.html"); } catch(e){}
+      if (!res.ok){ showError(res.j.error || "could not open the lab"); return; }
+      var d = res.j, spec = d.spec;
+      if (model.nodes.length && !(editing && editing.labId === labId)){
+        UI.confirm("Replace the drawing?", "Replace the drawing that is on the canvas now with " + spec.name
+                   + "?\n\nThe current drawing is not saved anywhere else.", {ok:"Replace", danger:true})
+          .then(function(ok){ if (ok) openSpec(d, spec, labId); });
+        return;
+      }
+      openSpec(d, spec, labId);
+    })
+    .catch(function(e){ showError(String(e)); });
+}
+function openSpec(d, spec, labId){
+  var m = JSON.parse(JSON.stringify(spec));
+  m.services = m.services || {sr:false, srgb:[16000, 23999], bgp:"off", core_asn:65000, l3vpn:false};
+  m.links = (m.links || []).map(function(l, i){ return {id:"l" + (i + 1), a:l.a, b:l.b}; });
+  if (!d.in_place) m.name = (spec.name + "-copy").slice(0, 31);
+  model = m; sel = null; seq = 1;
+  applyModelToForm();
+  $("isisopts").hidden = model.igp && model.igp !== "isis";
+  $("ospfopts").hidden = model.igp !== "ospf";
+  syncServices(); save();
+  setEditing({labId: labId, name: spec.name, inPlace: !!d.in_place});
+  render();
+  if ((d.warnings || []).length){
+    var body = $("sh_body"); body.textContent = "";
+    sheetIcon("info", "warn");
+    $("sh_title").textContent = "Opened " + spec.name + (d.how === "reconstructed"
+      ? " (rebuilt from the topology file)" : "");
+    $("sh_tabs").textContent = "";
+    d.warnings.forEach(function(w){ body.appendChild(el("div","note warn", w)); });
+    var foot = $("sh_foot"); foot.textContent = "";
+    foot.appendChild(sbtn("OK", "primary", closeSheet));
+    $("scrim").hidden = false;
+  } else toast("opened " + spec.name + (d.in_place ? "" : " as a copy"));
+}
+
+// ---------- wiring ----------
+$("btnpreview").addEventListener("click", doPreview);
+$("btnsave").addEventListener("click", function(){ doSave(false); });
+function clearCanvas(){
+  model.nodes = []; model.links = []; sel = null; seq = 1; linkSeq = 1;
+  setEditing(null);
+  render(); save();
+}
+$("btnclear").addEventListener("click", function(){
+  if (!model.nodes.length) return clearCanvas();
+  UI.confirm("Clear the canvas?", "Every node and link on the canvas is removed. The drawing is not saved anywhere else.",
+             {ok:"Clear canvas", danger:true}).then(function(ok){ if (ok) clearCanvas(); });
+});
+function openLabMenu(anchor){
+  var labs = ((UI.state() || {}).labs || []).filter(function(l){ return l.node_count > 0 && !l.parse_error; });
+  var items = [{head:"Open an existing lab"}];
+  labs.slice(0, 40).forEach(function(l){
+    items.push({label: l.name || l.file, icon:"map", hint: /^\/opt\/clab-topologies\//.test(l.path) ? "" : "as copy",
+                title: l.path, onClick: function(){ loadForEdit(l.id); }});
+  });
+  if (labs.length === 0) items.push({label:"no labs found yet", disabled:true});
+  UI.menu(anchor, items);
+}
+$("btnsavemenu").addEventListener("click", function(){
+  UI.menu($("btnsavemenu"), [
+    {label:"Save", icon:"download", hint:"Ctrl S", onClick:function(){ doSave(false); }},
+    {label:"Save & deploy", icon:"play", onClick:function(){ doSave(false, true); }},
+    {label:"Preview files", icon:"file", hint:"P", onClick:doPreview},
+    {sep:1},
+    {label:"Open an existing lab…", icon:"upload", onClick:function(){ openLabMenu($("btnsavemenu")); }},
+    {label:"Clear canvas", icon:"trash", danger:true, disabled:!model.nodes.length, onClick:function(){ $("btnclear").click(); }}
+  ]);
+});
+$("palq").addEventListener("input", renderPalette);
+$("palq").addEventListener("keydown", function(e){ if (e.key === "Escape" && $("palq").value){ e.stopPropagation(); $("palq").value = ""; renderPalette(); } });
+UI.commands([
+  {label:"Preview generated files", icon:"file", hint:"P", run:doPreview},
+  {label:"Save", icon:"download", hint:"Ctrl S", run:function(){ doSave(false); }},
+  {label:"Save & deploy", icon:"play", run:function(){ doSave(false, true); }},
+  {label:"Clear canvas", icon:"trash", run:function(){ $("btnclear").click(); }},
+  {label:"Filter node types", icon:"search", hint:"/", run:function(){ $("palq").focus(); }},
+  {label:"Open an existing lab in the builder", icon:"upload", run:function(){ openLabMenu($("btnsavemenu")); }}
+]);
+UI.keys([{keys:"P", label:"preview the generated files"}, {keys:"Ctrl S", label:"save the lab"},
+         {keys:"Del", label:"delete the selected node or link"}, {keys:"Esc", label:"deselect / close the preview"}]);
+$("f_igp").addEventListener("change", function(){
+  var v = $("f_igp").value;
+  $("isisopts").hidden = v !== "isis";
+  $("ospfopts").hidden = v !== "ospf";
+  syncServices(); save(); render();
+});
+["f_sr","f_bgp","f_vpn","f_asn"].forEach(function(id){
+  $(id).addEventListener("change", function(){ syncServices(); save(); render(); });
+});
+["f_srlo","f_srhi"].forEach(function(id){ $(id).addEventListener("change", save); });
+$("labname").addEventListener("input", function(){
+  var v = $("labname").value.trim();
+  $("nameerr").textContent = /^[a-z][a-z0-9-]{0,30}$/.test(v) ? "" : "a-z, 0-9 and - only";
+  save(); editBanner();
+});
+["f_link","f_prefix","f_lo","f_mgmt","f_mtu","f_area","f_tag","f_pid","f_oarea"]
+  .forEach(function(id){ $(id).addEventListener("change", save); });
+
+applyModelToForm();
+$("isisopts").hidden = model.igp && model.igp !== "isis";
+$("ospfopts").hidden = model.igp !== "ospf";
+syncServices();
+loadImages();
+render();
+editBanner();
+var editParam = new URLSearchParams(location.search).get("edit");
+if (editParam) loadForEdit(editParam);
+})();
+</script>
+</body>
+</html>
