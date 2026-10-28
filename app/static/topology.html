@@ -106,11 +106,11 @@ body{overflow:hidden}
    Quiet by design: off-path elements step back, the path is one thin accent
    line over a soft blur, and a single comet (bright head, fading tail)
    glides along it, passing behind each router. */
-/* the trace has its own colour: nothing else on the map is fuchsia (green /
+/* the trace has its own colour: no link on the map is ever blue (green /
    amber / red are adjacency state, teal is the UI accent, blues and violets
    are router kinds); live link colours step aside while a trace is shown */
-:root{--trace:#E879F9;--trace-ink:#F5D0FE;--on-trace:#2A0530}
-:root[data-theme="light"]{--trace:#C026D3;--trace-ink:#A21CAF;--on-trace:#fff}
+:root{--trace:#4C8DFF;--trace-ink:#C7DBFF;--on-trace:#04122E}
+:root[data-theme="light"]{--trace:#1D4ED8;--trace-ink:#1E40AF;--on-trace:#fff}
 .tracing .lk .link{stroke:var(--line-strong) !important;filter:none !important;transition:none !important}
 .tracing .lk.onpath .link{stroke:transparent !important}
 .tracing .lk .flowp,.tracing .lk .rate{display:none}
