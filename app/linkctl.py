@@ -239,9 +239,7 @@ class Links:
         """Admin up/down on the device itself."""
         import devcfg
         import topoedit
-        m = topoedit.PORT_RE.match(port)
-        num = int(m.group(1)) if m else 0
-        name = topoedit.iface_name(kind, num)
+        name = topoedit.node_iface(lab, node, kind, port)
         if kind == "nokia_srlinux":
             cfg = "set / interface %s admin-state %s" % (name, "enable" if up else "disable")
         else:
@@ -250,6 +248,23 @@ class Links:
         if not r.get("ok"):
             raise LinkError("%s: %s" % (node, "; ".join(r.get("errors") or ["push failed"])))
         log("%s: %s %s" % (node, name, "no shutdown" if up else "shutdown"))
+        if not up and kind in VM_KINDS:
+            self._verify_down(lab_index_fn, lab, node, name, log)
+
+    def _verify_down(self, lab_index_fn, lab, node, name, log):
+        """A router accepts `shutdown` on an interface it does not have (IOS-XR
+        pre-configuration) - so check the interface really went down."""
+        import devcfg
+        _, _, c, plat = devcfg.resolve(lab_index_fn(), lab["id"], node)
+        conn = devcfg._connect(lab, node, c, plat)
+        try:
+            out = conn.send_command("show interfaces %s" % name, read_timeout=40)
+        finally:
+            conn.disconnect()
+        first = next((l.strip() for l in out.splitlines() if name.lower() in l.lower()), out.strip()[:160])
+        if not re.search(r"administratively down|admin(istratively)?[- ]down", out, re.I):
+            raise LinkError("%s: %s did not go down (%s)" % (node, name, first[:160]))
+        log("%s: %s is administratively down" % (node, name))
 
     def _apply(self, lab_index_fn, lab, l, mode, up, log):
         for node, port, cname, kind, image in self._ends(lab, l):
@@ -275,7 +290,15 @@ class Links:
         lines = []
         self.audit("LINK-FAIL lab=%s link=%s mode=%s duration=%s from=%s"
                    % (lab.get("name"), link_key(l), mode, duration or "-", who))
-        self._apply(lab_index_fn, lab, l, mode, False, lines.append)
+        try:
+            self._apply(lab_index_fn, lab, l, mode, False, lines.append)
+        except Exception:
+            # never leave half a link down with no record of it
+            try:
+                self._apply(lab_index_fn, lab, l, mode, True, lines.append)
+            except Exception:                               # noqa: BLE001
+                pass
+            raise
         rec = {"mode": mode, "since": time.time(), "by": who,
                "restore_at": (time.time() + duration) if duration else None,
                "link": {k: l[k] for k in ("a", "a_if", "b", "b_if")}}

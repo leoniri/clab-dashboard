@@ -2215,8 +2215,22 @@ def _trace_post(handler, p):
         dst = pathtrace.node_address(lab, poller, dst)
         if not dst:
             return 400, {"error": "could not find an address on %s - give an IP" % dst_node}
+    # live link state, so a path over a dead link is reported as a drop even
+    # while the routers' tables still point at it
+    snap = {}
+    for _ in range(8):
+        snap = LIVE.get(lab["id"]) or {}
+        if snap.get("links"):
+            break
+        time.sleep(1)
+    linkstate = {lid: {"down": e.get("down"), "igp_state": e.get("igp_state"), "failed": e.get("failed")}
+                 for lid, e in (snap.get("links") or {}).items()}
+    for l in lab.get("links") or []:
+        rec = LINKS.state.get("%s|%s" % (lab.get("name"), linkctl.link_key(l)))
+        if rec:
+            linkstate.setdefault(l["id"], {})["failed"] = rec
     try:
-        res = pathtrace.trace(lab, poller, src, dst, p.get("src_vrf") or None)
+        res = pathtrace.trace(lab, poller, src, dst, p.get("src_vrf") or None, linkstate)
     except pathtrace.TraceError as exc:
         return 400, {"error": str(exc)}
     res.update({"src": src, "dst": dst, "dst_node": dst_node, "when": time.time()})

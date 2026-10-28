@@ -152,6 +152,13 @@ body{overflow:hidden}
 .trhdr text{font-family:var(--font-mono);font-size:9px;font-weight:600}
 .trhdr text.lb{fill:var(--trace-ink)} .trhdr text.pl{fill:var(--muted)} .trhdr text.sep{fill:var(--line-strong)}
 .trhdr.hl rect.bg{stroke:var(--trace)}
+.tracing .lk.onpath.blk .link{stroke:transparent !important}
+.trblk{fill:none;stroke:var(--crit);stroke-width:2.2;stroke-dasharray:5 5;opacity:.9;pointer-events:none}
+.trblock circle{fill:var(--surface);stroke:var(--crit);stroke-width:1.6}
+.trblock path:not(.trblk){stroke:var(--crit);stroke-width:1.8;stroke-linecap:round;fill:none}
+.hop .why{margin-top:8px;padding:6px 9px;border-radius:7px;font:11px/1.45 var(--font-sans);
+  color:var(--crit);background:var(--crit-soft)}
+.hop .why.warn{color:var(--warn);background:var(--warn-soft)}
 @media (prefers-reduced-motion:reduce){ .trcomet{display:none} .trripple{animation:none;opacity:0} }
 
 /* ---------- edit mode ---------- */
@@ -1324,6 +1331,16 @@ function drawTrace(byName){
     var l=h.link&&linkById(h.link), o=l&&orientSeg(l, st.node);
     if(!o) return;
     var d="M"+P(o[0])+" Q"+P(o[1])+" "+P(o[2]);
+    if(h.blocked){
+      // the router still points here, but the link is dead: the packet stops
+      var bg=svgEl("g",{class:"trblock","data-step":i});
+      bg.appendChild(svgEl("path",{d:d,class:"trblk"}));
+      var bm=qpt({p0:o[0],p1:o[1],p2:o[2]},0.5), xg=svgEl("g",{transform:"translate("+P(bm)+") scale("+LS.toFixed(3)+")"});
+      xg.appendChild(svgEl("circle",{r:9})); xg.appendChild(svgEl("path",{d:"M-3.5,-3.5 L3.5,3.5 M3.5,-3.5 L-3.5,3.5"}));
+      var bt=svgEl("title",{}); bt.textContent=h.blocked; xg.appendChild(bt);
+      bg.appendChild(xg); gTraceU.appendChild(bg);
+      return;
+    }
     var g=svgEl("g",{class:"trseg","data-step":i});
     g.appendChild(svgEl("path",{d:d,class:"trglow"}));
     g.appendChild(svgEl("path",{d:d,class:"trcore"}));
@@ -1376,7 +1393,7 @@ function drawTrace(byName){
   // one small chip above each router: step number, a dot for the kind of operation, the operation
   steps.forEach(function(st, i){
     var n=byName[st.node]; if(!n) return;
-    var op=opOf(st.h.action), txt=opShort(st.h.action).toUpperCase(), w=txt.length*6.1+38;
+    var op=st.h.blocked?"err":opOf(st.h.action), txt=(st.h.blocked?"drop · link down":opShort(st.h.action)).toUpperCase(), w=txt.length*6.1+38;
     var g=svgEl("g",{class:"trop","data-step":i,transform:"translate("+n.x.toFixed(1)+","+(n.y-R_ICON-13*LS).toFixed(1)+") scale("+LS.toFixed(3)+")"});
     g.appendChild(svgEl("rect",{x:-w/2,y:-9,width:w,height:18,rx:9,class:"bg"}));
     g.appendChild(svgEl("circle",{cx:-w/2+9,cy:0,r:6.5,class:"num"}));
@@ -1416,7 +1433,7 @@ function setTrace(on){
   else { sel=null; selLink=null; }
   render();
 }
-var RESULT_TEXT={reached:"reached the destination", "no-route":"stopped: no route", "left-lab":"left the lab",
+var RESULT_TEXT={reached:"reached the destination", blackhole:"dropped: the next link is down", "no-route":"stopped: no route", "left-lab":"left the lab",
   down:"stopped at a node that is down", loop:"too many hops - a loop?", unsupported:"stopped: a node the trace cannot read"};
 function renderTracePanel(box){
   var ph=el("div","ph"); ph.appendChild(el("span","ttl","Path trace"));
@@ -1466,7 +1483,7 @@ function renderTracePanel(box){
   [[String(Math.max(0,N-1)),"hops"],[String(N),"routers"],[String(labelOps),"label ops"],[r.seconds+" s","trace time"]].forEach(function(x){
     var d=el("div",null,x[0]); d.appendChild(el("span",null,x[1])); sts.appendChild(d); });
   sum.appendChild(sts);
-  var rs=el("div","res"); rs.appendChild(el("span","pill "+(ok?"ok":"warn"), RESULT_TEXT[r.result]||r.result));
+  var rs=el("div","res"); rs.appendChild(el("span","pill "+(ok?"ok":r.result==="blackhole"?"crit":"warn"), RESULT_TEXT[r.result]||r.result));
   rs.appendChild(document.createTextNode(r.commands+" show commands")); sum.appendChild(rs);
   box.appendChild(sum);
   // the path as one line: router, the header on the wire, router, …
@@ -1496,6 +1513,7 @@ function renderTracePanel(box){
     top.appendChild(el("span","op "+op, h.action||""));
     card.appendChild(top);
     st.subs.forEach(function(a){ var sb=el("div","sub","↳ "+a); card.appendChild(sb); });
+    if(h.blocked){ top.querySelector(".op").className="op err"; top.querySelector(".op").textContent="drops the packet"; }
     var kv=el("div","hkv");
     function row_(k, v){ kv.appendChild(el("span",null,k)); var x=el("span"); if(typeof v==="string") x.textContent=v; else x.appendChild(v); kv.appendChild(x); }
     if(h.in_labels && h.in_labels.length){ row_("in", pkt(h.in_labels.map(String).concat([(r.dst||"").indexOf(":")>=0?"IPv6":"IPv4"]))); }
@@ -1503,6 +1521,8 @@ function renderTracePanel(box){
     if(h.out_if) row_("out", h.out_if+(h.nh?"  →  "+h.nh:""));
     if(h.link) row_("wire", pkt(wireOf(h, r.dst).map(function(x){ return x.t; })));
     if(kv.children.length) card.appendChild(kv);
+    if(h.blocked) card.appendChild(el("div","why","Dropped: "+h.blocked+"."));
+    if(h.warn) card.appendChild(el("div","why warn",h.warn.charAt(0).toUpperCase()+h.warn.slice(1)+"."));
     if(h.ecmp && h.ecmp.length) card.appendChild(el("div","ecmp","+ "+h.ecmp.length+" equal-cost path"+(h.ecmp.length>1?"s":"")
       +" ("+h.ecmp.map(function(e){ return e.out_if; }).join(", ")+") — dashed on the map"));
     row.appendChild(card);

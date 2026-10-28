@@ -91,17 +91,31 @@ def _run(cmd, timeout=120, inp=None):
         return 1, "", str(exc)
 
 
-def iface_name(kind, n):
+def iface_name(kind, n, nic=None):
     style = (ROUTERS.get(kind) or {}).get("if")
     if style == "xe":
         return "GigabitEthernet%d" % (n + 1)
     if style == "xr":
-        return "GigabitEthernet0/0/0/%d" % (n - 1)
+        # vrnetlab XRd on vmxnet3 (XRD_NIC_TYPE) names its ports TenGigE
+        return ("TenGigE0/0/0/%d" if nic == "vmxnet3" else "GigabitEthernet0/0/0/%d") % (n - 1)
     if style == "nxos":
         return "Ethernet1/%d" % n
     if kind == "nokia_srlinux":
         return "ethernet-1/%d" % n
     return "eth%d" % n
+
+
+def node_nic(lab, node):
+    """The node's NIC model as the collector read it from the topology env."""
+    for n in lab.get("nodes") or []:
+        if n.get("name") == node:
+            return n.get("nic")
+    return None
+
+
+def node_iface(lab, node, kind, port):
+    """What the router itself calls the interface on this clab port."""
+    return iface_name(kind, port_num(port), node_nic(lab, node))
 
 
 # --------------------------------------------------------------------------
@@ -185,7 +199,7 @@ def ports(lab):
                   "used": used.get(n, {}), "nic_ports": live,
                   "max_eth": r["max_eth"] if r else LINUX_MAX_ETH,
                   "port_fmt": port_fmt(kind),
-                  "names": {(port_fmt(kind) % i): iface_name(kind, i)
+                  "names": {(port_fmt(kind) % i): iface_name(kind, i, node_nic(lab, n))
                             for i in range(1, (r["max_eth"] if r else 8) + 1)}}
     return res
 
@@ -676,7 +690,7 @@ def link_config(lab, node, kind, port, addr, igp):
     except OSError:
         cfg = ""
     ifc = ipaddress.ip_interface(addr)
-    name = iface_name(kind, port_num(port))
+    name = node_iface(lab, node, kind, port)
     style = ROUTERS[kind]["if"]
     isis = re.search(r"^router isis (\S+)", cfg, re.M)
     ospf = re.search(r"^router ospf (\S+)", cfg, re.M)
@@ -842,7 +856,7 @@ def configure_links(lab_index_fn, lab_id, ch, log):
             r = devcfg.push_config(lab_index_fn(), lab_id, n, text, save_startup_after=True)
             if r.get("ok"):
                 log("  %s: %s configured on %s and saved to its startup file"
-                    % (n, addr, iface_name(kind, port_num(p))))
+                    % (n, addr, node_iface(lab, n, kind, p)))
             else:
                 log("  %s: configuration errors: %s" % (n, "; ".join(r.get("errors") or [])))
 

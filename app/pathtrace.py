@@ -169,8 +169,9 @@ def parse_frr_route(js):
 # --------------------------------------------------------------------------
 
 class Tracer:
-    def __init__(self, lab, poller):
+    def __init__(self, lab, poller, linkstate=None):
         self.lab = lab
+        self.linkstate = linkstate or {}    # link id -> {failed, down, igp_state} (live poller + linkctl)
         self.poller = poller
         self.nodes = {n["name"]: n for n in lab.get("nodes") or []}
         self.cont = {c["short"]: c for c in lab.get("containers") or [] if c.get("state") == "running"}
@@ -387,6 +388,9 @@ class Tracer:
                     return self._done(hops, "left-lab", t0)
                 hop["link"] = link["id"]
                 hop["ecmp_links"] = [x["id"] for x in (self.link_out(node, e["out_if"])[0] for e in hop["ecmp"]) if x]
+                stop = self._check(hop, hops, link, t0)
+                if stop:
+                    return stop
                 stack = [target]
                 node, in_port = far, far_port
                 vrf = None
@@ -411,6 +415,9 @@ class Tracer:
                 return self._done(hops, "left-lab", t0)
             hop["link"] = link["id"]
             hop["ecmp_links"] = [x["id"] for x in (self.link_out(node, e["out_if"])[0] for e in hop["ecmp"]) if x]
+            stop = self._check(hop, hops, link, t0)
+            if stop:
+                return stop
             out = [l for l in p["labels"] if l != "pop"]
             # a label-switching router only swaps / pops the top label; what is
             # below it (the VPN label) travels on unchanged
@@ -429,12 +436,40 @@ class Tracer:
                 target = inner          # PHP popped the transport and there is no VPN label
         return self._done(hops, "loop", t0)
 
+    def blocked(self, link_id):
+        """(drop reason, warning) for forwarding out of this link right now.
+
+        The walk reads the routers' forwarding tables; they can still point at
+        a link that is dead - before the IGP notices (a `cut` on a VM router is
+        only seen when hellos time out) - so the live link state is checked too.
+        """
+        st = self.linkstate.get(link_id) or {}
+        f = st.get("failed")
+        if st.get("down"):
+            return ("the link is down%s" % (" (failed from the dashboard, %s)" % f.get("mode") if f else ""), None)
+        if st.get("igp_state") in ("lost", "down"):
+            return ("the IGP adjacency on this link is down, but the router still forwards over it "
+                    "(not converged yet) - packets are dropped here", None)
+        if f:
+            return (None, "marked failed from the dashboard (%s), but the interfaces and the IGP adjacency "
+                          "are still up - the failure did not take effect" % f.get("mode"))
+        return (None, None)
+
+    def _check(self, hop, hops, link, t0):
+        reason, warn = self.blocked(link["id"])
+        if warn:
+            hop["warn"] = warn
+        if reason:
+            hop["blocked"] = reason
+            return self._done(hops, "blackhole", t0)
+        return None
+
     def _platform_if(self, node, port):
         import topoedit
         plat = self.platform(node)
         if plat in ("linux", "frr"):
             return port
-        name = topoedit.iface_name(self.nodes[node]["kind"], topoedit.port_num(port))
+        name = topoedit.node_iface(self.lab, node, self.nodes[node]["kind"], port)
         if plat == "cisco_xr":
             # the box may call it TenGigE0/0/0/N (vmxnet3), not GigabitEthernet:
             # use whatever interface it really has that maps to this port
@@ -462,12 +497,12 @@ def _describe(stack, out):
     return "swap %s → %s" % (stack[0], top_out)
 
 
-def trace(lab, poller, src, dst, src_vrf=None):
+def trace(lab, poller, src, dst, src_vrf=None, linkstate=None):
     try:
         ipaddress.ip_address(dst)
     except ValueError:
         raise TraceError("destination must be an IPv4 address")
-    return Tracer(lab, poller).trace(src, dst, src_vrf)
+    return Tracer(lab, poller, linkstate).trace(src, dst, src_vrf)
 
 
 def node_address(lab, poller, node):
