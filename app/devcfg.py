@@ -702,12 +702,8 @@ def _startup_rel(lab, node, platform=None):
     return os.path.join("configs", "%s.%s" % (node, "cli" if platform == "srl" else "cfg")), True
 
 
-def save_startup(lab, node, audit=None):
-    """Write the node's cleaned running-config into its startup-config file.
-
-    lab is a lab dict from the collector (needs path, name, nodes, containers).
-    Returns {"node", "path", "created", "topology_updated", "saved_version", "bytes"}.
-    """
+def fetch_startup(lab, node):
+    """(platform, the node's running-config cleaned into startup form)."""
     _, nent, c, platform = resolve({lab["id"]: lab}, lab["id"], node)
     conn = _connect(lab, node, c, platform)
     try:
@@ -717,7 +713,25 @@ def save_startup(lab, node, audit=None):
     text = _clean(platform, raw, lab, node)
     if len(text.splitlines()) < 3 or ("hostname" not in text and platform != "srl"):
         raise DevError("the running-config from %s looks truncated - not saved" % node, 502)
+    return platform, text
 
+
+def save_startup(lab, node, audit=None):
+    """Write the node's cleaned running-config into its startup-config file.
+
+    lab is a lab dict from the collector (needs path, name, nodes, containers).
+    Returns {"node", "path", "created", "topology_updated", "saved_version", "bytes"}.
+    """
+    platform, text = fetch_startup(lab, node)
+    return write_startup(lab, node, platform, text, audit)
+
+
+def write_startup(lab, node, platform, text, audit=None):
+    """Write already-fetched startup text; points the topology at it if needed.
+
+    Reads the topology from disk, so calls for several nodes must run one
+    after the other (each may rewrite the topology file).
+    """
     rel, repoint = _startup_rel(lab, node, platform)
     full = os.path.join(os.path.dirname(lab["path"]), rel)
     exists = os.path.isfile(full)

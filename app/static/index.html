@@ -291,6 +291,7 @@ function renderStats(h){
 function labSignature(s){
   return JSON.stringify(s.labs.map(function(l){
     return [l.id, l.running, l.running_count, l.healthy_count, JSON.stringify(l.lan||{}), !!s.busy,
+            l.stale_config, l.stale_containers, JSON.stringify(l.saved||null),
             (l.containers||[]).map(function(c){ return c.state+c.status+(c.cpu||"")+(c.mem||""); }).join("")];
   })) + filter + query + JSON.stringify(Array.from(expanded));
 }
@@ -409,6 +410,10 @@ function renderLabs(s){
     if (l.stale_containers) nameLine.appendChild(badge("warn", "left over from a reboot",
       "Containers from a previous session exist but are stopped (the host rebooted?). "
       + "Redeploy brings the lab back; a plain start would not restart them.", "warn"));
+    else if (l.stale_config && l.saved && l.saved.latest && l.saved.since_deploy)
+      nameLine.appendChild(badge(l.saved.failed.length ? "warn" : "ok",
+        (l.running ? "config saved " : "starts from config saved ") + whenShort(l.saved.at), savedTitle(l.saved)
+        + (l.running ? "" : "\n\nStart runs deploy --reconfigure so every router boots from it."), "save"));
     else if (l.stale_config) nameLine.appendChild(badge("warn", "changed since deploy",
       "The topology or configs changed since the last deploy. Redeploy (deploy --reconfigure) loads them; "
       + "a plain start would reuse clab-" + l.name + "/ and the old config.", "warn"));
@@ -446,15 +451,21 @@ function renderLabs(s){
     var needsRe = l.stale_config || l.stale_containers;
     var mainBtn;
     if (l.running){
+      var saveBtn = UI.button("Save config", "quiet", function(){ saveLab(l, false); }, "save");
+      saveBtn.title = "Save the running config of every router (and the map layout) - the next start boots from them";
+      saveBtn.disabled = busy;
+      acts.appendChild(saveBtn);
       mainBtn = UI.button("Stop", "main halt", function(){
+        var chk = saveFirstBox();
         confirmThen("Stop " + (l.name||l.file) + "?",
-          "Destroys all " + l.node_count + " nodes. Anything configured on them since "
-          + "deploy and not saved to the topology is lost.",
-          "Stop lab", function(){ act(l, "destroy"); });
+          "Destroys all " + l.node_count + " nodes. Anything configured on them and not saved is lost.",
+          "Stop lab", function(){ if (chk.box.checked) saveLab(l, true); else act(l, "destroy"); }, chk.wrap);
       }, "stop");
       mainBtn.title = "clab destroy";
     } else {
-      mainBtn = UI.button(needsRe ? "Redeploy" : "Start", "main " + (needsRe ? "re" : "go"), function(){
+      // a save is a "change since deploy" too, but starting from it is just a start
+      var fromSave = l.stale_config && !l.stale_containers && l.saved && l.saved.latest && l.saved.since_deploy;
+      mainBtn = UI.button(needsRe && !fromSave ? "Redeploy" : "Start", "main " + (needsRe && !fromSave ? "re" : "go"), function(){
         var short = freeMb > 0 && l.est_ram_mb > freeMb;
         if (short){
           confirmThen("Not enough free memory",
@@ -462,8 +473,9 @@ function renderLabs(s){
             + gb(freeMb) + " is free. Deploying anyway will likely fail or destabilise running labs.",
             "Start anyway", function(){ act(l, needsRe ? "redeploy" : "deploy"); });
         } else act(l, needsRe ? "redeploy" : "deploy");
-      }, needsRe ? "redo" : "play");
-      mainBtn.title = needsRe ? "clab deploy --reconfigure" : "clab deploy";
+      }, needsRe && !fromSave ? "redo" : "play");
+      mainBtn.title = fromSave ? "clab deploy --reconfigure - boots from the configs saved " + new Date(l.saved.at*1000).toLocaleString()
+                    : needsRe ? "clab deploy --reconfigure" : "clab deploy";
     }
     mainBtn.disabled = busy || !!l.parse_error;
     if (busy) mainBtn.title = "another action is running";
@@ -656,6 +668,28 @@ document.addEventListener("keydown", function(e){
   if (e.key !== "Escape") return;
   if (!$("termwrap").hidden) closeTerm(); else closeModal();
 });
+
+// ---------- save current config ----------
+function whenShort(t){
+  var d = new Date(t*1000), now = new Date();
+  return d.toDateString() === now.toDateString() ? d.toLocaleTimeString().replace(/:\d\d$/, "") : d.toLocaleDateString();
+}
+function savedTitle(sv){
+  return "Config saved " + new Date(sv.at*1000).toLocaleString() + (sv.by ? " by " + sv.by : "")
+    + "\nsaved: " + ((sv.ok||[]).join(", ") || "-")
+    + ((sv.failed||[]).length ? "\nnot saved: " + sv.failed.join(", ") : "");
+}
+function saveFirstBox(){
+  var wrap = el("label","ucheck"), box = el("input"); box.type = "checkbox"; box.checked = true;
+  wrap.appendChild(box);
+  wrap.appendChild(document.createTextNode("Save the current config first, so the next start boots from it"));
+  return {wrap: wrap, box: box};
+}
+// the map keeps its layout per browser; send it so it goes into the topology
+function savedLayout(l){
+  try { return JSON.parse(localStorage.getItem("clabd-pos2-" + l.id) || "null"); } catch(e){ return null; }
+}
+function saveLab(l, thenStop){ act(l, thenStop ? "save-destroy" : "save", {layout: savedLayout(l)}); }
 
 // ---------- actions ----------
 function act(lab, action, extra){

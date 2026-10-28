@@ -284,6 +284,7 @@ select.uin,.field select{padding-right:28px;appearance:none;-webkit-appearance:n
 .field{display:flex;flex-direction:column;gap:5px;min-width:0}
 .field > label,.flabel{font:600 10.5px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 input[type=checkbox],input[type=radio]{accent-color:var(--accent);width:15px;height:15px;margin:0;cursor:pointer}
+label.ucheck{display:flex;gap:8px;align-items:center;font-size:12.5px;margin-top:12px;cursor:pointer}
 input[type=range]{accent-color:var(--accent)}
 .search{position:relative;display:inline-flex}
 .search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--muted);pointer-events:none}

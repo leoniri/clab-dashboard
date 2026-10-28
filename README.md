@@ -15,7 +15,9 @@ network labs from the browser.
   Flex-Algo + ODN, 6PE/6VPE, EVPN-VPWS, RR add-path, multicast …) with built-in lab guides
   that check themselves, plus imports from zip, git and the containerlab examples.
 - **Live editing** - add/remove nodes and links on a running lab, push and save device
-  configs, config snapshots with diff and restore.
+  configs, config snapshots with diff and restore, and **Save config**: one click writes
+  every router's running config (and the map layout) back into the lab, so the next start
+  boots from it.
 - **Manage** - container images (pull, search, upload, build vrnetlab router images from a
   vendor ISO/qcow2 with a boot test), Docker networks, trash, and **LAN access**: give lab
   nodes addresses on your LAN, including an SSH gateway into nodes that have no SSH server.

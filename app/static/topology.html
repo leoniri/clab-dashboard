@@ -1717,23 +1717,40 @@ function renderLabHeader(){
   $("labname").textContent = lab.name || lab.file;
   document.title = (lab.name || lab.file) + " · topology";
   var partial = lab.running && lab.running_count < lab.node_count;
-  var sig=[lab.running, partial, lab.stale_config, lab.stale_containers, window._busy].join();
+  var sv=lab.saved||{};
+  var sig=[lab.running, partial, lab.stale_config, lab.stale_containers, window._busy, sv.at, sv.latest, (sv.failed||[]).join()].join();
   if(sig===headSig) return;
   headSig=sig;
   labPill.textContent="";
   labPill.appendChild(el("span","pill "+(lab.running?(partial?"warn":"ok"):"idle"),
                          lab.running?(partial?"partial":"running"):"stopped"));
+  if(lab.saved){
+    var sb=el("span","pill "+((lab.saved.failed||[]).length?"warn":lab.saved.latest?"ok":"idle"),"saved "+whenShort(lab.saved.at));
+    sb.title=savedTitle(lab.saved); sb.style.marginLeft="6px"; labPill.appendChild(sb);
+  }
   labAct.textContent="";
   var needsRe = lab.stale_config || lab.stale_containers;
+  // a save is a "change since deploy" too, but starting from it is just a start
+  var fromSave = lab.stale_config && !lab.stale_containers && lab.saved && lab.saved.latest && lab.saved.since_deploy;
+  if(lab.running){
+    var sbtn=UI.button("Save config","",function(){ saveLab(false); },"save");
+    sbtn.title="Save the running config of every router and the map layout - the next start boots from them";
+    sbtn.disabled=!!window._busy;
+    labAct.appendChild(sbtn);
+  }
   var b = lab.running
     ? UI.button("Stop lab","",function(){
+        var chk=saveFirstBox();
         UI.confirm("Stop "+lab.name+"?","All "+lab.node_count+" nodes are destroyed. Anything configured on them "
-          +"and not saved to the topology is lost.",{ok:"Stop lab",danger:true}).then(function(ok){
-          if(!ok) return; b.disabled=true; labAction("destroy"); }); },"stop")
-    : UI.button(needsRe?"Redeploy":"Start lab","primary",function(){
-        b.disabled=true; labAction(needsRe?"redeploy":"deploy"); }, needsRe?"redo":"play");
+          +"and not saved is lost.",{ok:"Stop lab",danger:true,extra:chk.wrap}).then(function(ok){
+          if(!ok) return;
+          if(chk.box.checked) saveLab(true); else { b.disabled=true; labAction("destroy"); } }); },"stop")
+    : UI.button(needsRe&&!fromSave?"Redeploy":"Start lab","primary",function(){
+        b.disabled=true; labAction(needsRe?"redeploy":"deploy"); }, needsRe&&!fromSave?"redo":"play");
   b.disabled=!!window._busy;
   if(window._busy) b.title="another action is running";
+  else if(!lab.running && fromSave)
+    b.title="clab deploy --reconfigure - boots from the configs saved "+when(lab.saved.at);
   labAct.appendChild(b);
   labAct.appendChild(UI.moreButton(function(){ return [
     {label:"Convergence tests", icon:"bolt", href:"convergence.html?lab="+encodeURIComponent(lab.id)},
@@ -1925,6 +1942,8 @@ UI.commands([
   {label:"Toggle interface names", icon:"list", run:function(){ setIfs(!showIfs); }},
   {label:"Toggle legend", icon:"info", run:function(){ setLegend(!showLegend); }},
   {label:"Snapshots…", icon:"snapshot", run:function(){ if(lab) openSnapshots(); }},
+  {label:"Save current config", sub:"running configs + layout become the next start", icon:"save",
+   run:function(){ if(lab && lab.running && !window._busy) saveLab(false); }},
   {label:"Convergence tests", icon:"bolt", run:function(){ location.href="convergence.html?lab="+encodeURIComponent(labId); }},
   {label:"Edit lab files", icon:"file", run:function(){ location.href="edit.html?lab="+encodeURIComponent(labId); }},
   {label:"Export lab as zip", icon:"download", run:function(){ location.href="api/lab/export?lab="+encodeURIComponent(labId); }},
@@ -2317,6 +2336,45 @@ function setEditing(on, force){
 $("t_edit").addEventListener("click",function(){ setEditing(!editing); });
 window.addEventListener("beforeunload",function(e){ if(editing && nChanges(changes())){ e.preventDefault(); e.returnValue=""; } });
 
+
+// ---------- save current config ----------
+function whenShort(t){
+  var d=new Date(t*1000), now=new Date();
+  return d.toDateString()===now.toDateString() ? d.toLocaleTimeString().replace(/:\d\d$/,"") : d.toLocaleDateString();
+}
+function savedTitle(sv){
+  return "Config saved "+when(sv.at)+(sv.by?" by "+sv.by:"")
+    +"\nsaved: "+((sv.ok||[]).join(", ")||"-")
+    +((sv.failed||[]).length?"\nnot saved: "+sv.failed.join(", "):"")
+    +(sv.latest?"":"\nthe topology or configs changed after this save");
+}
+function saveFirstBox(){
+  var wrap=el("label","ucheck"), box=el("input"); box.type="checkbox"; box.checked=true;
+  wrap.appendChild(box); wrap.appendChild(document.createTextNode("Save the current config first, so the next start boots from it"));
+  return {wrap:wrap, box:box};
+}
+function currentLayout(){
+  var o={};
+  nodes.forEach(function(n){ if(!n.external) o[n.name]=[Math.round(n.x), Math.round(n.y)]; });
+  return o;
+}
+function saveLab(thenStop){
+  var m=modal((thenStop?"Save and stop · ":"Save current config · ")+lab.name, true);
+  m.scrim.dataset.locked="1";
+  var log=el("div","jlog","starting…"); m.body.appendChild(log);
+  function finish(){ delete m.scrim.dataset.locked; m.foot.appendChild(btn("Close","primary",m.close)); }
+  post("api/action",{lab_id:lab.id, action:thenStop?"save-destroy":"save", layout:currentLayout()}).then(function(j){
+    log.textContent="";
+    followJob(j.job_id, log, function(res){
+      log.appendChild(el("div", res.rc===0?"ok":"err", res.rc===0
+        ? (thenStop ? "Saved and stopped. Start the lab again and it boots from these configs."
+                    : "Saved. The next start (or a redeploy) boots every router from these configs.")
+        : (thenStop ? "The save did not complete, so the lab was NOT stopped." : "The save did not complete for every router.")));
+      log.scrollTop=log.scrollHeight;
+      finish();
+    });
+  }).catch(function(e){ log.textContent=e.message; finish(); });
+}
 
 // ---------- snapshots ----------
 function followJob(id, log, done){

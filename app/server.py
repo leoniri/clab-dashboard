@@ -60,6 +60,7 @@ import linkctl
 import livestate
 import pathtrace
 import snapshots
+import labsave
 import topoedit
 import vendorimg
 import sysbin
@@ -180,20 +181,42 @@ def lab_id(path):
     return hashlib.sha1(path.encode()).hexdigest()[:12]
 
 
-def config_is_stale(topo_path, lab_name):
-    """True when the topology or its configs changed since the last deploy.
+def config_state(topo_path, lab_name):
+    """{"stale", "saved"} for a lab.
 
+    stale: the topology or its configs changed since the last deploy.
     containerlab generates clab-<lab>/ on deploy and a plain `deploy` reuses
     it, so an edited startup-config is silently ignored until --reconfigure.
+    A "Save current config" (labsave) counts as a change: its marker is
+    written after every file it touched, wherever those live.
+
+    saved: the last save, when there is one ({at, ok, failed, latest} -
+    latest means nothing changed on disk after it).
     """
+    mark, mark_at = labsave.read_marker(topo_path, lab_name)
+    saved = None
+    if mark:
+        nodes = mark.get("nodes") or {}
+        saved = {"at": mark.get("saved") or mark_at, "by": mark.get("by"),
+                 "ok": sorted(n for n, v in nodes.items() if v.get("ok")),
+                 "failed": sorted(n for n, v in nodes.items() if not v.get("ok"))}
+    newest = _newest_change(topo_path)
+    if saved:
+        saved["latest"] = mark_at + 1.0 >= newest
     d = os.path.dirname(topo_path)
     state = os.path.join(d, "clab-%s" % lab_name, ".state.clab.yaml")
-    if not os.path.isfile(state):
-        return False
     try:
         deployed_at = os.path.getmtime(state)
     except OSError:
-        return False
+        return {"stale": False, "saved": saved}
+    if saved:
+        saved["since_deploy"] = mark_at > deployed_at + 1.0
+    # a second of slack: clab touches the state file as it writes the configs
+    return {"stale": max(newest, mark_at) > deployed_at + 1.0, "saved": saved}
+
+
+def _newest_change(topo_path):
+    d = os.path.dirname(topo_path)
     newest = 0.0
     try:
         newest = os.path.getmtime(topo_path)
@@ -206,8 +229,7 @@ def config_is_stale(topo_path, lab_name):
                 newest = max(newest, os.path.getmtime(os.path.join(cfgdir, fn)))
             except OSError:
                 pass
-    # a second of slack: clab touches the state file as it writes the configs
-    return newest > deployed_at + 1.0
+    return newest
 
 
 def node_ram_mb(kind, node_env, kind_env):
@@ -789,7 +811,8 @@ class Collector(threading.Thread):
             # will bring it back.
             lab["stale_containers"] = bool(containers) and lab["running_count"] == 0
             lab["running"] = lab["running_count"] > 0
-            lab["stale_config"] = config_is_stale(path, lab.get("name") or "")
+            cst = config_state(path, lab.get("name") or "")
+            lab["stale_config"], lab["saved"] = cst["stale"], cst["saved"]
             lab["healthy_count"] = sum(1 for c in containers if c["status"] == "healthy")
             labs.append(lab)
 
@@ -1119,7 +1142,7 @@ class Handler(BaseHTTPRequestHandler):
 
         action = payload.get("action")
         lid = payload.get("lab_id")
-        if action not in ACTIONS and action != "delete":
+        if action not in ACTIONS and action not in ("delete", "save", "save-destroy"):
             self._json({"error": "unknown action"}, 400)
             return
 
@@ -1138,6 +1161,18 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"error": "confirmation does not match the lab name"}, 400)
                 return
             steps = self._delete_steps(lab)
+        elif action in ("save", "save-destroy"):
+            # Save current config: running configs into the startup files
+            # (+ map layout), then optionally stop. A failed save stops the
+            # job, so the lab is never destroyed with its changes unsaved.
+            if not lab.get("running"):
+                self._json({"error": "the lab is not running - nothing to save"}, 409)
+                return
+            lid_ = lab["id"]
+            steps = [labsave.save_step(lambda: COLLECTOR.index().get(lid_) or lab,
+                                       payload.get("layout"), audit, self._who())]
+            if action == "save-destroy":
+                steps.append(ACTIONS["destroy"](path))
         else:
             steps = [ACTIONS[action](path)]
 
