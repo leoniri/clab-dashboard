@@ -55,18 +55,7 @@ def norm_ip(ip):
         return ip
 
 
-def parse_ips6(text):
-    """Global IPv6 addresses in `show ipv6 ... interface brief` / `ip -6 addr`
-    output (link-local, loopback and timestamps are skipped)."""
-    out = set()
-    for tok in re.findall(r"[0-9a-fA-F:]*:[0-9a-fA-F:]+(?:/\d+)?", text):
-        try:
-            a = ipaddress.IPv6Address(tok.split("/")[0])
-        except ValueError:
-            continue
-        if not (a.is_link_local or a.is_loopback or a.is_unspecified):
-            out.add(str(a))
-    return out
+parse_ips6 = livestate.parse_ips6
 
 
 def _loopback_block(text):
@@ -312,7 +301,7 @@ class Tracer:
     def owned(self, node):
         if node in self.ips:
             return self.ips[node]
-        cached = (self.poller.proto.get(node) or {}).get("ips")
+        cached = [ip for ip in (self.poller.proto.get(node) or {}).get("ips") or [] if ":" not in ip]
         if cached:
             self.ips[node] = set(cached)
             return self.ips[node]

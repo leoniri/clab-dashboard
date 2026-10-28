@@ -25,6 +25,7 @@ on IOS-XR, Eth1/1 -> eth1 on NX-OS, ethernet-1/1.0 -> e1-1 on SR Linux).
 
 import collections
 import concurrent.futures
+import ipaddress
 import json
 import re
 import threading
@@ -120,25 +121,69 @@ def parse_ospf_ios(text):
     return out
 
 
+def norm_ip(ip):
+    """Canonical text form (IPv6 lower-case, compressed); other text unchanged."""
+    try:
+        return str(ipaddress.ip_address(ip))
+    except ValueError:
+        return ip
+
+
+def _is_addr(s):
+    try:
+        ipaddress.ip_address(s)
+        return True
+    except ValueError:
+        return False
+
+
+def parse_ips6(text):
+    """Global IPv6 addresses in `show ipv6 ... interface brief` / `ip -6 addr`
+    output (link-local, loopback and timestamps are skipped)."""
+    out = set()
+    for tok in re.findall(r"[0-9a-fA-F:]*:[0-9a-fA-F:]+(?:/\d+)?", text):
+        try:
+            a = ipaddress.IPv6Address(tok.split("/")[0])
+        except ValueError:
+            continue
+        if not (a.is_link_local or a.is_loopback or a.is_unspecified):
+            out.add(str(a))
+    return out
+
+
 def parse_bgp_ios(text, vrf=None):
     """Summary tables of IOS-XE / IOS-XR / NX-OS: rows start with the neighbour
     address; AS is the third column, Up/Down the second last, the last is the
     prefix count when Established, else the state."""
     out = []
     af = None
-    for line in text.splitlines():
+    # a long (IPv6) neighbour address gets a line of its own, the columns
+    # follow on the next one: join them back into one row
+    lines, raw = [], text.splitlines()
+    i = 0
+    while i < len(raw):
+        line = raw[i]
+        f = line.split()
+        if len(f) == 1 and _is_addr(f[0]) and i + 1 < len(raw) and raw[i + 1][:1] in (" ", "\t") \
+                and raw[i + 1].split()[:1] and raw[i + 1].split()[0].isdigit():
+            line = f[0] + " " + raw[i + 1].strip()
+            i += 1
+        lines.append(line)
+        i += 1
+    for line in lines:
         m = re.match(r"^\s*(?:For address family|Address Family):\s*(.+?)\s*$", line)
         if m:
             af = m.group(1)
             continue
-        m = re.match(r"^\s*VRF:?\s*(\S+)", line)
+        # "VRF: CUST" heads a block; "VRF ID: 0x60000001" inside it is not a name
+        m = re.match(r"^\s*VRF:?\s*(?!ID:)(\S+)", line)
         if m and "Neighbor" not in line:
             vrf = m.group(1).strip('",')
         f = line.split()
-        if len(f) >= 9 and re.match("^%s$" % IP_RE, f[0]) and f[2].isdigit():
+        if len(f) >= 9 and _is_addr(f[0]) and f[2].isdigit():
             last = f[-1]
             established = last.isdigit()
-            out.append({"peer_ip": f[0], "asn": int(f[2]), "uptime": f[-2],
+            out.append({"peer_ip": norm_ip(f[0]), "asn": int(f[2]), "uptime": f[-2],
                         "state": "Established" if established else " ".join(f[9:]) or last,
                         "pfx": int(last) if established else None, "af": af,
                         "vrf": vrf if vrf not in (None, "default") else None})
@@ -170,29 +215,36 @@ IOS_CMDS = {
                  ("ospf", "show ip ospf neighbor", parse_ospf_ios),
                  ("bgp", "show bgp all summary", parse_bgp_ios),
                  ("ips", "show ip interface brief", lambda t: parse_ips_ios(
-                     "\n".join(l for l in t.splitlines() if not l.startswith("GigabitEthernet1 "))))],
+                     "\n".join(l for l in t.splitlines() if not l.startswith("GigabitEthernet1 ")))),
+                 ("ips6", "show ipv6 interface brief", parse_ips6)],
     "cisco_xr": [("isis", "show isis adjacency", parse_isis_xr),
                  ("ospf", "show ospf neighbor", parse_ospf_ios),
                  ("bgp", "show bgp all all summary", parse_bgp_ios),
                  ("bgpvrf", "show bgp vrf all summary", parse_bgp_ios),
-                 ("ips", "show ipv4 vrf all interface brief", parse_ips_ios)],
+                 ("bgpvrf6", "show bgp vrf all ipv6 unicast summary", parse_bgp_ios),
+                 ("ips", "show ipv4 vrf all interface brief", parse_ips_ios),
+                 ("ips6", "show ipv6 vrf all interface brief", parse_ips6)],
     "cisco_nxos": [("isis", "show isis adjacency", parse_isis_nxos),
                    ("ospf", "show ip ospf neighbors", parse_ospf_ios),
                    ("bgp", "show bgp all summary vrf all", parse_bgp_ios),
-                   ("ips", "show ip interface brief vrf all", parse_ips_ios)],
+                   ("ips", "show ip interface brief vrf all", parse_ips_ios),
+                   ("ips6", "show ipv6 interface brief vrf all", parse_ips6)],
 }
 NOT_RUNNING = re.compile(r"(not running|not enabled|Invalid input|% ?Invalid|not configured|"
                          r"No such|does not exist|BGP not active|Instance .* not found)", re.I)
 
 
 def collect_ios(conn, platform):
-    igp, bgp, ips = [], [], []
+    igp, bgp, ips, ips6 = [], [], [], []
     for what, cmd, parser in IOS_CMDS[platform]:
         try:
             text = conn.send_command(cmd, read_timeout=30)
         except Exception as exc:                        # noqa: BLE001
             raise RuntimeError("%s: %s" % (cmd, str(exc).splitlines()[0][:120]))
-        if NOT_RUNNING.search(text[:300]) and what != "ips":
+        if NOT_RUNNING.search(text[:300]) and not what.startswith("ips"):
+            continue
+        if what == "ips6":
+            ips6 = sorted(parse_ips6(text)) if not NOT_RUNNING.search(text[:300]) else []
             continue
         res = parser(text)
         if what in ("isis", "ospf"):
@@ -202,7 +254,7 @@ def collect_ios(conn, platform):
             bgp += [b for b in res if (b["peer_ip"], b["vrf"]) not in known]
         else:
             ips = res
-    return igp, bgp, ips
+    return igp, bgp, ips + ips6
 
 
 def _vtysh_json(conn, cmd):
@@ -235,8 +287,9 @@ def collect_frr(conn, cname):
             if not isinstance(body, dict):
                 continue
             for ip, p in (body.get("peers") or {}).items():
-                if not re.match("^%s$" % IP_RE, ip):
-                    continue
+                if not _is_addr(ip):
+                    continue            # an interface (BGP unnumbered)
+                ip = norm_ip(ip)
                 prev = next((b for b in bgp if b["peer_ip"] == ip and b["vrf"] == (None if vrf == "default" else vrf)), None)
                 if prev:
                     prev["af"] += ", " + af
@@ -248,6 +301,8 @@ def collect_frr(conn, cname):
                             "vrf": None if vrf == "default" else vrf, "desc": p.get("desc")})
     rc, out = conn.exec(["ip", "-4", "-o", "addr"], timeout=10)
     ips = sorted(set(re.findall(r"inet (%s)/" % IP_RE, out)) - {"127.0.0.1"})
+    rc, out = conn.exec(["ip", "-6", "-o", "addr"], timeout=10)
+    ips += sorted(parse_ips6(" ".join(re.findall(r"inet6 (\S+)", out))))
     return igp, bgp, ips
 
 
@@ -307,7 +362,7 @@ def collect_srl(conn, cname):
         for a in x.get("afi-safi") or []:
             if isinstance(a, dict):
                 pfx += int(a.get("received-routes") or 0)
-        bgp.append({"peer_ip": x["peer-address"], "asn": x.get("peer-as"),
+        bgp.append({"peer_ip": norm_ip(x["peer-address"]), "asn": x.get("peer-as"),
                     "state": str(x["session-state"]).capitalize(), "pfx": pfx,
                     "uptime": str(x.get("last-established") or "").split(" ")[0],
                     "af": None, "vrf": None if vrf == "default" else vrf,
@@ -319,6 +374,12 @@ def collect_srl(conn, cname):
         if isinstance(p, str) and "." in p:
             ips.append(p.split("/")[0])
     _walk(_srl_json(conn, "/interface * subinterface * ipv4 address *"), ad)
+
+    def ad6(x, ctx):
+        p = x.get("ip-prefix")
+        if isinstance(p, str) and ":" in p:
+            ips.extend(parse_ips6(p))
+    _walk(_srl_json(conn, "/interface * subinterface * ipv6 address *"), ad6)
     return igp, bgp, sorted(set(ips))
 
 
@@ -489,7 +550,7 @@ class LabPoller(threading.Thread):
         owner = {}
         for node, p in self.proto.items():
             for ip in p.get("ips") or []:
-                owner.setdefault(ip, node)
+                owner.setdefault(norm_ip(ip), node)
         failures = self.links.status_records(lab)
         links = {}
         for l in lab.get("links") or []:
@@ -529,7 +590,7 @@ class LabPoller(threading.Thread):
         for node, p in self.proto.items():
             bgp = []
             for b in p.get("bgp") or []:
-                b = dict(b, peer_node=owner.get(b["peer_ip"]))
+                b = dict(b, peer_node=owner.get(norm_ip(b["peer_ip"])))
                 bgp.append(b)
                 if b["peer_node"] and b["peer_node"] != node:
                     k = tuple(sorted((node, b["peer_node"])))
