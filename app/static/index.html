@@ -108,7 +108,8 @@
   padding:12px 14px 12px 12px;border:1px solid var(--line);border-radius:14px;isolation:isolate;
   background:linear-gradient(180deg,color-mix(in srgb,var(--surface-2) 55%,var(--surface)) 0%,var(--surface) 100%);
   box-shadow:var(--shadow-sm);cursor:pointer;
-  transition:border-color .18s,box-shadow .18s,transform .18s;animation:rise .25s ease-out both}
+  transition:border-color .18s,box-shadow .18s,transform .18s}
+.lab.enter{animation:rise .25s ease-out both}
 .lab:hover{border-color:var(--line-strong);box-shadow:var(--shadow);transform:translateY(-1px)}
 .lab:focus-visible{outline:none;box-shadow:var(--glow)}
 .lab::after{content:"";position:absolute;inset:0 0 auto 0;height:1px;border-radius:14px 14px 0 0;pointer-events:none;
@@ -134,7 +135,7 @@
 .lab.run .thumb{border-color:color-mix(in srgb,var(--ok) 25%,var(--line))}
 .lab.run .thumb line{stroke:color-mix(in srgb,var(--ok) 60%,var(--line-strong));stroke-dasharray:3 3;animation:flow 1.2s linear infinite}
 @keyframes flow{to{stroke-dashoffset:-6}}
-@media (prefers-reduced-motion:reduce){ .lab.run .thumb line{animation:none} .lab{animation:none} }
+@media (prefers-reduced-motion:reduce){ .lab.run .thumb line{animation:none} .lab.enter,.nodes.enter{animation:none} }
 
 .labmain{min-width:0;display:flex;flex-direction:column;gap:7px}
 .labname{display:flex;align-items:center;gap:10px;min-width:0}
@@ -178,7 +179,8 @@
 /* node table */
 .nodes{margin-top:-11px;border:1px solid var(--line-strong);border-top:1px dashed var(--line);
   border-radius:0 0 14px 14px;background:var(--surface);box-shadow:var(--shadow);overflow-x:auto;padding:6px 10px 10px;
-  animation:rise .2s ease-out both}
+}
+.nodes.enter{animation:rise .2s ease-out both}
 .nodes table{min-width:760px}
 .nodes td{font:12px var(--font-mono);white-space:nowrap;padding:7px 12px}
 .nodes td.nm{font-weight:600;color:var(--ink)}
@@ -472,9 +474,14 @@ function renderStats(h, labs){
 // ---------- labs ----------
 function labSignature(s){
   return JSON.stringify(s.labs.map(function(l){
-    return [l.id, l.running, l.running_count, l.healthy_count, JSON.stringify(l.lan||{}), !!s.busy,
-            l.stale_config, l.stale_containers, JSON.stringify(l.saved||null),
-            (l.containers||[]).map(function(c){ return c.state+c.status+(c.cpu||"")+(c.mem||""); }).join("")];
+    // cpu / mem change on every docker stats pass: they are patched in place
+    // by liveCells(), not part of the signature (a rebuild every few seconds
+    // is what made the page flicker)
+    var lan = l.lan || {};
+    return [l.id, l.running, l.running_count, l.healthy_count, !!s.busy,
+            [!!lan.enabled, (lan.active||[]).slice().sort(), lan.nodes||{}, lan.ssh||{}, (lan.unreachable||[]).slice().sort()],
+            l.stale_config, l.stale_containers, l.saved ? [l.saved.at, l.saved.latest, l.saved.since_deploy, l.saved.failed] : null,
+            (l.containers||[]).map(function(c){ return c.name+c.state+c.status+c.ipv4; }).join("")];
   })) + filter + query + JSON.stringify(Array.from(expanded));
 }
 
@@ -483,8 +490,23 @@ function badge(cls, text, title, ic){
   var b = el("span","ubadge " + cls); if (ic) b.appendChild(UI.icon(ic));
   b.appendChild(document.createTextNode(text)); if (title) b.title = title; return b;
 }
-function redraw(){ renderLabs(state); lastSig = labSignature(state); }
-function toggle(l){ if (expanded.has(l.id)) expanded.delete(l.id); else expanded.add(l.id); redraw(); }
+function redraw(){ renderLabs(state); liveCells(state); lastSig = labSignature(state); }
+var seenLabs = new Set(), justOpened = null;
+// cpu / mem cells of open node tables, updated without rebuilding anything
+function liveCells(s){
+  var by = {};
+  (s.labs||[]).forEach(function(l){ (l.containers||[]).forEach(function(c){ by[c.name] = c; }); });
+  document.querySelectorAll("#labs td[data-live]").forEach(function(td){
+    var c = by[td.dataset.c] || {}, v = c[td.dataset.live];
+    var txt = v || (td.dataset.live === "mem" ? td.dataset.est : "—");
+    if (td.textContent !== txt) td.textContent = txt;
+    td.classList.toggle("dim", !v);
+  });
+}
+function toggle(l){
+  if (expanded.has(l.id)) expanded.delete(l.id); else { expanded.add(l.id); justOpened = l.id; }
+  redraw(); justOpened = null;
+}
 function setFilter(v){
   filter = v;
   $("filterseg").querySelectorAll("button").forEach(function(b, i){
@@ -567,8 +589,9 @@ function renderLabs(s){
     var gone = l.parse_error === "topology file not found on disk";
     var drawable = l.node_count > 0 && !l.parse_error;
     var open = expanded.has(l.id) && l.node_count > 0;
-    var row = el("div","lab" + (l.running ? " run" : "") + (partial ? " part" : "") + (open ? " open" : ""));
-    row.style.animationDelay = Math.min(idx, 12) * 18 + "ms";
+    var fresh = !seenLabs.has(l.id); seenLabs.add(l.id);
+    var row = el("div","lab" + (l.running ? " run" : "") + (partial ? " part" : "") + (open ? " open" : "") + (fresh ? " enter" : ""));
+    if (fresh) row.style.animationDelay = Math.min(idx, 12) * 18 + "ms";
     row.tabIndex = 0;
     if (drawable){
       row.addEventListener("click", function(e){
@@ -712,7 +735,7 @@ function renderLabs(s){
 
     // --- node table ---
     if (open){
-      var wrap = el("div","nodes"), t = el("table","utable");
+      var wrap = el("div","nodes" + (justOpened === l.id ? " enter" : "")), t = el("table","utable");
       var thead = el("thead"), hr = el("tr");
       ["node","image","state","health","mgmt ipv4","lan","cpu","memory",""].forEach(function(h){
         hr.appendChild(el("th",null,h));
@@ -757,8 +780,10 @@ function renderLabs(s){
           lanTd.appendChild(el("span", "dim", " · no ssh yet"));
         }
         tr.appendChild(lanTd);
-        tr.appendChild(el("td", c.cpu ? null : "dim", c.cpu || "—"));
-        tr.appendChild(el("td", c.mem ? null : "dim", c.mem || gb(n.est_ram_mb) + " est"));
+        var cpuTd = el("td"), memTd = el("td");
+        cpuTd.dataset.live = "cpu"; memTd.dataset.live = "mem";
+        cpuTd.dataset.c = memTd.dataset.c = c.name || ""; memTd.dataset.est = gb(n.est_ram_mb) + " est";
+        tr.appendChild(cpuTd); tr.appendChild(memTd);
         var cliTd = el("td"); cliTd.style.textAlign = "right";
         if (c.name && c.state === "running"){
           var cli = UI.button("CLI", "sm", function(){
@@ -966,6 +991,7 @@ function tick(){
       renderStats(h, s.labs);
       var sig = labSignature(s);
       if (sig !== lastSig){ renderLabs(s); lastSig = sig; }
+      liveCells(s);
       schedule(s.busy ? POLL_BUSY : POLL_IDLE);
     })
     .catch(function(){
