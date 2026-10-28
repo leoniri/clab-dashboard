@@ -45,7 +45,7 @@ This installs **Docker** (if missing), the **latest containerlab**, and the dash
 prints the address and the generated `admin` password:
 
 ```
-==> clab-dashboard 0.10.0 is running - http://10.0.0.5:8080/
+==> clab-dashboard 0.11.0 is running - http://10.0.0.5:8080/
     containerlab 0.79.0
     login: admin / Xk7mPq2vRt9sLw4n
 ```
