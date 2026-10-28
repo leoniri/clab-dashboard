@@ -1414,8 +1414,9 @@ function opOf(a){
   a=a||"";
   if(/^push/.test(a)) return "push";
   if(/^swap/.test(a)) return "swap";
-  if(/^pop|SRv6 decap/.test(a)) return "pop";
-  if(/^delivered/.test(a)) return "done";
+  if(/^pop|SRv6 decap|SRv6 \S+ end of segments/.test(a)) return "pop";
+  if(/^SRv6 (uN|uA|End|End\.X) shift|^SRv6 (uB6|End\.B6)/.test(a)) return "swap";
+  if(/^delivered|^SRv6 SID \S+ reached/.test(a)) return "done";
   if(/^SRv6 H\./.test(a)) return "encap";
   if(/^forward/.test(a)) return "fwd";
   return "err";
@@ -1424,7 +1425,10 @@ function opShort(a){
   a=a||""; var m;
   if((m=/^swap (\S+) → (\S+)/.exec(a))) return m[1]===m[2] ? "swap "+m[1] : "swap "+m[1]+"→"+m[2];
   if((m=/^pop (\S+) \(PHP\)/.exec(a))) return "pop "+m[1]+" · PHP";
-  if(/^SRv6 H\./.test(a)) return "SRv6 encap";
+  if(/^SRv6 H\./.test(a)) return /SR policy/.test(a) ? "SRv6 encap · policy" : "SRv6 encap";
+  if((m=/^SRv6 (\S+) shift/.exec(a))) return m[1]+" shift";
+  if((m=/^SRv6 (uB6|End\.B6\S*) policy/.exec(a))) return m[1]+" policy";
+  if((m=/^SRv6 decap \((\S+)\)/.exec(a))) return m[1]+" decap";
   if(/^forward on SRv6/.test(a)) return "SRv6 fwd";
   if(/^forward$/.test(a)) return "IP forward";
   if(/^delivered/.test(a)) return "delivered";

@@ -259,7 +259,8 @@ def _path_summary(tr):
     if not tr or tr.get("error"):
         return tr
     return {"result": tr["result"],
-            "nodes": [h["node"] for h in tr["hops"] if not h.get("action", "").startswith(("pop VPN", "SRv6 decap"))],
+            # several records on one router (a decap, a uSID shift) are one node
+            "nodes": [h["node"] for i, h in enumerate(tr["hops"]) if i == 0 or tr["hops"][i - 1]["node"] != h["node"]],
             "links": [h["link"] for h in tr["hops"] if h.get("link")],
             "hops": tr["hops"]}
 

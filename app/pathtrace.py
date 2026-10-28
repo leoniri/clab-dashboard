@@ -1,27 +1,31 @@
 #!/usr/bin/env python3
 """
-Trace the path a packet takes through a running lab, from the routers' own
-forwarding tables - a control-plane walk, hop by hop:
+Trace the path a packet takes through a running lab through each router's own
+dataplane, hop by hop - the packet is carried as it is on the wire:
 
-  1. At the current node, look the target up in the right table (a VRF or the
-     global table): IOS-XE `show ip cef [vrf X] A.B.C.D detail`, IOS-XR
-     `show cef [vrf X] A.B.C.D`, NX-OS `show ip route A.B.C.D [vrf X]`,
-     FRR `show ip route [vrf X] A.B.C.D json`, Linux `ip route get`.
-  2. The result gives next hop(s), outgoing interface and the labels imposed.
-     The interface is mapped back to the clab port, the port to the link, the
-     link to the neighbour - that is the next hop on the map.
-  3. A VPN route resolves recursively to a BGP next hop (the remote PE's
-     loopback) and carries a VPN label; from there the walk follows that
-     next hop through the core (global table) with the VPN label kept at the
-     bottom of the stack, and switches back into the VRF of the same name on
-     the node that owns the next hop (the egress PE).
-  4. Plain IP arriving on a PE is looked up in the VRF of the incoming port.
-  5. It stops when a node owns the destination, when a router has no route, or
-     after MAX_HOPS.
+  * IP: the destination is looked up in the table of the VRF the packet
+    arrived in (IOS-XE `show ip cef`, IOS-XR `show cef`, NX-OS `show ip
+    route`, FRR `show ip route ... json`, Linux `ip route get`). The result
+    forwards it, pushes labels, or encapsulates it in SRv6 - with the SR
+    policy's inserted SIDs when the route is steered into one (XR shows the
+    binding SID and both SID lists); the SIDs are packed into uSID containers
+    as the headend does.
+  * SRv6: the DA is looked up in the global table. A local SID applies its
+    behaviour as the router reports it - uN / uA (shift) move to the next
+    uSID (uA out of its own adjacency), uB6 inserts the policy's SIDs, uDT4/6
+    decapsulates into the VRF, the last segment with USD decapsulates; any
+    other DA is forwarded on.
+  * MPLS: the top label is looked up in the router's label table (FRR `show
+    mpls table`): swap, PHP pop, or pop the VPN label into its VRF. On
+    platforms whose label table is not read here (IOS-XE / IOS-XR / NX-OS)
+    the walk follows the route to the FEC (the BGP next hop) and rewrites the
+    top label as that route says.
 
-Equal-cost next hops are all reported; the walk follows the first one. SR
-Linux is not walked (its FIB is not exposed in a form parsed here) - the
-trace stops there and says so.
+The interface a router sends on is mapped to the clab port, the port to the
+link, the link to the neighbour - the next hop on the map. Every equal-cost
+next hop is followed (each fork re-walks from the router where it splits).
+A trace ends when the packet is delivered, dropped (no route / no label), it
+leaves the lab, or after MAX_HOPS links. SR Linux is not walked.
 
 Router sessions are borrowed from the lab's live-state poller (livestate.py),
 so a trace over VMs costs a few `show` commands, not new SSH logins.
@@ -36,7 +40,8 @@ import devcfg
 import livestate
 import linkctl
 
-MAX_HOPS = 24
+MAX_HOPS = 24               # links crossed
+MAX_STEPS = 64              # lookups along one path (several per router: shift, decap, ...)
 MAX_BRANCHES = 8            # equal-cost paths followed per trace
 MAX_LOOKUPS = 120
 IP_RE = r"\d+\.\d+\.\d+\.\d+"
@@ -146,11 +151,22 @@ def parse_xr_cef(text):
     res = {"paths": [], "via": None, "vpn_label": None, "connected": False}
     if "Prefix not found" in text:
         return res
-    for m in re.finditer(r"SRv6 H\.(?:Encaps|Insert)\S*\s+SID-list \{([^}]*)\}", text):
+    for m in re.finditer(r"SRv6 H\.(Encaps|Insert)\S*\s+SID-list \{([^}]*)\}", text):
         # a TI-LFA repair path carries its own SID list - that is not the service encap
         if not _XR_BACKUP.search(_xr_via_line(text, m.start())):
-            res["srv6_sids"] = [x.strip() for x in m.group(1).replace(",", " ").split() if x.strip()]
-            break
+            key = "srv6_sids" if m.group(1) == "Encaps" else "srv6_insert"
+            res.setdefault(key, [norm_ip(x.strip()) for x in m.group(2).replace(",", " ").split() if x.strip()])
+    # "5f00:0:11::/48, version 5, SRv6 Endpoint uN (shift), internal ..." - a local SID
+    m = re.search(r"^(\S+)/(\d+), version \d+, SRv6 Endpoint ([^,]+?), internal", text, re.M)
+    if m:
+        vm = re.search(r"next hop VRF - '([^']+)'", text)
+        res["endpoint"] = {"sid": norm_ip(m.group(1)), "plen": int(m.group(2)), "behavior": m.group(3).strip(),
+                           "vrf": vm.group(1) if vm and vm.group(1) != "default" else None}
+    if re.search(r"^\S+, version \d+, SRv6 Headend", text, re.M):
+        res["headend"] = True
+    m = re.search(r"via local-srv6-sid (\S+?),", text)
+    if m:
+        res["bsid"] = norm_ip(m.group(1))        # steered into an SR policy by its binding SID
     if re.search(r"attached|receive", text.split("\n", 3)[-1][:600]) and "via" not in text:
         res["connected"] = True
     m = re.search(r"via (%s)/32, \d+ dependencies, recursive" % IP_RE, text)
@@ -248,6 +264,15 @@ def parse_frr_route(js):
         if not nh.get("fib") and not nh.get("active"):
             continue
         labels = [_lab_int(x) for x in nh.get("labels") or []]
+        seg6 = nh.get("seg6") or {}
+        if seg6.get("segs"):
+            segs = seg6["segs"] if isinstance(seg6["segs"], list) else str(seg6["segs"]).split("/")
+            res.setdefault("srv6_sids", [norm_ip(x) for x in segs if x])
+        loc = nh.get("seg6local") or {}
+        if loc.get("action"):
+            ctx = nh.get("seg6localContext") or {}
+            res["endpoint"] = {"sid": None, "plen": r.get("prefixLen"), "behavior": loc["action"],
+                               "vrf": ctx.get("vrfName") or ctx.get("table")}
         if nh.get("resolver") or res["via"]:
             if res["vpn_label"] is not None and (not labels or labels[-1] != res["vpn_label"]):
                 labels.append(res["vpn_label"])
@@ -259,6 +284,102 @@ def parse_frr_route(js):
     res["backups"] = [{"nh": nh.get("ip"), "out_if": nh.get("interfaceName"), "backup": True, "kind": "TI-LFA",
                        "labels": [l for l in (_lab_int(x) for x in nh.get("labels") or []) if l is not None]}
                       for nh in r.get("backupNexthops") or [] if nh.get("interfaceName")]
+    return res
+
+
+# --------------------------------------------------------------------------
+# SRv6 uSID (NEXT-CSID, F3216) containers
+# --------------------------------------------------------------------------
+
+USID_BITS = 16
+BLOCK_BITS = 32                 # F3216: 32-bit block, 16-bit uSIDs
+
+
+def _usids(sid, block_bits=BLOCK_BITS):
+    """(block, [uSIDs]) of a uSID container, or None when the address is not
+    one (a classic 128-bit SID: non-zero bits after the first empty slot)."""
+    a = int(ipaddress.IPv6Address(sid))
+    rest_bits = 128 - block_bits
+    rest = a & ((1 << rest_bits) - 1)
+    out = []
+    for i in range(rest_bits // USID_BITS):
+        u = (rest >> (rest_bits - USID_BITS * (i + 1))) & 0xffff
+        if u == 0:
+            if rest & ((1 << (rest_bits - USID_BITS * (i + 1))) - 1):
+                return None
+            break
+        out.append(u)
+    return a >> rest_bits, out
+
+
+def _container(block, usids, block_bits=BLOCK_BITS):
+    rest_bits = 128 - block_bits
+    v = block << rest_bits
+    for i, u in enumerate(usids):
+        v |= u << (rest_bits - USID_BITS * (i + 1))
+    return str(ipaddress.IPv6Address(v))
+
+
+def srv6_compose(sids, block_bits=BLOCK_BITS):
+    """The (DA, [SRH segments]) a headend builds from a SID list: consecutive
+    uSID containers of one block are packed into as few containers as fit
+    (H.Encaps.Red / H.Insert.Red with NEXT-CSID); other SIDs stay one each."""
+    per = (128 - block_bits) // USID_BITS
+    segs, cur = [], None
+    for sid in sids:
+        u = _usids(sid, block_bits)
+        if u and cur and cur[0] == u[0] and len(cur[1]) + len(u[1]) <= per:
+            cur[1].extend(u[1])
+            continue
+        if cur:
+            segs.append(_container(cur[0], cur[1], block_bits))
+            cur = None
+        if u:
+            cur = [u[0], list(u[1])]
+        else:
+            segs.append(norm_ip(sid))
+    if cur:
+        segs.append(_container(cur[0], cur[1], block_bits))
+    return (segs[0], segs[1:]) if segs else (None, [])
+
+
+def srv6_shift(da, n, block_bits=BLOCK_BITS):
+    """The DA after a uN / uA / uB6 (shift) consumed n uSIDs; None when the
+    container is used up."""
+    u = _usids(da, block_bits)
+    if not u or len(u[1]) <= n:
+        return None
+    return _container(u[0], u[1][n:], block_bits)
+
+
+# --------------------------------------------------------------------------
+# label (LFIB) lookups -> {"paths": [{out_if, nh, out: [labels] | None,
+#   vrf: pop and look up in this VRF | None, unlabelled: bool}], "backups": []}
+# out [] = pop (PHP / implicit-null)
+# --------------------------------------------------------------------------
+
+def parse_frr_lfib(js):
+    res = {"paths": [], "backups": []}
+    try:
+        d = json.loads(js[js.index("{"):]) if "{" in js else {}
+    except ValueError:
+        return res
+
+    def conv(nh):
+        stack = nh.get("outLabelStack") or ([nh["outLabel"]] if "outLabel" in nh else [])
+        out = [int(x) for x in stack if str(x).isdigit() and int(x) != 3]
+        if not nh.get("nexthop") and nh.get("type") == "BGP" and nh.get("interface"):
+            # the VPN label: pop it and look the packet up in the VRF
+            return {"out_if": None, "nh": None, "out": [], "vrf": nh["interface"], "unlabelled": False}
+        return {"out_if": nh.get("interface"), "nh": nh.get("nexthop"), "out": out, "vrf": None,
+                "unlabelled": False, "type": nh.get("type")}
+    for nh in d.get("nexthops") or []:
+        if nh.get("installed") is False:
+            continue
+        res["paths"].append(conv(nh))
+    for nh in d.get("backupNexthops") or []:
+        res["backups"].append(dict(conv(nh), backup=True, kind="TI-LFA",
+                                   labels=[l for l in conv(nh)["out"]]))
     return res
 
 
@@ -431,8 +552,17 @@ class Tracer:
             if not d:
                 return {"paths": [], "via": None, "vpn_label": None, "connected": False}
             r = d[0]
-            return {"paths": [{"nh": r.get("gateway"), "out_if": r.get("dev"), "labels": []}],
-                    "via": None, "vpn_label": None, "connected": r.get("type") == "local" or not r.get("gateway")}
+            enc = r.get("encap") or {}
+            labels, res = [], {"via": None, "vpn_label": None,
+                               "connected": r.get("type") == "local" or not r.get("gateway")}
+            if enc.get("encap_type") == "mpls":
+                labels = [_lab_int(x) for x in str(enc.get("dst") or "").split("/") if x]
+                res["connected"] = False
+            elif enc.get("encap_type") == "seg6" and enc.get("segs"):
+                res["srv6_sids"] = [norm_ip(x) for x in enc["segs"]]
+                res["connected"] = False
+            res["paths"] = [{"nh": r.get("gateway"), "out_if": r.get("dev"), "labels": [l for l in labels if l is not None]}]
+            return res
         v6 = ":" in target
         if plat == "frr":
             cmd = "show %s route %s%s json" % ("ipv6" if v6 else "ip", ("vrf %s " % vrf) if vrf else "", target)
@@ -467,13 +597,15 @@ class Tracer:
         if src not in self.cont:
             raise TraceError("%s is not running" % src)
         t0 = time.time()
-        start = {"node": src, "in_port": None, "vrf": src_vrf, "target": dst, "inner": dst,
-                 "vpn_vrf": None, "stack": [], "srv6": False}
+        start = {"node": src, "in_port": None, "vrf": src_vrf, "inner": dst, "enc": None,
+                 "fec": None, "vpn_vrf": None}
         queue, done, seen = [(start, [], None)], [], set()
         while queue and len(done) < MAX_BRANCHES and self.lookups < MAX_LOOKUPS:
             st, hops, force = queue.pop(0)
-            hops, result = self._walk(dict(st, stack=list(st["stack"])), hops, force,
-                                      queue if branches else None)
+            hops, result = self._walk(_copy_state(st), hops, force, queue if branches else None)
+            if result == "down" and hops and hops[-1].get("_far"):
+                far, far_port = hops[-1].pop("_far")
+                hops.append({"node": far, "in_port": far_port, "action": "not running"})
             key = tuple((h["node"], h.get("link")) for h in hops)
             if key in seen:
                 continue
@@ -492,122 +624,314 @@ class Tracer:
             self.cache[k] = self.lookup(node, vrf, target)
         return self.cache[k]
 
+    def _lfib(self, node, label):
+        """Label table entry on a platform whose LFIB is read directly, else None."""
+        if self.platform(node) not in LABEL_WALK:
+            return None
+        k = (node, "mpls", label)
+        if k not in self.cache:
+            self.lookups += 1
+            rc, out = devcfg.ExecConn(self.cont[node]["name"], "frr").exec(
+                ["vtysh", "-c", "show mpls table %d json" % label], timeout=20)
+            self.cmds += 1
+            self.cache[k] = parse_frr_lfib(out)
+        return self.cache[k]
+
+    # The packet is walked through each router's own dataplane: an MPLS packet
+    # by its top label, an SRv6 packet by its destination address (a local SID
+    # applies its behaviour - uN/uA shift, uB6 policy insert, uDT decap), an
+    # IP packet by its destination in the VRF it arrived in. Each step on a
+    # router is a record of its own; the map groups them per router.
     def _walk(self, st, hops, force, forks):
-        node, in_port, vrf = st["node"], st["in_port"], st["vrf"]
-        target, inner, vpn_vrf, stack, srv6 = st["target"], st["inner"], st["vpn_vrf"], st["stack"], st["srv6"]
-        for _ in range(MAX_HOPS):
+        links = 0
+        for _ in range(MAX_STEPS):
+            here = _copy_state(st)
             n0 = len(hops)
-            here = {"node": node, "in_port": in_port, "vrf": vrf, "target": target, "inner": inner,
-                    "vpn_vrf": vpn_vrf, "stack": list(stack), "srv6": srv6}
-            hop = {"node": node, "in_port": in_port, "vrf": vrf, "lookup": target, "in_labels": list(stack)}
+            node, enc = st["node"], st["enc"]
+            hop = {"node": node, "in_port": st["in_port"], "vrf": st["vrf"], "in_labels": _enc_repr(enc)}
             hops.append(hop)
-            owns = self.owns(node, target)
-            if srv6 and self.owns_sid(node, target):
-                # the SID belongs to this node's locator: decapsulate into the VRF
-                hop["action"] = "SRv6 decap %s → VRF %s" % (target, vpn_vrf or "?")
-                vrf, target, stack, srv6 = vpn_vrf, inner, [], False
-                hop2 = {"node": node, "in_port": in_port, "vrf": vrf, "lookup": target, "in_labels": []}
-                hops.append(hop2)
-                hop = hop2
-                owns = self.owns(node, target)
-            elif owns and target != inner:
-                # the BGP next hop is here: this is the egress PE, back into the VRF
-                hop["action"] = "pop VPN label%s → VRF %s" % (
-                    (" %s" % stack[-1]) if stack else "", vpn_vrf or "?")
-                vrf, target, stack = vpn_vrf, inner, []
-                hop2 = {"node": node, "in_port": in_port, "vrf": vrf, "lookup": target, "in_labels": []}
-                hops.append(hop2)
-                hop = hop2
-                owns = self.owns(node, target)
-            if owns:
+
+            def pick(paths):
+                # this branch was forked onto one of the equal-cost next hops
+                nonlocal force
+                p = next((x for x in paths if force and _same_path(x, force)), None) or paths[0]
+                if force is None and forks is not None:
+                    for alt in paths:
+                        if alt is not p:
+                            forks.append((here, [dict(h) for h in hops[:n0]], alt))
+                force = None
+                return p, [x for x in paths if x is not p]
+
+            # ---- MPLS: the top label
+            if enc and enc["t"] == "mpls":
+                stack = enc["stack"]
+                top = stack[0]
+                hop["lookup"] = "label %s" % top
+                if top in (0, 2):
+                    hop["action"] = "pop explicit-null %s" % top
+                    st["enc"] = {"t": "mpls", "stack": stack[1:]} if stack[1:] else None
+                    continue
+                lf = self._lfib(node, top)
+                if lf is None:
+                    r = self._mpls_by_fec(st, hop, pick)
+                    if r == "next":
+                        continue
+                    if r:
+                        return hops, r
+                    links += 1
+                    continue
+                if not lf["paths"]:
+                    hop["action"] = "no label table entry for %s - dropped" % top
+                    return hops, "no-route"
+                p, others = pick(lf["paths"])
+                if p["vrf"]:
+                    hop["action"] = "pop VPN label %s → VRF %s" % (top, p["vrf"])
+                    rest = stack[1:]
+                    st["enc"] = {"t": "mpls", "stack": rest} if rest else None
+                    st["vrf"] = p["vrf"]
+                    continue
+                new = p["out"] + stack[1:]
+                if not p["out"]:
+                    hop["action"] = "pop %s (PHP)" % top
+                elif len(p["out"]) == 1:
+                    hop["action"] = "swap %s → %s" % (top, p["out"][0])
+                else:
+                    hop["action"] = "swap %s → %s, push %s" % (top, p["out"][-1], " ".join(str(x) for x in p["out"][:-1]))
+                hop["out_labels"] = p["out"]
+                st["enc"] = {"t": "mpls", "stack": new} if new else None
+                r = self._send(st, hop, node, p, others, lf)
+                if r:
+                    return hops, r
+                links += 1
+                if links > MAX_HOPS:
+                    break
+                continue
+
+            # ---- SRv6: the destination address
+            if enc and enc["t"] == "srv6":
+                da = enc["da"]
+                hop["lookup"] = da
+                res = self._lookup(node, None, da)
+                ep = res.get("endpoint")
+                if not ep and self.owns(node, da):
+                    hop["action"] = "delivered (SRv6 DA %s is this router's address)" % da
+                    return hops, "reached"
+                if ep:
+                    r = self._srv6_endpoint(st, hop, res, ep, pick)
+                    if r == "next":
+                        continue
+                    if r:
+                        return hops, r
+                    links += 1
+                    continue
+                if res.get("updated"):
+                    hop["fib_updated"] = res["updated"]
+                if not res["paths"]:
+                    hop["action"] = "no route to %s - dropped" % da
+                    return hops, "no-route"
+                p, others = pick(res["paths"])
+                hop["action"] = "forward on SRv6 DA %s" % da
+                r = self._send(st, hop, node, p, others, res)
+                if r:
+                    return hops, r
+                links += 1
+                if links > MAX_HOPS:
+                    break
+                continue
+
+            # ---- IP: the destination in the VRF it arrived in
+            inner, vrf = st["inner"], st["vrf"]
+            hop["lookup"] = inner
+            if self.owns(node, inner):
                 hop["action"] = "delivered"
                 return hops, "reached"
             try:
-                res = self._lookup(node, vrf, target)
+                res = self._lookup(node, vrf, inner)
             except TraceError as exc:
                 hop["action"] = str(exc)
                 return hops, "unsupported"
-            if not res["paths"]:
-                hop["action"] = "no route to %s%s" % (target, (" in VRF %s" % vrf) if vrf else "")
-                return hops, "no-route"
-            # this branch was forked onto one of the equal-cost next hops
-            p = force or res["paths"][0]
-            if force is None and forks is not None:
-                for alt in res["paths"][1:]:
-                    forks.append((here, [dict(h) for h in hops[:n0]], alt))
-            force = None
-            others = [x for x in res["paths"] if x is not p]
+            if res.get("endpoint") and not vrf and ":" in inner:
+                # an IPv6 packet whose destination is a local SID gets the SID's
+                # behaviour - SRv6 is plain IPv6 on the wire (a trace to a SID)
+                hops.pop()
+                st["enc"], st["sid_target"] = {"t": "srv6", "da": inner, "srh": []}, True
+                continue
             if res.get("updated"):
                 hop["fib_updated"] = res["updated"]
-            if res.get("srv6_sids") and not srv6:
-                # SRv6 VPN: the packet is encapsulated towards the service SID;
-                # the core forwards on that IPv6 destination (its locator)
-                hop["srv6"] = res["srv6_sids"]
-                vpn_vrf, target, srv6 = vrf, res["srv6_sids"][0], True
-                hop["out_if"], hop["nh"] = p["out_if"], p["nh"]
-                hop["out_labels"] = []
-                hop["ecmp"] = [{"out_if": x["out_if"], "nh": x["nh"], "labels": []} for x in others]
-                hop["action"] = "SRv6 H.Encaps.Red → %s" % " ".join(res["srv6_sids"])
-                hop["stack_out"] = ["DA " + target]
-                link, far, far_port = self.link_out(node, p["out_if"])
-                if link is None:
-                    hop["action"] += " - %s leaves the lab" % p["out_if"]
-                    return hops, "left-lab"
-                hop["link"] = link["id"]
-                hop["ecmp_links"] = [x["id"] for x in (self.link_out(node, e["out_if"])[0] for e in hop["ecmp"]) if x]
-                # the repair path is held on the SID's locator route in the
-                # global table, not on the VRF route that did the encap
+            if not res["paths"]:
+                hop["action"] = "no route to %s%s" % (inner, (" in VRF %s" % vrf) if vrf else "")
+                return hops, "no-route"
+            p, others = pick(res["paths"])
+            # XR calls a route "SRv6 Headend" also when only its TI-LFA backup
+            # inserts SIDs: the primary path's Encaps / Insert list is what counts
+            if res.get("srv6_sids") or res.get("srv6_insert"):
+                # H.Insert alone (IPv6 steered into a policy): the original
+                # destination stays as the last segment
+                sids = (res.get("srv6_insert") or []) + (res.get("srv6_sids") or [inner])
+                da, srh = srv6_compose(sids)
+                if not da:
+                    hop["action"] = "SRv6 headend without a SID list"
+                    return hops, "unsupported"
+                hop["srv6"] = res.get("srv6_sids") or []
+                hop["action"] = "SRv6 H.Encaps.Red → %s" % da + (
+                    " (SR policy, BSID %s: + %s)" % (res["bsid"], " ".join(res.get("srv6_insert") or []))
+                    if res.get("bsid") else "")
+                st["enc"] = {"t": "srv6", "da": da, "srh": srh}
+                st["vpn_vrf"] = vrf
+                # the repair path lives on the core route (or the policy's BSID), not the VRF route
+                core = None
                 try:
-                    core = self._lookup(node, None, target)
+                    core = self._lookup(node, None, res.get("bsid") or da)
                 except TraceError:
-                    core = None
-                self._protection(hop, node, core if core and core["paths"] else res)
-                if self._check(hop, link):
-                    return hops, "blackhole"
-                stack = [target]
-                node, in_port = far, far_port
-                vrf = None
-                if far not in self.cont:
-                    hops.append({"node": far, "in_port": far_port, "action": "not running"})
-                    return hops, "down"
+                    pass
+                r = self._send(st, hop, node, p, others, core if core and core["paths"] else res)
+                if r:
+                    return hops, r
+                links += 1
                 continue
-            if res["via"] and res["via"] != target and not stack:
-                # VPN (or recursive BGP) route: follow the BGP next hop from here on
-                hop["via"] = res["via"]
-                vpn_vrf, target = vrf, res["via"]
-            hop["out_if"], hop["nh"] = p["out_if"], p["nh"]
-            hop["out_labels"] = p["labels"]
-            hop["ecmp"] = [{"out_if": x["out_if"], "nh": x["nh"], "labels": x["labels"]} for x in others]
-            hop["action"] = ("forward on SRv6 DA %s" % target) if srv6 else _describe(stack, p["labels"])
-            link, far, far_port = self.link_out(node, p["out_if"])
-            if link is None:
-                if res["connected"] and target == inner:
-                    hop["action"] = "delivered on a directly connected network"
-                    return hops, "reached"
-                hop["action"] += " - %s leaves the lab" % p["out_if"]
-                return hops, "left-lab"
-            hop["link"] = link["id"]
-            hop["ecmp_links"] = [x["id"] for x in (self.link_out(node, e["out_if"])[0] for e in hop["ecmp"]) if x]
-            self._protection(hop, node, res)
-            if self._check(hop, link):
-                return hops, "blackhole"
-            out = [l for l in p["labels"] if l != "pop"]
-            # a label-switching router only swaps / pops the top label; what is
-            # below it (the VPN label) travels on unchanged
-            if srv6:
-                hop["stack_out"] = ["DA " + target]
+            if p["labels"]:
+                st["enc"] = {"t": "mpls", "stack": list(p["labels"])}
+                st["fec"] = res["via"] if res["via"] and res["via"] != inner else None
+                st["vpn_vrf"] = vrf
+                if res["via"] and res["via"] != inner:
+                    hop["via"] = res["via"]
+                hop["action"] = "push " + " ".join(str(l) for l in p["labels"])
+                hop["out_labels"] = p["labels"]
             else:
-                stack = (out[:1] + stack[1:]) if stack else out
-                hop["stack_out"] = list(stack)
-            node, in_port = far, far_port
-            if far not in self.cont:
-                hops.append({"node": far, "in_port": far_port, "action": "not running"})
-                return hops, "down"
-            # plain IP arriving on a router is looked up in its incoming port's VRF
-            vrf = None if stack else self.vrf_of(far, self._platform_if(far, far_port))
-            if not stack and target != inner:
-                target = inner          # PHP popped the transport and there is no VPN label
+                hop["action"] = "forward"
+            r = self._send(st, hop, node, p, others, res, connected=res["connected"])
+            if r:
+                return hops, r
+            links += 1
+            if links > MAX_HOPS:
+                break
         return hops, "loop"
+
+    def _srv6_endpoint(self, st, hop, res, ep, pick):
+        """Apply a local SID's behaviour. "next" = carry on at this router."""
+        node, da, srh = st["node"], st["enc"]["da"], list(st["enc"]["srh"])
+        beh = ep["behavior"]
+        kind = beh.split()[0].split("(")[0]
+        k = kind.lower()
+        shift = "shift" in beh.lower()
+        block = BLOCK_BITS
+        used = max(1, ((ep.get("plen") or block + USID_BITS) - block) // USID_BITS)
+
+        def advance():
+            """The DA after this SID: the rest of the container, else the next
+            SRH segment; None = no segments left."""
+            nxt = srv6_shift(da, used) if shift else None
+            if nxt is None and srh:
+                nxt = srh.pop(0)
+            return nxt
+        if st.get("sid_target") and (k.startswith(("udt", "end.dt", "udx", "end.dx"))
+                                     or (k in ("un", "end") and not (shift and srv6_shift(da, used)) and not srh)):
+            hop["action"] = "SRv6 SID %s reached (%s)" % (da, beh)
+            return "reached"
+        if k in ("udt4", "udt6", "udt46", "end.dt4", "end.dt6", "end.dt46"):
+            vrf = ep.get("vrf") or st.get("vpn_vrf")
+            hop["action"] = "SRv6 decap (%s) → VRF %s" % (kind, vrf or "default")
+            st["enc"], st["vrf"] = None, vrf
+            return "next"
+        if k in ("un", "end"):
+            nxt = advance()
+            if nxt:
+                hop["action"] = "SRv6 %s shift → DA %s" % (kind, nxt)
+                st["enc"] = {"t": "srv6", "da": nxt, "srh": srh}
+            else:
+                # last segment with USD: the inner packet goes on as plain IP
+                hop["action"] = "SRv6 %s end of segments - decap" % kind
+                st["enc"], st["vrf"] = None, None
+            return "next"
+        if k in ("ub6", "end.b6", "end.b6.encaps", "end.b6.insert"):
+            rest = advance()
+            policy = res.get("srv6_insert") or res.get("srv6_sids") or []
+            if not policy:
+                hop["action"] = "SRv6 %s without a policy SID list" % kind
+                return "unsupported"
+            nda, nsrh = srv6_compose(policy + ([rest] if rest else []))
+            hop["action"] = "SRv6 %s policy insert %s → DA %s" % (kind, " ".join(policy), nda)
+            st["enc"] = {"t": "srv6", "da": nda, "srh": nsrh + srh}
+            return "next"
+        if k in ("ua", "end.x", "udx4", "udx6", "end.dx4", "end.dx6"):
+            if not res["paths"]:
+                hop["action"] = "SRv6 %s with no adjacency" % kind
+                return "no-route"
+            p, others = pick(res["paths"])
+            if k.startswith(("udx", "end.dx")):
+                hop["action"] = "SRv6 decap (%s) → out %s" % (kind, p["out_if"])
+                st["enc"], st["vrf"] = None, None
+            else:
+                nxt = advance()
+                if nxt:
+                    hop["action"] = "SRv6 %s shift → DA %s, out %s" % (kind, nxt, p["out_if"])
+                    st["enc"] = {"t": "srv6", "da": nxt, "srh": srh}
+                else:
+                    hop["action"] = "SRv6 %s end of segments - decap, out %s" % (kind, p["out_if"])
+                    st["enc"] = None
+            return self._send(st, hop, node, p, others, res)
+        hop["action"] = "SRv6 endpoint %s (not modelled)" % beh
+        return "unsupported"
+
+    def _mpls_by_fec(self, st, hop, pick):
+        """A labelled packet on a router whose label table is not read: follow
+        the route to the FEC (the BGP next hop) and rewrite the top label as
+        that route says. "next" = carry on at this router."""
+        node, stack, fec = st["node"], st["enc"]["stack"], st.get("fec")
+        if fec and self.owns(node, fec):
+            hop["action"] = "pop VPN label%s → VRF %s" % ((" %s" % stack[-1]) if stack else "", st["vpn_vrf"] or "?")
+            st["enc"], st["vrf"] = None, st["vpn_vrf"]
+            return "next"
+        if not fec:
+            hop["action"] = "label %s: this router's label table is not read and the FEC is unknown" % stack[0]
+            return "unsupported"
+        hop["lookup"] = fec
+        try:
+            res = self._lookup(node, None, fec)
+        except TraceError as exc:
+            hop["action"] = str(exc)
+            return "unsupported"
+        if res.get("updated"):
+            hop["fib_updated"] = res["updated"]
+        if not res["paths"]:
+            hop["action"] = "no route to %s" % fec
+            return "no-route"
+        p, others = pick(res["paths"])
+        out = [l for l in p["labels"] if l != "pop"]
+        hop["action"] = _describe(stack, p["labels"])
+        hop["out_labels"] = p["labels"]
+        # a label-switching router only swaps / pops the top label; what is
+        # below it (the VPN label) travels on unchanged
+        new = out[:1] + stack[1:]
+        st["enc"] = {"t": "mpls", "stack": new} if new else None
+        return self._send(st, hop, node, p, others, res)
+
+    def _send(self, st, hop, node, p, others, res, connected=False):
+        """Put the packet on the wire out of path p; move the state to the far
+        end. A result string when the walk ends here."""
+        hop["out_if"], hop["nh"] = p.get("out_if"), p.get("nh")
+        hop["ecmp"] = [{"out_if": x.get("out_if"), "nh": x.get("nh"),
+                        "labels": x.get("labels") or x.get("out") or []} for x in others]
+        hop["stack_out"] = _enc_repr(st["enc"])
+        link, far, far_port = self.link_out(node, p.get("out_if"))
+        if link is None:
+            if connected and not st["enc"]:
+                hop["action"] = "delivered on a directly connected network"
+                return "reached"
+            hop["action"] += " - %s leaves the lab" % p.get("out_if")
+            return "left-lab"
+        hop["link"] = link["id"]
+        hop["ecmp_links"] = [x["id"] for x in (self.link_out(node, e["out_if"])[0] for e in hop["ecmp"]) if x]
+        self._protection(hop, node, res)
+        if self._check(hop, link):
+            return "blackhole"
+        st["node"], st["in_port"] = far, far_port
+        if far not in self.cont:
+            hop["_far"] = (far, far_port)
+            return "down"
+        # plain IP arriving on a router is looked up in its incoming port's VRF
+        st["vrf"] = None if st["enc"] else self.vrf_of(far, self._platform_if(far, far_port))
+        return None
 
     def _protection(self, hop, node, res):
         """The repair path (LFA / TI-LFA) the router holds for this hop, if any."""
@@ -676,6 +1000,31 @@ class Tracer:
 
     def _done(self, hops, result, t0):
         return {"hops": hops, "result": result, "seconds": round(time.time() - t0, 2), "commands": self.cmds}
+
+
+# platforms whose label table the walk reads; the others follow the FEC's route
+LABEL_WALK = {"frr"}
+
+
+def _copy_state(st):
+    st = dict(st)
+    if st.get("enc"):
+        st["enc"] = dict(st["enc"], **({"stack": list(st["enc"]["stack"])} if "stack" in st["enc"]
+                                       else {"srh": list(st["enc"]["srh"])}))
+    return st
+
+
+def _same_path(a, b):
+    return a.get("out_if") == b.get("out_if") and a.get("nh") == b.get("nh")
+
+
+def _enc_repr(enc):
+    """The encapsulation as shown on a hop card: labels top first, or the SRv6 DA (+ SRH)."""
+    if not enc:
+        return []
+    if enc["t"] == "mpls":
+        return list(enc["stack"])
+    return ["DA " + enc["da"]] + ["SRH " + x for x in enc["srh"]]
 
 
 def _describe(stack, out):
