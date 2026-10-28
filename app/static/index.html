@@ -17,17 +17,16 @@
    One panel, four cells split by hairlines. Each cell: label row, a ring
    gauge beside the headline number, and a full-width footer strip (trend line,
    capacity bar or running labs) so all four line up. */
-.host{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 28px;
-  border:1px solid var(--line);border-radius:16px;overflow:hidden;isolation:isolate;
+.host{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:0 0 28px}
+.inst{position:relative;min-width:0;padding:16px 20px 0;display:flex;flex-direction:column;overflow:hidden;isolation:isolate;
+  border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
   background:linear-gradient(180deg,color-mix(in srgb,var(--surface-2) 70%,var(--surface)) 0%,var(--surface) 100%);
-  box-shadow:var(--shadow)}
-.host::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;z-index:2;pointer-events:none;
-  background:linear-gradient(90deg,transparent 0%,color-mix(in srgb,var(--accent) 55%,transparent) 30%,
-    color-mix(in srgb,var(--accent-2) 45%,transparent) 70%,transparent 100%)}
-.host::after{content:"";position:absolute;inset:-40% 40% auto -10%;height:120%;z-index:-1;pointer-events:none;
-  background:radial-gradient(closest-side,color-mix(in srgb,var(--accent) 7%,transparent),transparent)}
-.inst{position:relative;min-width:0;padding:16px 20px 0;display:flex;flex-direction:column}
-.inst + .inst{border-left:1px solid var(--line)}
+  transition:border-color .2s}
+.inst:hover{border-color:var(--line-strong)}
+.inst::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--ring,var(--accent)) 60%,transparent),transparent)}
+.inst::after{content:"";position:absolute;inset:-60% 30% auto -30%;height:140%;z-index:-1;pointer-events:none;
+  background:radial-gradient(closest-side,color-mix(in srgb,var(--ring,var(--accent)) 8%,transparent),transparent)}
 .inst .k{display:flex;align-items:center;gap:8px;font:500 12px var(--font-sans);color:var(--ink-2);letter-spacing:.01em}
 .inst .k .ic{display:grid;place-items:center;width:22px;height:22px;border-radius:7px;
   background:var(--accent-soft);color:var(--accent-ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 22%,transparent)}
@@ -81,9 +80,8 @@
 .runl a i{flex:none;width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok)}
 .runl .more{color:var(--muted);background:var(--surface-3);box-shadow:none}
 .runl .none{font:400 11px var(--font-mono);color:var(--muted);padding-top:3px}
-@media (max-width:1100px){ .host{grid-template-columns:1fr 1fr} .inst:nth-child(3){border-left:0}
-  .inst:nth-child(n+3){border-top:1px solid var(--line)} }
-@media (max-width:560px){ .host{grid-template-columns:1fr} .inst + .inst{border-left:0;border-top:1px solid var(--line)} }
+@media (max-width:1100px){ .host{grid-template-columns:1fr 1fr} }
+@media (max-width:560px){ .host{grid-template-columns:1fr} }
 
 /* ---------- toolbar ---------- */
 .listhead{display:flex;align-items:center;gap:10px;margin:0 0 12px;flex-wrap:wrap}
