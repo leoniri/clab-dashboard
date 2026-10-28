@@ -434,7 +434,15 @@ class Tracer:
         plat = self.platform(node)
         if plat in ("linux", "frr"):
             return port
-        return topoedit.iface_name(self.nodes[node]["kind"], topoedit.port_num(port))
+        name = topoedit.iface_name(self.nodes[node]["kind"], topoedit.port_num(port))
+        if plat == "cisco_xr":
+            # the box may call it TenGigE0/0/0/N (vmxnet3), not GigabitEthernet:
+            # use whatever interface it really has that maps to this port
+            self.vrf_of(node, name)
+            for real in self.ifvrf.get(node) or {}:
+                if livestate.to_port(plat, real) == port:
+                    return real
+        return name
 
     def _done(self, hops, result, t0):
         return {"hops": hops, "result": result, "seconds": round(time.time() - t0, 2), "commands": self.cmds}

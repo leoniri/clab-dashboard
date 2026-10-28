@@ -54,11 +54,15 @@ def to_port(platform, ifname):
     if platform == "srl":
         m = re.match(r"^ethernet-1/(\d+)", s)
         return "e1-%s" % m.group(1) if m else None
+    # any Ethernet speed: vrnetlab presents GigabitEthernet or TenGigE (XRd on
+    # vmxnet3), TenGigabitEthernet etc. depending on the NIC model
     if platform == "cisco_xe":
-        m = re.match(r"^(?:Gi|GigabitEthernet)\s*(\d+)$", s)
+        m = re.match(r"^(?:Gi|GigabitEthernet|Te|TenGigabitEthernet|Fo|FortyGigabitEthernet|"
+                     r"Hu|HundredGigE|TwentyFiveGigE|Twe)\s*(\d+)$", s)
         return "eth%d" % (int(m.group(1)) - 1) if m else None
     if platform == "cisco_xr":
-        m = re.match(r"^(?:Gi|GigabitEthernet)\s*0/0/0/(\d+)$", s)
+        m = re.match(r"^(?:Gi|GigabitEthernet|Te|TenGigE|TF|TwentyFiveGigE|Fo|FortyGigE|"
+                     r"FH|FiftyGigE|Hu|HundredGigE|TH|TwoHundredGigE|FH|FourHundredGigE)\s*0/0/0/(\d+)$", s)
         return "eth%d" % (int(m.group(1)) + 1) if m else None
     if platform == "cisco_nxos":
         m = re.match(r"^(?:Eth|Ethernet)\s*1/(\d+)$", s)

@@ -102,16 +102,36 @@ body{overflow:hidden}
 .node text.ip{font-family:var(--font-mono);font-size:9.5px;fill:var(--muted);pointer-events:none}
 .node circle.st{stroke:var(--canvas);stroke-width:2.5}
 
-/* ---------- path trace ---------- */
-.trpath{fill:none;stroke:var(--accent);stroke-width:5;stroke-linecap:round;opacity:.92;pointer-events:none;
-  filter:drop-shadow(0 0 6px var(--accent))}
-.trpath.alt{stroke-width:2.5;stroke-dasharray:4 5;opacity:.7;filter:none}
-.trarrow{fill:var(--accent);pointer-events:none}
-.trlbl rect{fill:var(--accent)}
-.trlbl text{font-family:var(--font-mono);font-size:10px;font-weight:700;fill:var(--on-accent);pointer-events:none}
-.trnum circle{fill:var(--surface);stroke:var(--accent);stroke-width:2}
-.trnum text{font-family:var(--font-mono);font-size:10px;font-weight:700;fill:var(--accent-ink);pointer-events:none}
-.tracing .lk .link{opacity:.3}
+/* ---------- path trace ----------
+   Off-path nodes and links step back; the path is a ribbon coloured from
+   source (accent) to destination (accent-2), with marching dashes and a
+   packet running along it; every router on it carries its operation. */
+.tracing .lk:not(.onpath){opacity:.22}
+.tracing .node:not(.onpath){opacity:.32}
+.tracing .lk.onpath .link{stroke:transparent}
+.trpath{fill:none;stroke-width:6;stroke-linecap:round;pointer-events:none;opacity:.95}
+.trglow{fill:none;stroke-width:14;stroke-linecap:round;pointer-events:none;opacity:.18}
+.trdash{fill:none;stroke:#fff;stroke-width:1.6;stroke-linecap:round;stroke-dasharray:1.5 9;pointer-events:none;opacity:.75;
+  animation:trmarch .7s linear infinite}
+:root[data-theme="light"] .trdash{opacity:.9}
+@keyframes trmarch{to{stroke-dashoffset:-10.5}}
+.tralt{fill:none;stroke-width:2.5;stroke-dasharray:4 5;opacity:.6;pointer-events:none}
+.trpkt{fill:#fff;pointer-events:none;filter:drop-shadow(0 0 4px var(--accent))}
+.trpkt-ring{fill:none;stroke:var(--accent);stroke-width:2;pointer-events:none}
+.trseg.hl .trpath{stroke-width:8} .trseg.hl .trglow{opacity:.4}
+.trhdr rect{fill:var(--surface);stroke:var(--line-strong);stroke-width:1}
+.trhdr .lb{fill:var(--accent)} .trhdr .pl{fill:var(--surface-3)}
+.trhdr text{font-family:var(--font-mono);font-size:9.5px;font-weight:700;pointer-events:none}
+.trhdr text.lbt{fill:var(--on-accent)} .trhdr text.plt{fill:var(--ink-2)}
+.trop{pointer-events:none}
+.trop rect{fill:var(--surface);stroke-width:1.4}
+.trop circle{stroke:none}
+.trop text{font-family:var(--font-mono);font-size:10px;font-weight:600;fill:var(--ink)}
+.trop text.n{fill:var(--on-accent);font-weight:700;font-size:9.5px}
+.trop.hl rect{stroke-width:2.4}
+.trflag rect{stroke:none} .trflag text{font-family:var(--font-mono);font-size:8.5px;font-weight:700;letter-spacing:.08em;fill:var(--on-accent)}
+.node.trhl .halo{opacity:1;stroke:var(--accent);stroke-width:2}
+@media (prefers-reduced-motion:reduce){ .trdash{animation:none} }
 
 /* ---------- edit mode ---------- */
 .node.new .halo{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6;stroke-dasharray:5 3;opacity:1}
@@ -242,18 +262,52 @@ body{overflow:hidden}
 .trform{display:grid;grid-template-columns:auto 1fr;gap:7px 10px;align-items:center;font-size:12px;margin-bottom:12px}
 .trform label{font:600 10px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .trform select,.trform input{width:100%;min-width:0}
-.trres{font-size:12px;margin:10px 0 2px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;color:var(--ink-2)}
-.hops{display:flex;flex-direction:column;margin-top:8px;position:relative}
-.hop{display:grid;grid-template-columns:24px 1fr;gap:10px;padding:8px 0;position:relative}
-.hop+.hop::before{content:"";position:absolute;left:11px;top:-8px;height:16px;border-left:2px dotted var(--line-strong)}
-.hop .n{width:22px;height:22px;border-radius:50%;border:2px solid var(--accent);color:var(--accent-ink);background:var(--surface);
-  font:700 10px var(--font-mono);display:flex;align-items:center;justify-content:center;box-shadow:0 0 8px color-mix(in srgb,var(--accent) 40%,transparent)}
-.hop .n.pop{border-style:dashed;box-shadow:none}
-.hop b{font-size:13px}
-.hop .d{font-size:12px;color:var(--ink-2)}
-.hop .m{font:11px var(--font-mono);color:var(--muted)}
-.hop .stack{display:inline-flex;gap:3px;margin-left:4px;flex-wrap:wrap}
-.hop .stack span{font:600 10.5px var(--font-mono);background:var(--accent-soft);color:var(--accent-ink);border-radius:4px;padding:0 5px}
+.trsum{margin:12px 0 10px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--surface-2) 60%,var(--surface)),var(--surface))}
+.trsum .ends{display:flex !important;flex-direction:row;align-items:center;gap:10px;white-space:nowrap;font:600 15px var(--font-display);letter-spacing:-.01em;flex-wrap:wrap}
+.trsum .ends > span{display:inline-block}
+.trsum .ends .ar{flex:1;display:block !important;min-width:24px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--accent-2));position:relative}
+.trsum .ends .ar::after{content:"";position:absolute;right:-1px;top:-4px;border:5px solid transparent;border-left:7px solid var(--accent-2);border-right:0}
+.trsum .dip{font:400 11px var(--font-mono);color:var(--muted);margin-top:2px}
+.trsum .st{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap}
+.trsum .st div{font:600 15px var(--font-display);color:var(--ink)}
+.trsum .st span{display:block;font:500 9px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:1px}
+.trsum .res{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:11.5px;color:var(--ink-2)}
+.trline{display:flex;align-items:center;flex-wrap:wrap;gap:4px 0;margin:4px 0 12px}
+.trline .st{display:inline-flex;align-items:center;gap:5px;font:600 11px var(--font-mono);padding:3px 8px;border-radius:99px;
+  border:1.5px solid var(--c);color:var(--ink);background:color-mix(in srgb,var(--c) 12%,transparent);cursor:default}
+.trline .lk{display:inline-flex;align-items:center;font:600 9.5px var(--font-mono);color:var(--muted);padding:0 2px}
+.trline .lk::before,.trline .lk::after{content:"";width:8px;height:2px;background:var(--line-strong)}
+.trline .lk i{font-style:normal;padding:1px 5px;border-radius:4px;background:var(--surface-3);color:var(--ink-2);margin:0 2px}
+.hops{display:flex;flex-direction:column;gap:0;position:relative}
+.hop{position:relative;display:grid;grid-template-columns:26px 1fr;gap:12px;padding:0 0 14px}
+.hop::before{content:"";position:absolute;left:12px;top:26px;bottom:0;width:2px;border-radius:2px;
+  background:linear-gradient(var(--c),var(--c2))}
+.hop:last-child::before{display:none}
+.hop .n{width:26px;height:26px;border-radius:50%;background:var(--c);color:var(--on-accent);
+  font:700 11px var(--font-mono);display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 0 3px var(--surface),0 0 12px color-mix(in srgb,var(--c) 55%,transparent)}
+.hop .card{border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--surface-2);transition:border-color .15s,box-shadow .15s}
+.hop:hover .card{border-color:var(--c);box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 40%,transparent)}
+.hop .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hop .top b{font:600 13.5px var(--font-display)}
+.hop .role{font:600 9px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.hop .vrf{font:500 10px var(--font-mono);padding:1px 6px;border-radius:4px;background:var(--surface-3);color:var(--ink-2)}
+.op{display:inline-flex;align-items:center;gap:5px;font:600 10.5px var(--font-mono);padding:2px 8px;border-radius:99px;margin-left:auto}
+.op.push{color:var(--ok);background:var(--ok-soft)} .op.swap{color:var(--warn);background:var(--warn-soft)}
+.op.pop{color:var(--accent-2);background:color-mix(in srgb,var(--accent-2) 14%,transparent)}
+.op.fwd{color:var(--ink-2);background:var(--surface-3)} .op.done{color:var(--accent-ink);background:var(--accent-soft)}
+.op.encap{color:var(--xe);background:var(--xe-soft)} .op.err{color:var(--crit);background:var(--crit-soft)}
+.hop .hkv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin-top:8px;font:11px var(--font-mono);color:var(--ink-2)}
+.hop .hkv span:nth-child(odd){color:var(--muted);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;padding-top:1px}
+.hop .hkv span{min-width:0;overflow-wrap:anywhere}
+.pkt{display:inline-flex;border-radius:5px;overflow:hidden;border:1px solid var(--line-strong);vertical-align:middle}
+.pkt i{font:700 10px var(--font-mono);font-style:normal;padding:1px 6px}
+.pkt i.lb{background:var(--accent-soft);color:var(--accent-ink)} .pkt i.lb + i.lb{border-left:1px solid var(--line-strong)}
+.pkt i.pl{background:var(--surface-3);color:var(--ink-2);border-left:1px solid var(--line-strong)}
+.pkt i.pl:first-child{border-left:0}
+.hop .sub{margin-top:8px;font:11px var(--font-mono);color:var(--accent-2);display:flex;gap:6px;align-items:center}
+.hop .ecmp{margin-top:6px;font:10.5px var(--font-mono);color:var(--muted)}
 .pending{display:flex;flex-direction:column;gap:5px;margin:8px 0 10px}
 .pend{display:flex;align-items:center;gap:8px;font:11px var(--font-mono);background:var(--surface-2);border:1px solid var(--line);
   border-radius:7px;padding:5px 8px}
@@ -339,6 +393,7 @@ body{overflow:hidden}
         </defs>
         <rect id="bg" x="0" y="0" width="100%" height="100%" fill="url(#grid)"/>
         <g id="world">
+          <g id="gtraceu"></g>
           <g id="glinks"></g>
           <g id="gbgp"></g>
           <g id="gtrace"></g>
@@ -419,7 +474,7 @@ var world = document.getElementById("world");
 var gNodes = document.getElementById("gnodes");
 var gLinks = document.getElementById("glinks");
 var gBgp = document.getElementById("gbgp");
-var gTrace = document.getElementById("gtrace");
+var gTrace = document.getElementById("gtrace"), gTraceU = document.getElementById("gtraceu");
 // path trace: the form, the last result, and "follow" (re-trace every few s)
 var trace = {open:false, src:"", dst:"", ip:"", res:null, err:null, busy:false, follow:false, timer:null};
 // lab guide (lab-guide.json written by the catalogue's scenarios, else the README)
@@ -456,7 +511,7 @@ try{ showIfs = localStorage.getItem("clabd-topo-ifs") !== "0"; }catch(e){}
 
 // ---------- interface names ----------
 // Topology files usually say ethN; show what the router itself calls the port.
-function platformIf(kind, image, ifn){
+function platformIf(kind, image, ifn, nic){
   var s=/^e1-(\d+)$/.exec(ifn||"");
   if(s && kind==="nokia_srlinux") return "ethernet-1/"+s[1];
   var m=/^eth(\d+)$/.exec(ifn||"");
@@ -464,7 +519,7 @@ function platformIf(kind, image, ifn){
   var n=+m[1];
   if(n===0) return ifn;
   if(kind==="cisco_c8000v"||kind==="cisco_csr1000v") return "GigabitEthernet"+(n+1);
-  if(kind==="cisco_xrd_vrouter" && /vrnetlab/.test(image||"")) return "GigabitEthernet0/0/0/"+(n-1);
+  if(kind==="cisco_xrd_vrouter" && /vrnetlab/.test(image||"")) return (nic==="vmxnet3"?"TenGigE0/0/0/":"GigabitEthernet0/0/0/")+(n-1);
   if(kind==="cisco_n9kv") return "Ethernet1/"+n;
   return ifn;
 }
@@ -477,7 +532,7 @@ function shortIf(ifn){
     .replace(/^Loopback/,"Lo").replace(/^Ethernet/,"Eth").replace(/^ethernet-/,"e");
 }
 function ifInfo(node, ifn){
-  var full = node ? platformIf(node.kind, node.image, ifn) : (ifn||"");
+  var full = node ? platformIf(node.kind, node.image, ifn, node.nic) : (ifn||"");
   return {raw:ifn||"", full:full, short:shortIf(full)};
 }
 
@@ -829,7 +884,7 @@ function render(){
       var isSel = selLink === l;
       var dim = (sel && !hi) || (selLink && !isSel);
       var lv = liveOf(l);
-      var g=svgEl("g",{class:"lk"+(hi?" hi":"")+(isSel?" sel":"")+(dim?" dim":"")
+      var g=svgEl("g",{"data-lid":l.id, class:"lk"+(hi?" hi":"")+(isSel?" sel":"")+(dim?" dim":"")
                            +(l._new?" new":"")+(l._del?" del":"")+(lv&&lv.st?" st-"+lv.st:"")});
       var ext = !l.a_known || !l.b_known;
       var lp=svgEl("path",{d:d, class:"link"+(ext?" ext":"")});
@@ -915,7 +970,7 @@ function render(){
     });
   }
 
-  gTrace.textContent="";
+  gTrace.textContent=""; gTraceU.textContent="";
   stage.classList.toggle("tracing", !!(trace.open && trace.res));
   if(trace.open && trace.res) drawTrace(byName);
 
@@ -947,8 +1002,10 @@ function render(){
       h.addEventListener("pointerdown",function(e){ startLinkDrag(e,n); });
       g.appendChild(h);
     }
+    g.setAttribute("data-node", n.name);
     gNodes.appendChild(g);
   });
+  markTrace();
 
   renderInspector();
   updateHud();
@@ -1175,44 +1232,135 @@ function openImpair(l, d){
 // ---------- path trace ----------
 function linkById(id){ return links.filter(function(l){ return l.id===id; })[0]; }
 function stackText(st){ return (st||[]).map(String).join(" · "); }
+// The hop list grouped per router: consecutive records on one node (a VPN
+// pop / SRv6 decap followed by the VRF lookup) are one step with sub-actions.
+function traceSteps(r){
+  var steps=[];
+  (r.hops||[]).forEach(function(h){
+    var last=steps[steps.length-1];
+    if(last && last.node===h.node && !last.h.link){ last.subs.push(last.h.action); last.h=h; return; }
+    steps.push({node:h.node, h:h, subs:[]});
+  });
+  return steps;
+}
+function trColor(f){ return "color-mix(in srgb, var(--accent-2) "+Math.round(Math.max(0,Math.min(1,f))*100)+"%, var(--accent))"; }
+function opOf(a){
+  a=a||"";
+  if(/^push/.test(a)) return "push";
+  if(/^swap/.test(a)) return "swap";
+  if(/^pop|SRv6 decap/.test(a)) return "pop";
+  if(/^delivered/.test(a)) return "done";
+  if(/^SRv6 H\./.test(a)) return "encap";
+  if(/^forward/.test(a)) return "fwd";
+  return "err";
+}
+function opShort(a){
+  a=a||""; var m;
+  if((m=/^swap (\S+) → (\S+)/.exec(a))) return m[1]===m[2] ? "swap "+m[1] : "swap "+m[1]+"→"+m[2];
+  if((m=/^pop (\S+) \(PHP\)/.exec(a))) return "pop "+m[1]+" · PHP";
+  if(/^SRv6 H\./.test(a)) return "SRv6 encap";
+  if(/^forward on SRv6/.test(a)) return "SRv6 fwd";
+  if(/^forward$/.test(a)) return "IP forward";
+  if(/^delivered/.test(a)) return "delivered";
+  if(/^no route/.test(a)) return "no route";
+  return a.length>22 ? a.slice(0,21)+"…" : a;
+}
+// what the packet looks like on the wire leaving a hop: labels top first, then the payload
+function wireOf(h, dst){
+  var inner = (dst||"").indexOf(":")>=0 ? "IPv6" : "IPv4";
+  var st=h.stack_out||[], out=[];
+  st.forEach(function(x){ x=String(x); out.push(/^DA /.test(x) ? {t:"SRv6 "+x, k:"lb"} : {t:x, k:"lb"}); });
+  out.push({t:inner, k:"pl"});
+  return out;
+}
+function orientSeg(l, from){
+  var sg=l._seg; if(!sg) return null;
+  return l._A===from ? [sg.p0,sg.p1,sg.p2] : [sg.p2,sg.p1,sg.p0];
+}
 function drawTrace(byName){
-  var hops=(trace.res.hops||[]), k=0;
-  hops.forEach(function(h){
-    var draw=function(lid, alt, withLabel){
-      var l=linkById(lid); if(!l || !l._seg) return;
-      var sg=l._seg, fwd = l._A===h.node;         // segment runs from _A to the other end
-      var d="M"+sg.p0.x.toFixed(1)+","+sg.p0.y.toFixed(1)+" Q"+sg.p1.x.toFixed(1)+","+sg.p1.y.toFixed(1)+" "+sg.p2.x.toFixed(1)+","+sg.p2.y.toFixed(1);
-      gTrace.appendChild(svgEl("path",{d:d, class:"trpath"+(alt?" alt":"")}));
-      if(alt) return;
-      // arrow at 62% along the direction of travel
-      var t = fwd ? 0.62 : 0.38, p=qpt(sg,t);
-      var dx=2*(1-t)*(sg.p1.x-sg.p0.x)+2*t*(sg.p2.x-sg.p1.x), dy=2*(1-t)*(sg.p1.y-sg.p0.y)+2*t*(sg.p2.y-sg.p1.y);
-      var a=Math.atan2(dy,dx)*180/Math.PI + (fwd?0:180);
-      var ar=svgEl("path",{d:"M-7,-6 L7,0 L-7,6 z", class:"trarrow",
-        transform:"translate("+p.x.toFixed(1)+","+p.y.toFixed(1)+") rotate("+a.toFixed(1)+") scale("+LS.toFixed(3)+")"});
-      gTrace.appendChild(ar);
-      if(withLabel && h.stack_out && h.stack_out.length){
-        var txt=stackText(h.stack_out), w=txt.length*6.2+10, q=qpt(sg,0.5);
-        var g=svgEl("g",{class:"trlbl",transform:"translate("+q.x.toFixed(1)+","+(q.y-14*LS).toFixed(1)+") scale("+LS.toFixed(3)+")"});
-        g.appendChild(svgEl("rect",{x:-w/2,y:-8,width:w,height:16,rx:4}));
-        var tx=svgEl("text",{x:0,y:3.5,"text-anchor":"middle"}); tx.textContent=txt; g.appendChild(tx);
-        var tt=svgEl("title",{}); tt.textContent="label stack on the wire, top first"; g.appendChild(tt);
-        gTrace.appendChild(g);
-      }
-    };
-    (h.ecmp_links||[]).forEach(function(id){ draw(id, true, false); });
-    if(h.link) draw(h.link, false, true);
+  var r=trace.res, steps=traceSteps(r), N=steps.length;
+  var clock=(performance.now()/1000);
+  var pktD="", lastEnd=null;
+  steps.forEach(function(st, i){
+    var h=st.h, f0=N>1?i/(N-1):0, f1=N>1?(i+1)/(N-1):1, col=trColor((f0+f1)/2);
+    (h.ecmp_links||[]).forEach(function(id){
+      var l=linkById(id), o=l&&orientSeg(l,st.node); if(!o) return;
+      gTraceU.appendChild(svgEl("path",{d:"M"+o[0].x+","+o[0].y+" Q"+o[1].x+","+o[1].y+" "+o[2].x+","+o[2].y,
+        class:"tralt", style:"stroke:"+col}));
+    });
+    var l=h.link&&linkById(h.link), o=l&&orientSeg(l, st.node);
+    if(!o) return;
+    var d="M"+o[0].x.toFixed(1)+","+o[0].y.toFixed(1)+" Q"+o[1].x.toFixed(1)+","+o[1].y.toFixed(1)+" "+o[2].x.toFixed(1)+","+o[2].y.toFixed(1);
+    var g=svgEl("g",{class:"trseg","data-step":i});
+    g.appendChild(svgEl("path",{d:d,class:"trglow",style:"stroke:"+col}));
+    g.appendChild(svgEl("path",{d:d,class:"trpath",style:"stroke:"+col}));
+    var dash=svgEl("path",{d:d,class:"trdash"}); dash.style.animationDelay=(-(clock%0.7)).toFixed(2)+"s";
+    g.appendChild(dash);
+    gTraceU.appendChild(g);       // under the links, so the interface pills stay on top
+    // packet route: into the router's centre, then out along the next link
+    var A=byName[st.node];
+    pktD += (pktD ? " L"+A.x.toFixed(1)+","+A.y.toFixed(1)+" L" : "M") + o[0].x.toFixed(1)+","+o[0].y.toFixed(1)
+          + " Q"+o[1].x.toFixed(1)+","+o[1].y.toFixed(1)+" "+o[2].x.toFixed(1)+","+o[2].y.toFixed(1);
+    lastEnd=o[2];
+    // the packet header on this link, beside its middle
+    var sg={p0:o[0],p1:o[1],p2:o[2]}, m=qpt(sg,0.5), ang=tangentAng(sg,0.5), off=17*LS;
+    var w=wireOf(h, r.dst), widths=w.map(function(x){ return x.t.length*6+10; }), tw=widths.reduce(function(a,b){ return a+b; },0);
+    var hx=m.x-Math.sin(ang)*off, hy=m.y+Math.cos(ang)*off;
+    var hg=svgEl("g",{class:"trhdr","data-step":i,transform:"translate("+hx.toFixed(1)+","+hy.toFixed(1)+") scale("+LS.toFixed(3)+")"});
+    hg.appendChild(svgEl("rect",{x:-tw/2-1,y:-9,width:tw+2,height:18,rx:5}));
+    var x=-tw/2;
+    w.forEach(function(p, j){
+      var bx=svgEl("rect",{x:x,y:-8,width:widths[j],height:16,rx:j===0?4:0,class:p.k});
+      if(p.k==="lb") bx.setAttribute("style","fill:"+col);
+      hg.appendChild(bx);
+      var t=svgEl("text",{x:x+widths[j]/2,y:3.5,"text-anchor":"middle",class:p.k+"t"}); t.textContent=p.t; hg.appendChild(t);
+      x+=widths[j];
+    });
+    var tt=svgEl("title",{}); tt.textContent=st.node+" → "+(l.a===st.node?l.b:l.a)+": "+w.map(function(x){ return x.t; }).join(" | ")
+      +"\n(top label first)"; hg.appendChild(tt);
+    gTrace.appendChild(hg);
   });
-  // hop numbers beside the nodes, in order
-  var seen={};
-  hops.forEach(function(h){
-    if(seen[h.node] || h.action && /^(pop VPN|SRv6 decap)/.test(h.action)) return;
-    var n=byName[h.node]; if(!n) return;
-    seen[h.node]=++k;
-    var g=svgEl("g",{class:"trnum",transform:"translate("+(n.x-R_ICON-4).toFixed(1)+","+(n.y-R_ICON+2).toFixed(1)+") scale("+LS.toFixed(3)+")"});
-    g.appendChild(svgEl("circle",{r:9})); var t=svgEl("text",{x:0,y:3.5,"text-anchor":"middle"}); t.textContent=String(k);
-    g.appendChild(t); gTrace.appendChild(g);
+  // a packet travelling the whole path; SMIL runs on document time, so the
+  // phase survives the map being redrawn
+  var dstStep=steps[N-1];
+  if(pktD && dstStep && byName[dstStep.node] && !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)){
+    var D=byName[dstStep.node]; pktD+=" L"+D.x.toFixed(1)+","+D.y.toFixed(1);
+    var dur=Math.max(2.4, N*1.1).toFixed(1)+"s";
+    var pk=svgEl("g",{});
+    pk.appendChild(svgEl("circle",{r:(7*LS).toFixed(2),class:"trpkt-ring"}));
+    pk.appendChild(svgEl("circle",{r:(3.6*LS).toFixed(2),class:"trpkt"}));
+    pk.appendChild(svgEl("animateMotion",{dur:dur, repeatCount:"indefinite", path:pktD, begin:"0s"}));
+    gTrace.appendChild(pk);
+  }
+  // operation chips above each router on the path
+  steps.forEach(function(st, i){
+    var n=byName[st.node]; if(!n) return;
+    var f=N>1?i/(N-1):0, col=opOf(st.h.action)==="err"?"var(--crit)":trColor(f), txt=opShort(st.h.action), w=txt.length*6.1+30;
+    var g=svgEl("g",{class:"trop","data-step":i,transform:"translate("+n.x.toFixed(1)+","+(n.y-R_ICON-14*LS).toFixed(1)+") scale("+LS.toFixed(3)+")"});
+    g.appendChild(svgEl("rect",{x:-w/2,y:-10,width:w,height:20,rx:10,style:"stroke:"+col}));
+    g.appendChild(svgEl("circle",{cx:-w/2+10,cy:0,r:7,style:"fill:"+col}));
+    var nt=svgEl("text",{x:-w/2+10,y:3.3,"text-anchor":"middle",class:"n"}); nt.textContent=String(i+1); g.appendChild(nt);
+    var t=svgEl("text",{x:-w/2+22,y:3.5}); t.textContent=txt; g.appendChild(t);
+    if(i===0 || i===N-1){
+      var fl=i===0?"SOURCE":(r.result==="reached"?"DESTINATION":"STOPPED"), fw=fl.length*6+12;
+      var fg=svgEl("g",{class:"trflag",transform:"translate("+(-w/2)+",-24)"});
+      fg.appendChild(svgEl("rect",{x:0,y:-6,width:fw,height:12,rx:3,style:"fill:"+(r.result!=="reached"&&i>0?"var(--warn)":col)}));
+      var ft=svgEl("text",{x:6,y:3}); ft.textContent=fl; fg.appendChild(ft); g.appendChild(fg);
+    }
+    gTrace.appendChild(g);
   });
+}
+// fade what is not on the path (called at the end of render, once nodes exist)
+function markTrace(){
+  if(!(trace.open && trace.res)) return;
+  var onN={}, onL={};
+  (trace.res.hops||[]).forEach(function(h){ onN[h.node]=1; if(h.link) onL[h.link]=1; (h.ecmp_links||[]).forEach(function(x){ onL[x]=1; }); });
+  gNodes.querySelectorAll("g.node").forEach(function(g){ if(onN[g.getAttribute("data-node")]) g.classList.add("onpath"); });
+  gLinks.querySelectorAll("g.lk").forEach(function(g){ if(onL[g.getAttribute("data-lid")]) g.classList.add("onpath"); });
+}
+function traceHover(i, node, on){
+  document.querySelectorAll('#gtrace [data-step="'+i+'"], #gtraceu [data-step="'+i+'"]').forEach(function(x){ x.classList.toggle("hl", on); });
+  var g=gNodes.querySelector('g.node[data-node="'+node+'"]'); if(g) g.classList.toggle("trhl", on);
 }
 function runTrace(){
   if(!trace.src || !(trace.dst || trace.ip)){ trace.err="pick a source and a destination"; renderInspector(true); return; }
@@ -1271,35 +1419,67 @@ function renderTracePanel(box){
   if(trace.err){ box.appendChild(el("p","te-note err",trace.err)); return; }
   var r=trace.res; if(!r) { box.appendChild(el("p","hint","Pick two nodes. The trace follows each router's lookup — the "
     +"VRF of the incoming port, the BGP next hop through the core, the label stack pushed, swapped and popped.")); return; }
-  var ok=r.result==="reached";
-  var res=el("div","trres"); res.appendChild(el("span","pill "+(ok?"ok":"warn"), RESULT_TEXT[r.result]||r.result));
-  res.appendChild(document.createTextNode("  "+r.src+" → "+(r.dst_node?r.dst_node+" ("+r.dst+")":r.dst)
-    +" · "+new Date(r.when*1000).toLocaleTimeString()));
-  box.appendChild(res);
-  var hl=el("div","hops"), k=0;
-  (r.hops||[]).forEach(function(h){
-    var isPop=/^(pop VPN|SRv6 decap)/.test(h.action||"");
-    var row=el("div","hop"), n=el("div","n"+(isPop?" pop":""), isPop?"↓":String(++k)); row.appendChild(n);
-    var body=el("div");
-    var t=el("div"); t.appendChild(el("b",null,h.node));
-    if(h.vrf) t.appendChild(el("span","m","  vrf "+h.vrf));
-    body.appendChild(t);
-    var d=el("div","d",(h.action||""));
-    body.appendChild(d);
-    var meta=[];
-    if(h.lookup && !isPop) meta.push("lookup "+h.lookup);
-    if(h.out_if) meta.push("out "+h.out_if+(h.nh?" → "+h.nh:""));
-    if(meta.length) body.appendChild(el("div","m",meta.join(" · ")));
-    if(h.stack_out && h.stack_out.length){
-      var st=el("div","m","wire "); var sp=el("span","stack");
-      h.stack_out.forEach(function(x){ sp.appendChild(el("span",null,String(x))); }); st.appendChild(sp); body.appendChild(st);
+  var ok=r.result==="reached", steps=traceSteps(r), N=steps.length;
+  var labelOps=steps.filter(function(st){ return /push|swap|pop/.test(opOf(st.h.action)); }).length;
+  // summary
+  var sum=el("div","trsum"), ends=el("div","ends");
+  ends.appendChild(el("span",null,r.src)); ends.appendChild(el("span","ar"));
+  ends.appendChild(el("span",null,r.dst_node||r.dst)); sum.appendChild(ends);
+  sum.appendChild(el("div","dip","to "+r.dst+" · traced "+new Date(r.when*1000).toLocaleTimeString()));
+  var sts=el("div","st");
+  [[String(Math.max(0,N-1)),"hops"],[String(N),"routers"],[String(labelOps),"label ops"],[r.seconds+" s","trace time"]].forEach(function(x){
+    var d=el("div",null,x[0]); d.appendChild(el("span",null,x[1])); sts.appendChild(d); });
+  sum.appendChild(sts);
+  var rs=el("div","res"); rs.appendChild(el("span","pill "+(ok?"ok":"warn"), RESULT_TEXT[r.result]||r.result));
+  rs.appendChild(document.createTextNode(r.commands+" show commands")); sum.appendChild(rs);
+  box.appendChild(sum);
+  // the path as one line: router, the header on the wire, router, …
+  var line=el("div","trline");
+  steps.forEach(function(st, i){
+    var c=el("span","st", st.node); c.style.setProperty("--c", trColor(N>1?i/(N-1):0));
+    c.addEventListener("mouseenter",function(){ traceHover(i, st.node, true); });
+    c.addEventListener("mouseleave",function(){ traceHover(i, st.node, false); });
+    line.appendChild(c);
+    if(i<N-1){
+      var lk=el("span","lk"); lk.appendChild(el("i",null, wireOf(st.h, r.dst).map(function(x){ return x.t; }).slice(0,-1).join("·") || "IP"));
+      line.appendChild(lk);
     }
-    if(h.ecmp && h.ecmp.length) body.appendChild(el("div","m","+ "+h.ecmp.length+" equal-cost path"+(h.ecmp.length>1?"s":"")
+  });
+  box.appendChild(line);
+  // one card per router
+  var hl=el("div","hops");
+  steps.forEach(function(st, i){
+    var h=st.h, op=opOf(h.action);
+    var row=el("div","hop");
+    row.style.setProperty("--c", trColor(N>1?i/(N-1):0)); row.style.setProperty("--c2", trColor(N>1?(i+1)/(N-1):0));
+    row.appendChild(el("div","n",String(i+1)));
+    var card=el("div","card"), top=el("div","top");
+    top.appendChild(el("b",null,h.node));
+    top.appendChild(el("span","role", i===0?"source":i===N-1?(ok?"destination":"last hop"):"transit"));
+    if(h.vrf) top.appendChild(el("span","vrf","vrf "+h.vrf));
+    top.appendChild(el("span","op "+op, h.action||""));
+    card.appendChild(top);
+    st.subs.forEach(function(a){ var sb=el("div","sub","↳ "+a); card.appendChild(sb); });
+    var kv=el("div","hkv");
+    function row_(k, v){ kv.appendChild(el("span",null,k)); var x=el("span"); if(typeof v==="string") x.textContent=v; else x.appendChild(v); kv.appendChild(x); }
+    if(h.in_labels && h.in_labels.length){ row_("in", pkt(h.in_labels.map(String).concat([(r.dst||"").indexOf(":")>=0?"IPv6":"IPv4"]))); }
+    if(h.lookup) row_("lookup", h.lookup + (h.via ? "  via BGP nh "+h.via : ""));
+    if(h.out_if) row_("out", h.out_if+(h.nh?"  →  "+h.nh:""));
+    if(h.link) row_("wire", pkt(wireOf(h, r.dst).map(function(x){ return x.t; })));
+    if(kv.children.length) card.appendChild(kv);
+    if(h.ecmp && h.ecmp.length) card.appendChild(el("div","ecmp","+ "+h.ecmp.length+" equal-cost path"+(h.ecmp.length>1?"s":"")
       +" ("+h.ecmp.map(function(e){ return e.out_if; }).join(", ")+") — dashed on the map"));
-    row.appendChild(body); hl.appendChild(row);
+    row.appendChild(card);
+    row.addEventListener("mouseenter",function(){ traceHover(i, h.node, true); });
+    row.addEventListener("mouseleave",function(){ traceHover(i, h.node, false); });
+    hl.appendChild(row);
   });
   box.appendChild(hl);
-  box.appendChild(el("p","hint","took "+r.seconds+" s, "+r.commands+" commands"));
+}
+function pkt(parts){
+  var p=el("span","pkt");
+  parts.forEach(function(x, j){ p.appendChild(el("i", j===parts.length-1?"pl":"lb", String(x))); });
+  return p;
 }
 
 
@@ -2520,7 +2700,7 @@ function tick(now){
     if(first){
       nodes=(lab.nodes||[]).map(function(n){
         return {name:n.name, kind:n.kind, image:n.image, mgmt_ipv4:n.mgmt_ipv4,
-                icon:n.icon, est_ram_mb:n.est_ram_mb, pos:n.pos, x:0, y:0};
+                icon:n.icon, est_ram_mb:n.est_ram_mb, pos:n.pos, nic:n.nic, x:0, y:0};
       });
       // endpoints that are not topology nodes (host, mgmt-net, macvlan)
       var known={}; nodes.forEach(function(n){ known[n.name]=1; });

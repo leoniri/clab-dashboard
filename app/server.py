@@ -355,6 +355,8 @@ def parse_topology(path):
             # containerlab's own convention for the node's diagram icon
             "icon": (labels.get("graph-icon") if isinstance(labels, dict) else None),
             "user": str(env.get("USERNAME") or "clab"),
+            # vrnetlab XRd on vmxnet3 names its ports TenGigE, not GigabitEthernet
+            "nic": str(env.get("XRD_NIC_TYPE") or "") or None,
         })
         # FRR is kind linux to containerlab; call it what it is in the summary
         shown = "frr" if kind == "linux" and devcfg.FRR_IMAGE_RE.search(str(image)) else kind
