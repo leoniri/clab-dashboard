@@ -159,6 +159,50 @@ body{overflow:hidden}
 .hop .why{margin-top:8px;padding:6px 9px;border-radius:7px;font:11px/1.45 var(--font-sans);
   color:var(--crit);background:var(--crit-soft)}
 .hop .why.warn{color:var(--warn);background:var(--warn-soft)}
+/* transit map */
+.trcase{fill:none;stroke:var(--canvas);stroke-width:11;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.trroute{fill:none;stroke:var(--trace);stroke-width:5;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;
+  filter:drop-shadow(0 0 6px color-mix(in srgb,var(--trace) 45%,transparent))}
+:root[data-theme="light"] .trcase{stroke:#fff}
+:root[data-theme="light"] .trroute{filter:drop-shadow(0 1px 2px color-mix(in srgb,var(--trace) 35%,transparent))}
+.drawin{stroke-dasharray:var(--L) var(--L);stroke-dashoffset:var(--L);animation:trdraw 1.1s cubic-bezier(.65,0,.35,1) forwards}
+@keyframes trdraw{to{stroke-dashoffset:0}}
+.trchevw{fill:none;stroke:#fff;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.trchevw.late{opacity:0;animation:trfade .4s ease 1s forwards}
+@keyframes trfade{to{opacity:1}}
+.trhit{fill:none;stroke:transparent;stroke-width:16}
+.trseg.hl .trhit{stroke:color-mix(in srgb,var(--trace) 22%,transparent)}
+.trglint{fill:none;stroke:#fff;stroke-width:2.6;stroke-linecap:round;opacity:.85;pointer-events:none;
+  stroke-dasharray:var(--len) 100000;stroke-dashoffset:var(--o0);animation:trcomet var(--dur) linear infinite;
+  filter:drop-shadow(0 0 4px #fff)}
+.trcard{pointer-events:auto}
+.trcard rect.bg{fill:var(--surface);stroke:var(--line-strong);stroke-width:1;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
+:root[data-theme="light"] .trcard rect.bg{filter:drop-shadow(0 3px 8px rgba(11,19,32,.12))}
+.trcard rect.lbx{fill:color-mix(in srgb,var(--trace) 18%,transparent)}
+.trcard text{font-family:var(--font-mono);font-size:9.5px;font-weight:600}
+.trcard text.lb{fill:var(--trace-ink);font-weight:700} .trcard text.pl{fill:var(--muted)}
+.trcard.hl rect.bg{stroke:var(--trace)}
+.trst{pointer-events:none}
+.trst .ring{fill:var(--surface);stroke:var(--trace);stroke-width:2.4}
+.trst text{font-family:var(--font-mono);font-size:10px;font-weight:700;fill:var(--trace-ink)}
+.trst.end .ring{fill:var(--trace)} .trst.end text{fill:#fff}
+.trst.bad .ring{stroke:var(--crit)} .trst.bad.end .ring{fill:var(--crit)}
+.trcap{pointer-events:none}
+.trcap rect.bg{fill:var(--surface);stroke:var(--line-strong);stroke-width:1;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
+:root[data-theme="light"] .trcap rect.bg{filter:drop-shadow(0 3px 8px rgba(11,19,32,.12))}
+.trcap text{font-family:var(--font-mono);font-size:9.5px;font-weight:600;letter-spacing:.06em;fill:var(--ink)}
+.trcap.hl rect.bg{stroke:var(--trace)}
+/* particle flow */
+.trfline{fill:none;stroke:var(--trace);stroke-width:1.6;opacity:.55;pointer-events:none}
+.trfglow{fill:none;stroke:var(--trace);stroke-width:10;opacity:.12;filter:blur(4px);pointer-events:none}
+.trseg.hl .trfline{opacity:1;stroke-width:2.6}
+.trpart{pointer-events:none}
+.trpart .core{fill:#fff}
+.trpart .halo{fill:var(--trace);opacity:.35;filter:blur(2.5px)}
+:root[data-theme="light"] .trpart .core{fill:var(--trace)}
+.trfhalo{fill:color-mix(in srgb,var(--trace) 8%,transparent);stroke:color-mix(in srgb,var(--trace) 35%,transparent);stroke-width:1;pointer-events:none}
+.trfhalo.end{stroke:var(--trace);stroke-width:1.4}
+@media (prefers-reduced-motion:reduce){ .trglint,.trpart{display:none} .drawin{animation:none;stroke-dasharray:none} .trchevw.late{animation:none;opacity:1} }
 @media (prefers-reduced-motion:reduce){ .trcomet{display:none} .trripple{animation:none;opacity:0} }
 
 /* ---------- edit mode ---------- */
@@ -1312,7 +1356,7 @@ function orientSeg(l, from){
 }
 var OP_COLOR={push:"var(--ok)", swap:"var(--warn)", pop:"var(--accent-2)", done:"var(--trace)",
   fwd:"var(--muted)", encap:"var(--xe)", err:"var(--crit)"};
-function drawTrace(byName){
+function drawTraceComet(byName){
   var r=trace.res, steps=traceSteps(r), N=steps.length, ok=r.result==="reached";
   var full="", started=false;
   function P(p){ return p.x.toFixed(1)+","+p.y.toFixed(1); }
@@ -1408,6 +1452,156 @@ function drawTrace(byName){
     gTrace.appendChild(g);
   });
 }
+// ---- trace styles: transit / flow / comet (View menu, ?trace=<style>) ----
+var TRACE_STYLES=[["transit","Transit map"],["flow","Particle flow"],["comet","Comet"]];
+var traceStyle=(function(){
+  var q=/[?&]trace=(transit|flow|comet)/.exec(location.search);
+  var v=q?q[1]:null;
+  try{ if(v) localStorage.setItem("clabd-trace-style",v); else v=localStorage.getItem("clabd-trace-style"); }catch(e){}
+  return v||"transit";
+})();
+function setTraceStyle(v){ traceStyle=v; try{ localStorage.setItem("clabd-trace-style",v); }catch(e){} traceDrawn=null; render(); }
+var traceDrawn=null;          // the result whose draw-in animation already played
+function drawTrace(byName){
+  $("stage").setAttribute("data-trs", traceStyle);
+  if(traceStyle==="comet") return drawTraceComet(byName);
+  if(traceStyle==="flow") return drawTraceFlow(byName);
+  return drawTraceTransit(byName);
+}
+function P_(p){ return p.x.toFixed(1)+","+p.y.toFixed(1); }
+// geometry shared by the styles: one oriented curve per hop, and one path
+// through the whole route (into each router's centre and out again)
+function traceGeom(byName){
+  var r=trace.res, steps=traceSteps(r), segs=[], full="", started=false;
+  steps.forEach(function(st, i){
+    var h=st.h, l=h.link&&linkById(h.link), o=l&&orientSeg(l, st.node), A=byName[st.node];
+    if(!o || !A) return;
+    var sg={p0:o[0],p1:o[1],p2:o[2]};
+    segs.push({i:i, st:st, h:h, l:l, sg:sg, d:"M"+P_(o[0])+" Q"+P_(o[1])+" "+P_(o[2]), blocked:!!h.blocked});
+    if(h.blocked) return;
+    full += (started ? " L"+P_(A)+" L" : "M"+P_(A)+" L") + P_(o[0]) + " Q"+P_(o[1])+" "+P_(o[2]);
+    started=true;
+  });
+  // the route ends in the centre of the last router it reaches
+  var lastOk=null;
+  for(var k=0;k<segs.length;k++){ if(segs[k].blocked) break; lastOk=segs[k]; }
+  if(lastOk){ var nx=steps[lastOk.i+1], E=nx&&byName[nx.node]; if(E) full+=" L"+P_(E); }
+  return {r:r, steps:steps, N:steps.length, segs:segs, full:full, ok:r.result==="reached"};
+}
+function drawBlocked(sg, d, i, why){
+  var bg=svgEl("g",{class:"trblock","data-step":i});
+  bg.appendChild(svgEl("path",{d:d,class:"trblk"}));
+  var xg=svgEl("g",{transform:"translate("+P_(qpt(sg,0.5))+") scale("+LS.toFixed(3)+")"});
+  xg.appendChild(svgEl("circle",{r:9})); xg.appendChild(svgEl("path",{d:"M-3.5,-3.5 L3.5,3.5 M3.5,-3.5 L-3.5,3.5"}));
+  var bt=svgEl("title",{}); bt.textContent=why; xg.appendChild(bt);
+  bg.appendChild(xg); gTraceU.appendChild(bg);
+}
+function pathLen(d){ var p=svgEl("path",{d:d}); gTrace.appendChild(p); var L=p.getTotalLength(); p.remove(); return L; }
+// a card beside the middle of a link: what is on the wire (labels top first, payload)
+function wireCard(G, seg, cls){
+  var m=qpt(seg.sg,0.5), ang=tangentAng(seg.sg,0.5), off=19*LS, w=wireOf(seg.h, trace.res.dst);
+  var widths=w.map(function(x){ return x.t.length*6.2+(x.k==="lb"?12:8); }), tw=widths.reduce(function(a,b){ return a+b; },0)+8;
+  var g=svgEl("g",{class:cls,"data-step":seg.i,transform:"translate("+(m.x-Math.sin(ang)*off).toFixed(1)+","
+    +(m.y+Math.cos(ang)*off).toFixed(1)+") scale("+LS.toFixed(3)+")"});
+  g.appendChild(svgEl("rect",{x:-tw/2,y:-10,width:tw,height:20,rx:6,class:"bg"}));
+  var x=-tw/2+4;
+  w.forEach(function(p, j){
+    if(p.k==="lb") g.appendChild(svgEl("rect",{x:x,y:-6.5,width:widths[j]-4,height:13,rx:3.5,class:"lbx"}));
+    var t=svgEl("text",{x:(x+(widths[j]-(p.k==="lb"?4:0))/2).toFixed(1),y:3.4,"text-anchor":"middle",class:p.k}); t.textContent=p.t; g.appendChild(t);
+    x+=widths[j];
+  });
+  var tt=svgEl("title",{}); tt.textContent="on the wire "+seg.st.node+" → "+(seg.l.a===seg.st.node?seg.l.b:seg.l.a)+":  "
+    +w.map(function(x){ return x.t; }).join(" | ")+"   (top label first)"; g.appendChild(tt);
+  G.appendChild(g);
+}
+// station badge (number) at a router's top-left, and its operation beside the name
+function stations(G, geo, byName){
+  geo.steps.forEach(function(st, i){
+    var n=byName[st.node]; if(!n) return;
+    var end=(i===0||i===geo.N-1), op=st.h.blocked?"err":opOf(st.h.action);
+    var g=svgEl("g",{class:"trst"+(end?" end":"")+(op==="err"?" bad":""),"data-step":i,
+      transform:"translate("+(n.x-R_ICON+3).toFixed(1)+","+(n.y-R_ICON+5).toFixed(1)+") scale("+LS.toFixed(3)+")"});
+    g.appendChild(svgEl("circle",{r:10.5,class:"ring"}));
+    var t=svgEl("text",{x:0,y:3.8,"text-anchor":"middle"}); t.textContent=String(i+1); g.appendChild(t);
+    G.appendChild(g);
+    var txt=(st.h.blocked?"drop · link down":opShort(st.h.action)).toUpperCase(), w=txt.length*6.3+22;
+    var c=svgEl("g",{class:"trcap","data-step":i,transform:"translate("+n.x.toFixed(1)+","+(n.y-R_ICON-15*LS).toFixed(1)+") scale("+LS.toFixed(3)+")"});
+    c.appendChild(svgEl("rect",{x:-w/2,y:-10,width:w,height:20,rx:10,class:"bg"}));
+    c.appendChild(svgEl("circle",{cx:-w/2+11,cy:0,r:3,style:"fill:"+OP_COLOR[op]}));
+    var ct=svgEl("text",{x:-w/2+19,y:3.5}); ct.textContent=txt; c.appendChild(ct);
+    G.appendChild(c);
+  });
+}
+
+// Transit map: a cased route that draws itself in, white chevrons inside it,
+// station badges, a rare glint running along it.
+function drawTraceTransit(byName){
+  var geo=traceGeom(byName);
+  geo.segs.forEach(function(sg){ if(sg.blocked) drawBlocked(sg.sg, sg.d, sg.i, sg.h.blocked);
+    (sg.h.ecmp_links||[]).forEach(function(id){ var l=linkById(id), o=l&&orientSeg(l, sg.st.node); if(!o) return;
+      gTraceU.appendChild(svgEl("path",{d:"M"+P_(o[0])+" Q"+P_(o[1])+" "+P_(o[2]),class:"tralt"})); }); });
+  if(geo.full){
+    var L=pathLen(geo.full), fresh=traceDrawn!==trace.res; traceDrawn=trace.res;
+    var cas=svgEl("path",{d:geo.full,class:"trcase"}), rt=svgEl("path",{d:geo.full,class:"trroute"});
+    if(fresh && !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)){
+      [cas,rt].forEach(function(p){ p.style.setProperty("--L",L.toFixed(1)); p.classList.add("drawin"); });
+    }
+    gTraceU.appendChild(cas); gTraceU.appendChild(rt);
+    // per hop: a hover target and a chevron in the middle of the line
+    geo.segs.forEach(function(sg){
+      if(sg.blocked) return;
+      var g=svgEl("g",{class:"trseg","data-step":sg.i});
+      g.appendChild(svgEl("path",{d:sg.d,class:"trhit"}));
+      [0.3].forEach(function(t){
+        var cp=qpt(sg.sg,t), ca=travelAng(sg.sg,t)*180/Math.PI;
+        g.appendChild(svgEl("path",{d:"M-2.6,-3.6 L1.6,0 L-2.6,3.6",class:"trchevw"+(fresh?" late":""),
+          transform:"translate("+P_(cp)+") rotate("+ca.toFixed(1)+") scale("+LS.toFixed(3)+")"}));
+      });
+      gTraceU.appendChild(g);
+    });
+    // glint: one short highlight every few seconds, on the page clock
+    var speed=520*LS, dur=L/speed+3.2, span=(L+60)*dur/(L/speed);
+    var gl=svgEl("path",{d:geo.full,class:"trglint"});
+    gl.style.setProperty("--len",(40*LS).toFixed(1)); gl.style.setProperty("--o0",(40*LS).toFixed(1));
+    gl.style.setProperty("--o1",(40*LS-span).toFixed(1)); gl.style.setProperty("--dur",dur.toFixed(2)+"s");
+    gl.style.animationDelay=(-((performance.now()/1000)%dur)).toFixed(2)+"s";
+    gTraceU.appendChild(gl);
+  }
+  geo.segs.forEach(function(sg){ if(!sg.blocked) wireCard(gTrace, sg, "trcard"); });
+  stations(gTrace, geo, byName);
+}
+
+// Particle flow: a quiet line with evenly spaced glowing particles streaming
+// from source to destination.
+function drawTraceFlow(byName){
+  var geo=traceGeom(byName);
+  geo.segs.forEach(function(sg){
+    if(sg.blocked){ drawBlocked(sg.sg, sg.d, sg.i, sg.h.blocked); return; }
+    var g=svgEl("g",{class:"trseg","data-step":sg.i});
+    g.appendChild(svgEl("path",{d:sg.d,class:"trfglow"}));
+    g.appendChild(svgEl("path",{d:sg.d,class:"trfline"}));
+    gTraceU.appendChild(g);
+  });
+  if(geo.full && !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)){
+    var L=pathLen(geo.full), gap=70*LS, K=Math.max(3, Math.min(40, Math.round(L/gap))), dur=L/(150*LS);
+    for(var k=0;k<K;k++){
+      var pg=svgEl("g",{class:"trpart"});
+      pg.appendChild(svgEl("circle",{r:(5.5*LS).toFixed(2),class:"halo"}));
+      pg.appendChild(svgEl("circle",{r:(2.3*LS).toFixed(2),class:"core"}));
+      // begin is document time, so the stream keeps its phase across redraws
+      pg.appendChild(svgEl("animateMotion",{dur:dur.toFixed(2)+"s",repeatCount:"indefinite",path:geo.full,
+        begin:(-(k*dur/K)).toFixed(2)+"s",keyPoints:"0;1",keyTimes:"0;1",calcMode:"linear"}));
+      gTrace.appendChild(pg);
+    }
+  }
+  geo.steps.forEach(function(st, i){
+    var n=byName[st.node]; if(!n) return;
+    gTraceU.appendChild(svgEl("ellipse",{cx:n.x,cy:n.y,rx:R_ICON+12,ry:R_ICON+4,class:"trfhalo"+(i===0||i===geo.N-1?" end":"")}));
+  });
+  geo.segs.forEach(function(sg){ if(!sg.blocked) wireCard(gTrace, sg, "trcard"); });
+  stations(gTrace, geo, byName);
+}
+
 // fade what is not on the path (called at the end of render, once nodes exist)
 function markTrace(){
   if(!(trace.open && trace.res)) return;
@@ -2116,9 +2310,11 @@ $("t_view").addEventListener("click",function(){
     {label:"Adjacency colours", checked:live.on, onClick:function(v){ setLive(v); }},
     {label:"Traffic on links", checked:showRate, onClick:setRate},
     {label:"BGP sessions", checked:showBgp, onClick:setBgp},
+    {head:"Path trace style"}
+  ].concat(TRACE_STYLES.map(function(t){ return {label:t[1], checked:traceStyle===t[0], onClick:function(){ setTraceStyle(t[0]); }}; })).concat([
     {sep:1},
     {label:"Legend", checked:showLegend, onClick:setLegend}
-  ], {align:"left", focus:false});
+  ]), {align:"left", focus:false});
 });
 function setIfs(v){ showIfs=v; store("clabd-topo-ifs",v); render(); }
 function setRate(v){ showRate=v; store("clabd-rate",v); if(v && !live.on) setLive(true); render(); }
