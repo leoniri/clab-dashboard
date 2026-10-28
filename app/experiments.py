@@ -194,8 +194,8 @@ def validate(lab, pb):
         if probe["src"] not in convergence.probe_nodes(lab):
             raise ExpError("the probe must start from an FRR or Linux node")
         dst = str(probe.get("dst") or "").strip()
-        if dst not in names and not re.match(r"^\d+\.\d+\.\d+\.\d+$", dst):
-            raise ExpError("the probe destination is a node name or an IPv4 address")
+        if dst not in names and not convergence.is_ip(dst):
+            raise ExpError("the probe destination is a node name or an IP address")
         out["probe"] = {"src": probe["src"], "dst": dst,
                         "interval_ms": _int(probe.get("interval_ms", 10), 1, 100, "probe interval")}
     else:
@@ -657,11 +657,10 @@ class Probe:
         cont = next((c for c in lab.get("containers") or [] if c.get("short") == pb["src"]), None)
         if not cont or cont.get("state") != "running":
             raise ExpError("probe source %s is not running" % pb["src"])
-        self.src_ip = pathtrace.node_address(lab, poller, pb["src"])
-        self.dst_ip = pb["dst"] if re.match(r"^\d+\.\d+\.\d+\.\d+$", pb["dst"]) \
-            else pathtrace.node_address(lab, poller, pb["dst"])
-        if not self.src_ip or not self.dst_ip:
-            raise ExpError("could not work out the probe's addresses")
+        try:
+            self.src_ip, self.dst_ip = convergence.probe_addresses(lab, poller, pb["src"], pb["dst"])
+        except ValueError as exc:
+            raise ExpError("probe: %s" % exc)
         pid = linkctl._pid(cont["name"])
         self.proc = subprocess.Popen([linkctl.NSENTER, "-t", str(pid), "-n", convergence.PYTHON, convergence.PROBER,
                                       self.src_ip, self.dst_ip, str(pb["interval_ms"]), str(MAX_TOTAL + 300)],

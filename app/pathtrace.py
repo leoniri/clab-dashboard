@@ -208,6 +208,13 @@ def parse_xr_cef(text):
         for m in re.finditer(r"^\s*\d+\s+Y\s+(\S+)\s+(%s)" % ADDR_RE, text, re.M):
             if m.group(1) != "recursive":
                 res["paths"].append({"nh": m.group(2), "out_if": m.group(1), "labels": []})
+    # TI-LFA: "next hop fe80::.../128, Repair Node(s): 2001:db8::12[, ...]"
+    for m in re.finditer(r"Repair Node\(s\): ([^\n]+)", text):
+        via = _xr_via_line(text, m.start())
+        nodes = [norm_ip(x) for x in re.findall(ADDR_RE, m.group(1))]
+        for p in res["paths"]:
+            if p.get("backup") and re.search(r"via %s/" % re.escape(p["nh"]), via, re.I):
+                p["repair_nodes"] = nodes
     if res["via"] and res["paths"]:
         bottom = [p["labels"][-1] for p in res["paths"] if len(p["labels"]) > 1]
         res["vpn_label"] = bottom[0] if bottom else None
@@ -373,6 +380,13 @@ class Tracer:
         except ValueError:
             return False
         return any(a in n for n in self.srv6_locators(node) if n.version == a.version)
+
+    def sid_owner(self, sid):
+        """The node whose SRv6 locator holds this SID."""
+        for node in self.cont:
+            if self.platform(node) == "cisco_xr" and self.owns_sid(node, sid):
+                return node
+        return None
 
     def owner_of(self, ip):
         for node in self.cont:
@@ -552,7 +566,13 @@ class Tracer:
                     return hops, "left-lab"
                 hop["link"] = link["id"]
                 hop["ecmp_links"] = [x["id"] for x in (self.link_out(node, e["out_if"])[0] for e in hop["ecmp"]) if x]
-                self._protection(hop, node, res)
+                # the repair path is held on the SID's locator route in the
+                # global table, not on the VRF route that did the encap
+                try:
+                    core = self._lookup(node, None, target)
+                except TraceError:
+                    core = None
+                self._protection(hop, node, core if core and core["paths"] else res)
                 if self._check(hop, link):
                     return hops, "blackhole"
                 stack = [target]
@@ -613,6 +633,8 @@ class Tracer:
             link, far, _ = self.link_out(node, b["out_if"])
             hop["backup"] = {"out_if": b["out_if"], "nh": b["nh"], "labels": b.get("labels") or [],
                              "kind": b.get("kind") or "backup", "link": link["id"] if link else None, "to": far}
+            if b.get("repair_nodes"):
+                hop["backup"]["repair_nodes"] = b["repair_nodes"]
         elif self.platform(node) in ("cisco_xe", "cisco_xr"):
             hop["unprotected"] = True
 
@@ -721,12 +743,15 @@ def node_addresses(lab, poller, node, t=None):
     return out
 
 
-def node_address(lab, poller, node, src=None):
+def node_address(lab, poller, node, src=None, family=None):
     """A sensible address for a node: its loopback, else its first data address.
     With `src`, the first candidate src actually has a route to - an IPv6-only
-    core (SRv6) routes the IPv6 loopback, not the IPv4 one the box also has."""
+    core (SRv6) routes the IPv6 loopback, not the IPv4 one the box also has.
+    `family` (4 or 6) limits it to one address family."""
     t = Tracer(lab, poller)
     cands = node_addresses(lab, poller, node, t)
+    if family:
+        cands = [ip for ip in cands if (":" in ip) == (family == 6)]
     if src and src != node and src in t.cont and len(cands) > 1:
         for ip in cands[:4]:
             try:

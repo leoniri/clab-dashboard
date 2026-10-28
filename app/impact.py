@@ -240,6 +240,29 @@ def repair_path(g, plr, dst, link_id):
     return ps[0] if ps else None
 
 
+def steered_path(g, plr, first_link, waypoints, dst, link_id):
+    """The path a router's backup really takes: out of its backup link
+    (first_link), then through each repair node / SID owner in turn, then on
+    to dst - each leg the shortest path with the protected link_id removed.
+    None when a leg cannot be modelled."""
+    e = g["edges"].get(first_link)
+    if plr not in g["nodes"] or dst not in g["nodes"] or not e or plr not in (e["a"], e["b"]):
+        return None
+    out = [{"node": plr, "link": first_link}]
+    here = e["b"] if e["a"] == plr else e["a"]
+    for w in [x for x in waypoints if x in g["nodes"]] + [dst]:
+        if w == here:
+            continue
+        _, preds = spf(g, here, drop_links={link_id})
+        ps = paths(preds, here, w, 1)
+        if not ps:
+            return None
+        out.extend(ps[0][:-1])
+        here = w
+    out.append({"node": here, "link": None})
+    return out
+
+
 # --------------------------------------------------------------------------
 # the analysis
 # --------------------------------------------------------------------------

@@ -233,9 +233,9 @@ function renderEditor(main){
   var nodes=(data.nodes||[]).map(function(n){ return [n.name,n.name]; });
   field(f,"To (node or IP)", (function(){
     var w=el("div","dstrow");
-    var isIp=/^\d+\.\d+\.\d+\.\d+$/.test(draft.dst||"");
+    var isIp=/^\d+\.\d+\.\d+\.\d+$/.test(draft.dst||"") || (draft.dst||"").indexOf(":")>=0;
     var s=selectEl([["","IP →"]].concat(nodes), isIp?"":draft.dst, function(v){ if(v){ draft.dst=v; ip.value=""; upd(); } });
-    var ip=el("input","uin mono"); ip.placeholder="10.0.0.6"; ip.value=isIp?draft.dst:"";
+    var ip=el("input","uin mono"); ip.placeholder="10.0.0.6 / 2001:db8::6"; ip.value=isIp?draft.dst:"";
     ip.addEventListener("input",function(){ if(ip.value.trim()){ draft.dst=ip.value.trim(); s.value=""; upd(); } });
     w.appendChild(s); w.appendChild(ip); return w; })());
   field(f,"Link to fail", selectEl((data.links||[]).map(function(l){ return [linkKey(l), linkLabel(l)]; }),

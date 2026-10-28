@@ -1803,7 +1803,9 @@ function backupEl(b){
   var s=el("span","bk");
   s.appendChild(el("i","kind",b.kind));
   s.appendChild(document.createTextNode(" "+(b.out_if||"")+(b.to?" → "+b.to:"")));
-  if(b.labels && b.labels.length) s.appendChild(el("span","lbls"," push "+b.labels.join(" ")));
+  if(b.labels && b.labels.length) s.appendChild(el("span","lbls",(String(b.labels[0]).indexOf(":")>=0?" SIDs ":" push ")+b.labels.join(" ")));
+  var rv=(b.repair_via&&b.repair_via.length)?b.repair_via:b.repair_nodes;
+  if(rv && rv.length) s.appendChild(el("span","lbls"," via "+rv.join(", ")));
   return s;
 }
 function drawTraceExtras(geo){

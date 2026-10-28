@@ -24,6 +24,7 @@ Stored per lab under <lab dir>/.clabd-scenarios/<lab>/: scenarios.json and
 runs/<id>.json (the per-probe RTTs included, for the chart).
 """
 
+import ipaddress
 import json
 import os
 import re
@@ -94,6 +95,35 @@ def load(lab):
         return []
 
 
+def is_ip(s):
+    try:
+        ipaddress.ip_address(s)
+        return True
+    except ValueError:
+        return False
+
+
+def probe_addresses(lab, poller, src, dst, src_ip=None):
+    """(source, destination) addresses for a probe from node `src` to `dst`
+    (a node or an IP). The destination is one src has a route to; the
+    source is in the same address family, one the far end routes back to.
+    ValueError when there is none."""
+    dst_ip = str(ipaddress.ip_address(dst)) if is_ip(dst) else pathtrace.node_address(lab, poller, dst, src)
+    if not dst_ip:
+        raise ValueError("could not work out an address on %s - give an IP" % dst)
+    fam = 6 if ":" in dst_ip else 4
+    if src_ip:
+        if (":" in src_ip) != (fam == 6):
+            raise ValueError("the source address %s and the destination %s are not the same IP version"
+                             % (src_ip, dst_ip))
+        return src_ip, dst_ip
+    back = dst if not is_ip(dst) else pathtrace.Tracer(lab, poller).owner_of(dst_ip)
+    src_ip = pathtrace.node_address(lab, poller, src, back, family=fam)
+    if not src_ip:
+        raise ValueError("%s has no IPv%d address to send the probe from" % (src, fam))
+    return src_ip, dst_ip
+
+
 def validate(lab, sc):
     names = {n["name"] for n in lab.get("nodes") or []}
     out = {"id": sc.get("id") or os.urandom(5).hex(), "name": str(sc.get("name") or "").strip()[:60]}
@@ -109,8 +139,8 @@ def validate(lab, sc):
     dst = str(sc.get("dst") or "").strip()
     if not dst:
         raise ConvError("pick a destination")
-    if dst not in names and not re.match(r"^\d+\.\d+\.\d+\.\d+$", dst):
-        raise ConvError("the destination is a node name or an IPv4 address")
+    if dst not in names and not is_ip(dst):
+        raise ConvError("the destination is a node name or an IP address")
     out["dst"] = dst
     try:
         out["interval_ms"] = max(1, min(100, int(sc.get("interval_ms") or 5)))
@@ -244,11 +274,10 @@ def run(lab_index_fn, lab_id, sc, links, live, audit, log):
     cont = next((c for c in lab.get("containers") or [] if c.get("short") == sc["src"]), None)
     if not cont or cont.get("state") != "running":
         raise ConvError("%s is not running" % sc["src"])
-    src_ip = sc["src_ip"] or pathtrace.node_address(lab, poller, sc["src"])
-    dst_ip = sc["dst"] if re.match(r"^\d+\.\d+\.\d+\.\d+$", sc["dst"]) \
-        else pathtrace.node_address(lab, poller, sc["dst"])
-    if not src_ip or not dst_ip:
-        raise ConvError("could not work out the source / destination address - give IPs")
+    try:
+        src_ip, dst_ip = probe_addresses(lab, poller, sc["src"], sc["dst"], sc["src_ip"])
+    except ValueError as exc:
+        raise ConvError(str(exc))
     rid = time.strftime("%Y%m%d%H%M%S") + os.urandom(2).hex()
     total = sc["pre_s"] + sc["down_s"] + sc["post_s"]
     log("%s: probing %s -> %s every %d ms for %d s" % (sc["name"], src_ip, dst_ip, sc["interval_ms"], total))

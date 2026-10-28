@@ -2263,9 +2263,11 @@ def _trace_post(handler, p):
 
 
 def _trace_repairs(lab, poller, snap, res):
-    """Where each protected hop's backup takes the traffic: the post-convergence
-    path from that router to the hop's destination with the link taken out
-    (the path TI-LFA steers onto), from the IGP model."""
+    """Where each protected hop's backup takes the traffic, from the IGP model:
+    out of the backup link the router programmed, through the TI-LFA repair
+    nodes (or the owners of its SRv6 SIDs) in order, then on to the hop's
+    destination - with the protected link taken out. Without a backup link
+    to start from, the post-convergence path."""
     hops = [h for h in res.get("hops") or [] if h.get("backup") and h.get("link")]
     if not hops:
         return
@@ -2275,10 +2277,22 @@ def _trace_repairs(lab, poller, snap, res):
         return
     t = pathtrace.Tracer(lab, poller)
     for h in hops:
-        owner = t.owner_of(h.get("lookup") or "")
+        # an SRv6 encap hop forwards on its service SID, not the VRF lookup
+        look = (h.get("srv6") or [None])[0] or h.get("lookup") or ""
+        owner = t.owner_of(look) or t.sid_owner(look)
         if not owner:
             continue
-        p = impact.repair_path(g, h["node"], owner, h["link"])
+        bk = h["backup"]
+        ways = [t.owner_of(ip) for ip in bk.get("repair_nodes") or []]
+        if not ways:
+            ways = [t.sid_owner(s) for s in bk.get("labels") or [] if isinstance(s, str) and ":" in s]
+        if any(ways):
+            bk["repair_via"] = [w for w in ways if w]
+        p = None
+        if bk.get("link"):
+            p = impact.steered_path(g, h["node"], bk["link"], [w for w in ways if w], owner, h["link"])
+        if not p:
+            p = impact.repair_path(g, h["node"], owner, h["link"])
         if p:
             h["backup"]["repair"] = p
             h["backup"]["to_node"] = owner

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Fast ICMP prober for convergence tests. Run inside a lab node's network
+Fast ICMP / ICMPv6 prober for convergence tests. Run inside a lab node's network
 namespace (nsenter -n), with the host's python:
 
     prober.py SRC DST INTERVAL_MS DURATION_S
@@ -12,6 +12,7 @@ At the end it prints one line {"done":1,"start":epoch,"interval_ms":..,
 "rtt_us":[rtt in microseconds, or -1 for a lost probe, per sequence number]}.
 """
 
+import ipaddress
 import json
 import os
 import signal
@@ -37,8 +38,18 @@ def main():
     duration = float(sys.argv[4])
     n = int(duration / interval)
     ident = os.getpid() & 0xffff
-    sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
-    sock.bind((src, 0))
+    v6 = ":" in dst
+    dst = str(ipaddress.ip_address(dst))
+    if v6:
+        # the kernel fills in the ICMPv6 checksum (it covers the pseudo-header)
+        # and hands back the ICMPv6 message without the IPv6 header
+        sock = socket.socket(socket.AF_INET6, socket.SOCK_RAW, socket.IPPROTO_ICMPV6)
+        sock.bind((src, 0, 0, 0))
+        req, rep = 128, 129
+    else:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
+        sock.bind((src, 0))
+        req, rep = 8, 0
     sock.settimeout(0.2)
     sent = [0.0] * n
     rtt = [-1] * n
@@ -53,11 +64,11 @@ def main():
             except OSError:
                 return
             now = time.monotonic()
-            ihl = (data[0] & 0x0f) * 4
+            ihl = 0 if v6 else (data[0] & 0x0f) * 4
             if len(data) < ihl + 8:
                 continue
             typ, code, _, rid, seq = struct.unpack("!BBHHH", data[ihl:ihl + 8])
-            if typ != 0 or rid != ident or addr[0] != dst:
+            if typ != rep or rid != ident or addr[0].split("%")[0] != dst:
                 continue
             # the 16-bit sequence wraps; map it back to the closest index sent
             base = int((now - t0) / interval) if sent else 0
@@ -85,12 +96,13 @@ def main():
         d = target - time.monotonic()
         if d > 0:
             time.sleep(d)
-        hdr = struct.pack("!BBHHH", 8, 0, 0, ident, i & 0xffff)
+        hdr = struct.pack("!BBHHH", req, 0, 0, ident, i & 0xffff)
         pkt = hdr + payload
-        pkt = struct.pack("!BBHHH", 8, 0, checksum(pkt), ident, i & 0xffff) + payload
+        if not v6:
+            pkt = struct.pack("!BBHHH", req, 0, checksum(pkt), ident, i & 0xffff) + payload
         sent[i] = time.monotonic()
         try:
-            sock.sendto(pkt, (dst, 0))
+            sock.sendto(pkt, (dst, 0, 0, 0) if v6 else (dst, 0))
         except OSError:
             pass                            # no route right now: counts as lost
         el = sent[i] - t0
