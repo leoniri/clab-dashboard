@@ -1609,7 +1609,7 @@ function renderTracePanel(box){
   f.appendChild(el("label",null,"to"));
   f.appendChild(sel_(trace.dst, names, function(v){ trace.dst=v; trace.ip=""; ipIn.value=""; }, "— node —"));
   f.appendChild(el("label",null,"or IP"));
-  var ipIn=el("input"); ipIn.className="uin"; ipIn.placeholder="10.0.0.6"; ipIn.value=trace.ip;
+  var ipIn=el("input"); ipIn.className="uin"; ipIn.placeholder="10.0.0.6 or 2001:db8::6"; ipIn.value=trace.ip;
   ipIn.addEventListener("input",function(){ trace.ip=ipIn.value.trim(); });
   ipIn.addEventListener("keydown",function(e){ if(e.key==="Enter") runTrace(); });
   f.appendChild(ipIn);

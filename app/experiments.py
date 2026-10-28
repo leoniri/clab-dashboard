@@ -587,7 +587,7 @@ class Recorder:
         key = "%s>%s" % (w["src"], w["dst"])
         t = time.time()
         try:
-            dst = w.get("ip") or pathtrace.node_address(lab, poller, w["dst"])
+            dst = w.get("ip") or pathtrace.node_address(lab, poller, w["dst"], w["src"])
             w["ip"] = dst
             tr = pathtrace.trace(lab, poller, w["src"], dst, None, _linkstate(lab, snap, self.links),
                                  branches=False)

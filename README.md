@@ -7,7 +7,7 @@ network labs from the browser.
   memory pre-flight, in-browser CLI to every node, and an audit log of every action.
 - **Topology map** - live IGP adjacencies, BGP sessions and link traffic; fail a link or
   add delay/loss/jitter; capture packets in the browser (Wireshark-style decode, pcap
-  download); control-plane **path trace** through SR-MPLS, SRv6 and L3VPN - every
+  download); control-plane **path trace** through SR-MPLS, SRv6 and L3VPN, to IPv4 or IPv6 destinations - every
   equal-cost branch, each router's LFA / TI-LFA backup and where it repairs to, and the
   path before vs. after a change; convergence measurements.
 - **What if** - the blast radius of failing any set of links or routers, from the live

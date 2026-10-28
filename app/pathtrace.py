@@ -47,6 +47,43 @@ class TraceError(Exception):
     pass
 
 
+def norm_ip(ip):
+    """Canonical text form (IPv6 lower-case, compressed); other text unchanged."""
+    try:
+        return str(ipaddress.ip_address(ip))
+    except ValueError:
+        return ip
+
+
+def parse_ips6(text):
+    """Global IPv6 addresses in `show ipv6 ... interface brief` / `ip -6 addr`
+    output (link-local, loopback and timestamps are skipped)."""
+    out = set()
+    for tok in re.findall(r"[0-9a-fA-F:]*:[0-9a-fA-F:]+(?:/\d+)?", text):
+        try:
+            a = ipaddress.IPv6Address(tok.split("/")[0])
+        except ValueError:
+            continue
+        if not (a.is_link_local or a.is_loopback or a.is_unspecified):
+            out.add(str(a))
+    return out
+
+
+def _loopback_block(text):
+    """The lines of a `show ... interface brief` listing that belong to
+    Loopback0 (IOS family IPv6 output puts the addresses on the lines below)."""
+    lines = text.splitlines()
+    for i, l in enumerate(lines):
+        if re.match(r"(?:Loopback0|Lo0|loopback0|lo0)\b", l, re.I):
+            block = [l]
+            for nxt in lines[i + 1:]:
+                if nxt[:1] not in (" ", "\t"):
+                    break
+                block.append(nxt)
+            return "\n".join(block)
+    return ""
+
+
 # --------------------------------------------------------------------------
 # per-platform lookups -> {"paths": [{nh, out_if, labels}], "via": bgp nh|None,
 #                          "vpn_label": int|None, "connected": bool, "raw": text}
@@ -103,6 +140,9 @@ def parse_xe_cef(text):
     return _split_backups(res)
 
 
+_XR_BACKUP = re.compile(r"(?<!-)\bbackup(?: \(([^)]*)\))?")
+
+
 def _xr_via_line(text, pos):
     """The `via ...` line a position in `show cef` output belongs to."""
     start = None
@@ -117,9 +157,11 @@ def parse_xr_cef(text):
     res = {"paths": [], "via": None, "vpn_label": None, "connected": False}
     if "Prefix not found" in text:
         return res
-    m = re.search(r"SRv6 H\.(?:Encaps|Insert)\S*\s+SID-list \{([^}]*)\}", text)
-    if m:
-        res["srv6_sids"] = [x.strip() for x in m.group(1).replace(",", " ").split() if x.strip()]
+    for m in re.finditer(r"SRv6 H\.(?:Encaps|Insert)\S*\s+SID-list \{([^}]*)\}", text):
+        # a TI-LFA repair path carries its own SID list - that is not the service encap
+        if not _XR_BACKUP.search(_xr_via_line(text, m.start())):
+            res["srv6_sids"] = [x.strip() for x in m.group(1).replace(",", " ").split() if x.strip()]
+            break
     if re.search(r"attached|receive", text.split("\n", 3)[-1][:600]) and "via" not in text:
         res["connected"] = True
     m = re.search(r"via (%s)/32, \d+ dependencies, recursive" % IP_RE, text)
@@ -131,25 +173,33 @@ def parse_xr_cef(text):
 
     def mark(p, via_line):
         # "via 10.1.13.2/32, TenGigE0/0/0/1, ..., backup (Local-LFA) [flags 0x300]"
-        bm = re.search(r"\bbackup(?: \(([^)]*)\))?", via_line)
+        # "..., protected, ECMP-backup (Local-LFA)": an equal-cost path that is
+        # also the repair of the others - it forwards, so it is not a backup
+        bm = _XR_BACKUP.search(via_line)
         if bm:
             p.update(backup=True, kind=bm.group(1) or "backup")
         elif "protected" in via_line:
             p["protected"] = True
+            em = re.search(r"ECMP-backup(?: \(([^)]*)\))?", via_line)
+            if em:
+                p["ecmp_backup"] = em.group(1) or "LFA"
         return p
 
-    for m in re.finditer(r"^\s*next hop (%s)/\d+ (\S+)\s+labels imposed \{([^}]*)\}" % IP_RE, text, re.M):
+    for m in re.finditer(r"^\s*next hop (%s)/\d+ (\S+)\s+labels imposed \{([^}]*)\}" % ADDR_RE, text, re.M):
         labels = [_lab_int(x) for x in m.group(3).split()]
         res["paths"].append(mark({"nh": m.group(1), "out_if": m.group(2),
                                   "labels": [l for l in labels if l is not None]}, _xr_via_line(text, m.start())))
     if not res["paths"]:
         # IGP route: "via 10.10.0.5/32, GigabitEthernet0/0/0/0, ... labels imposed {16001}"
-        vias = list(re.finditer(r"^\s*via (%s)/\d+, (\S+?),.*$" % IP_RE, text, re.M))
+        vias = list(re.finditer(r"^\s*via (%s)/\d+, (\S+?),.*$" % ADDR_RE, text, re.M))
         for i, m in enumerate(vias):
             end = vias[i + 1].start() if i + 1 < len(vias) else min(len(text), m.start() + 600)
             blk = text[m.start():end]
             lm = re.search(r"labels imposed \{([^}]*)\}", blk)
             labels = [_lab_int(x) for x in lm.group(1).split()] if lm else []
+            sm = re.search(r"SID-list \{([^}]*)\}", blk)
+            if not labels and sm and _XR_BACKUP.search(m.group(0)):
+                labels = [x for x in sm.group(1).replace(",", " ").split() if x]   # SRv6 TI-LFA segments
             res["paths"].append(mark({"nh": m.group(1), "out_if": m.group(2),
                                       "labels": [l for l in labels if l is not None]}, m.group(0)))
     if not res["paths"]:
@@ -228,6 +278,7 @@ class Tracer:
         self.nodes = {n["name"]: n for n in lab.get("nodes") or []}
         self.cont = {c["short"]: c for c in lab.get("containers") or [] if c.get("state") == "running"}
         self.ips = {}               # node -> set of its IPv4 addresses
+        self.ips6 = {}              # node -> set of its global IPv6 addresses (fetched on demand)
         self.ifvrf = {}             # node -> {platform ifname: vrf}
         self.locators = {}          # node -> [ipaddress.IPv6Network] (SRv6)
         self.cache = {}             # (node, vrf, target) -> lookup result
@@ -279,6 +330,27 @@ class Tracer:
         self.ips[node] = ips
         return ips
 
+    IP6_CMDS = {"cisco_xe": "show ipv6 interface brief",
+                "cisco_xr": "show ipv6 vrf all interface brief",
+                "cisco_nxos": "show ipv6 interface brief vrf all"}
+
+    def owned6(self, node):
+        if node not in self.ips6:
+            plat = self.platform(node)
+            ips = set()
+            try:
+                if plat in ("linux", "frr"):
+                    ips = parse_ips6(" ".join(re.findall(r"inet6 (\S+)", self.nsrun(node, [linkctl.IP, "-6", "-o", "addr"]))))
+                elif plat in self.IP6_CMDS:
+                    ips = parse_ips6(self.run(node, self.IP6_CMDS[plat]))
+            except Exception:                                  # noqa: BLE001
+                pass
+            self.ips6[node] = ips
+        return self.ips6[node]
+
+    def owns(self, node, ip):
+        return ip in (self.owned6(node) if ":" in ip else self.owned(node))
+
     def srv6_locators(self, node):
         if node not in self.locators:
             nets = []
@@ -304,7 +376,7 @@ class Tracer:
 
     def owner_of(self, ip):
         for node in self.cont:
-            if ip in self.owned(node):
+            if self.owns(node, ip):
                 return node
         return None
 
@@ -426,7 +498,7 @@ class Tracer:
                     "vpn_vrf": vpn_vrf, "stack": list(stack), "srv6": srv6}
             hop = {"node": node, "in_port": in_port, "vrf": vrf, "lookup": target, "in_labels": list(stack)}
             hops.append(hop)
-            owns = target in self.owned(node)
+            owns = self.owns(node, target)
             if srv6 and self.owns_sid(node, target):
                 # the SID belongs to this node's locator: decapsulate into the VRF
                 hop["action"] = "SRv6 decap %s → VRF %s" % (target, vpn_vrf or "?")
@@ -434,7 +506,7 @@ class Tracer:
                 hop2 = {"node": node, "in_port": in_port, "vrf": vrf, "lookup": target, "in_labels": []}
                 hops.append(hop2)
                 hop = hop2
-                owns = target in self.owned(node)
+                owns = self.owns(node, target)
             elif owns and target != inner:
                 # the BGP next hop is here: this is the egress PE, back into the VRF
                 hop["action"] = "pop VPN label%s → VRF %s" % (
@@ -443,7 +515,7 @@ class Tracer:
                 hop2 = {"node": node, "in_port": in_port, "vrf": vrf, "lookup": target, "in_labels": []}
                 hops.append(hop2)
                 hop = hop2
-                owns = target in self.owned(node)
+                owns = self.owns(node, target)
             if owns:
                 hop["action"] = "delivered"
                 return hops, "reached"
@@ -531,6 +603,11 @@ class Tracer:
     def _protection(self, hop, node, res):
         """The repair path (LFA / TI-LFA) the router holds for this hop, if any."""
         bks = res.get("backups") or []
+        if not bks:
+            # XR "ECMP-backup": the other equal-cost path is this one's repair
+            mine = next((x for x in res["paths"] if x["out_if"] == hop.get("out_if")), None)
+            if mine and mine.get("ecmp_backup"):
+                bks = [dict(x, kind=mine["ecmp_backup"] + " (ECMP)") for x in res["paths"] if x is not mine][:1]
         if bks:
             b = bks[0]
             link, far, _ = self.link_out(node, b["out_if"])
@@ -606,32 +683,55 @@ def _describe(stack, out):
 
 def trace(lab, poller, src, dst, src_vrf=None, linkstate=None, branches=True):
     try:
-        ipaddress.ip_address(dst)
+        dst = str(ipaddress.ip_address(dst))
     except ValueError:
-        raise TraceError("destination must be an IPv4 address")
+        raise TraceError("destination must be an IPv4 or IPv6 address")
     return Tracer(lab, poller, linkstate).trace(src, dst, src_vrf, branches)
 
 
-def node_address(lab, poller, node):
-    """A sensible address for a node: its loopback, else its first data address."""
-    t = Tracer(lab, poller)
+def node_addresses(lab, poller, node, t=None):
+    """Candidate addresses for a node, best first: Loopback0 IPv4, Loopback0
+    IPv6, then its other data addresses (IPv4, then IPv6)."""
+    t = t or Tracer(lab, poller)
+    lo4, lo6 = [], []
     if node in t.cont:
         plat = t.platform(node)
         try:
             if plat in ("linux", "frr"):
-                lo = re.findall(r"inet (%s)/" % IP_RE, t.nsrun(node, [linkctl.IP, "-4", "-o", "addr", "show", "dev", "lo"]))
-                lo = [ip for ip in lo if not ip.startswith("127.")]
-                if lo:
-                    return lo[0]
+                lo4 = re.findall(r"inet (%s)/" % IP_RE, t.nsrun(node, [linkctl.IP, "-4", "-o", "addr", "show", "dev", "lo"]))
+                lo4 = [ip for ip in lo4 if not ip.startswith("127.")]
+                lo6 = sorted(parse_ips6(" ".join(re.findall(r"inet6 (\S+)", t.nsrun(
+                    node, [linkctl.IP, "-6", "-o", "addr", "show", "dev", "lo"])))))
             elif plat in ("cisco_xe", "cisco_xr", "cisco_nxos"):
                 cmd = {"cisco_xe": "show ip interface brief", "cisco_xr": "show ipv4 vrf all interface brief",
                        "cisco_nxos": "show ip interface brief vrf all"}[plat]
                 m = re.search(r"^(?:Loopback0|Lo0|loopback0)\s+(%s)" % IP_RE, t.run(node, cmd), re.M)
-                if m:
-                    return m.group(1)
+                lo4 = [m.group(1)] if m else []
+                lo6 = sorted(parse_ips6(_loopback_block(t.run(node, Tracer.IP6_CMDS[plat]))))
         except Exception:                                  # noqa: BLE001
             pass
-    ips = sorted(t.owned(node), key=lambda ip: (not ip.startswith("10.0."), ip))
     mg = {c.get("ipv4") for c in lab.get("containers") or []}
-    ips = [ip for ip in ips if ip not in mg and not ip.startswith("172.")]
-    return ips[0] if ips else None
+    v4 = sorted(t.owned(node), key=lambda ip: (not ip.startswith("10.0."), ip))
+    v4 = [ip for ip in v4 if ip not in mg and not ip.startswith("172.")]
+    v6 = sorted(t.owned6(node)) if node in t.cont else []
+    out = []
+    for ip in lo4 + lo6 + v4 + v6:
+        if ip not in out:
+            out.append(ip)
+    return out
+
+
+def node_address(lab, poller, node, src=None):
+    """A sensible address for a node: its loopback, else its first data address.
+    With `src`, the first candidate src actually has a route to - an IPv6-only
+    core (SRv6) routes the IPv6 loopback, not the IPv4 one the box also has."""
+    t = Tracer(lab, poller)
+    cands = node_addresses(lab, poller, node, t)
+    if src and src != node and src in t.cont and len(cands) > 1:
+        for ip in cands[:4]:
+            try:
+                if t.lookup(src, None, ip)["paths"]:
+                    return ip
+            except Exception:                              # noqa: BLE001
+                continue
+    return cands[0] if cands else None

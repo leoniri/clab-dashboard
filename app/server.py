@@ -2235,7 +2235,7 @@ def _trace_post(handler, p):
     dst_node = None
     if dst in names:
         dst_node = dst
-        dst = pathtrace.node_address(lab, poller, dst)
+        dst = pathtrace.node_address(lab, poller, dst, src)
         if not dst:
             return 400, {"error": "could not find an address on %s - give an IP" % dst_node}
     # live link state, so a path over a dead link is reported as a drop even
