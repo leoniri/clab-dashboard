@@ -84,52 +84,101 @@
 @media (max-width:560px){ .host{grid-template-columns:1fr} }
 
 /* ---------- toolbar ---------- */
-.listhead{display:flex;align-items:center;gap:10px;margin:0 0 12px;flex-wrap:wrap}
-.listhead .count{font:12px var(--font-mono);color:var(--muted)}
+.listhead{display:flex;align-items:flex-end;gap:14px;margin:0 0 14px;flex-wrap:wrap}
+.lh-title{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.lh-title h2{margin:0;font:600 20px var(--font-display);letter-spacing:-.02em;color:var(--ink)}
+.listhead .count{display:flex;gap:6px;flex-wrap:wrap}
+.listhead .count span{display:inline-flex;align-items:center;gap:6px;font:500 11px var(--font-mono);color:var(--muted);
+  padding:3px 9px;border-radius:99px;background:var(--surface-2);border:1px solid var(--line)}
+.listhead .count b{color:var(--ink);font-weight:600}
+.listhead .count i{width:6px;height:6px;border-radius:50%;background:var(--idle)}
+.listhead .count .on i{background:var(--ok);box-shadow:0 0 6px var(--ok)}
 .listhead .tools{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.listhead .useg button .n{margin-left:6px;font:600 10px var(--font-mono);color:var(--muted);
+  padding:0 5px;border-radius:99px;background:var(--surface-3)}
+.listhead .useg button[aria-pressed=true] .n{color:var(--accent-ink);background:var(--accent-soft)}
 .search input{width:260px}
 @media (max-width:760px){ .search input{width:170px} }
 
-/* ---------- lab rows ---------- */
-.labs{display:flex;flex-direction:column;gap:8px}
-.lab{position:relative;display:grid;grid-template-columns:96px minmax(0,1fr) auto auto;align-items:center;gap:18px;
-  padding:10px 12px 10px 10px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
-  cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s;animation:rise .2s ease-out both}
-.lab:hover{border-color:var(--line-strong);box-shadow:var(--shadow-sm)}
-.lab.run{border-color:color-mix(in srgb,var(--ok) 38%,var(--line))}
-.lab.run::before{content:"";position:absolute;left:-1px;top:14px;bottom:14px;width:3px;border-radius:0 3px 3px 0;
+/* ---------- lab cards ----------
+   thumb | name, kinds + notes, path | facts (fixed) | actions (fixed), so the
+   numbers and buttons line up from one card to the next. */
+.labs{display:flex;flex-direction:column;gap:10px}
+.lab{position:relative;display:grid;grid-template-columns:128px minmax(0,1fr) 216px 340px;align-items:center;gap:20px;
+  padding:12px 14px 12px 12px;border:1px solid var(--line);border-radius:14px;isolation:isolate;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--surface-2) 55%,var(--surface)) 0%,var(--surface) 100%);
+  box-shadow:var(--shadow-sm);cursor:pointer;
+  transition:border-color .18s,box-shadow .18s,transform .18s;animation:rise .25s ease-out both}
+.lab:hover{border-color:var(--line-strong);box-shadow:var(--shadow);transform:translateY(-1px)}
+.lab:focus-visible{outline:none;box-shadow:var(--glow)}
+.lab::after{content:"";position:absolute;inset:0 0 auto 0;height:1px;border-radius:14px 14px 0 0;pointer-events:none;
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--line-strong) 80%,transparent),transparent)}
+.lab.run{border-color:color-mix(in srgb,var(--ok) 32%,var(--line))}
+.lab.run::after{background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--ok) 65%,transparent),transparent)}
+.lab.run::before{content:"";position:absolute;left:-1px;top:16px;bottom:16px;width:3px;border-radius:0 3px 3px 0;
   background:var(--ok);box-shadow:0 0 12px var(--ok)}
+.lab.part{border-color:color-mix(in srgb,var(--warn) 32%,var(--line))}
 .lab.part::before{background:var(--warn);box-shadow:0 0 12px var(--warn)}
-.lab.open{border-bottom-left-radius:0;border-bottom-right-radius:0;border-color:var(--line-strong)}
-.thumb{width:96px;height:60px;border-radius:8px;background:var(--canvas);border:1px solid var(--line);display:block;overflow:hidden}
-.thumb line{stroke:var(--line-strong);stroke-width:1.3}
-.thumb circle{fill:var(--oth);stroke:var(--canvas);stroke-width:1.2}
+.lab.part::after{background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--warn) 65%,transparent),transparent)}
+.lab.open{border-bottom-left-radius:0;border-bottom-right-radius:0;border-color:var(--line-strong);transform:none}
+
+/* thumbnail: a little dotted canvas with the lab drawn on it */
+.thumb{width:128px;height:76px;border-radius:10px;display:block;overflow:hidden;border:1px solid var(--line);
+  background:radial-gradient(circle at 50% 45%,color-mix(in srgb,var(--accent) 7%,transparent),transparent 70%),
+    radial-gradient(var(--grid) 1px,transparent 1.2px) 0 0/8px 8px,var(--canvas)}
+.thumb line{stroke:var(--line-strong);stroke-width:1.2;stroke-linecap:round}
+.thumb circle{fill:var(--oth);stroke:var(--canvas);stroke-width:1.6}
 .thumb .k-xe{fill:var(--xe)} .thumb .k-xr{fill:var(--xr)} .thumb .k-nx{fill:var(--nx)} .thumb .k-lin{fill:var(--lin)}
 .thumb .k-frr{fill:var(--frr)} .thumb .k-srl{fill:var(--srl)}
-.lab.run .thumb line{stroke:color-mix(in srgb,var(--ok) 55%,var(--line-strong))}
-.labmain{min-width:0}
-.labname{display:flex;align-items:center;gap:9px;flex-wrap:wrap;min-width:0}
-.labname a{font:600 16px var(--font-display);color:var(--ink);text-decoration:none;letter-spacing:-.01em}
+.lab:not(.run) .thumb circle{opacity:.75}
+.lab.run .thumb{border-color:color-mix(in srgb,var(--ok) 25%,var(--line))}
+.lab.run .thumb line{stroke:color-mix(in srgb,var(--ok) 60%,var(--line-strong));stroke-dasharray:3 3;animation:flow 1.2s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-6}}
+@media (prefers-reduced-motion:reduce){ .lab.run .thumb line{animation:none} .lab{animation:none} }
+
+.labmain{min-width:0;display:flex;flex-direction:column;gap:7px}
+.labname{display:flex;align-items:center;gap:10px;min-width:0}
+.labname a{font:600 17px var(--font-display);color:var(--ink);text-decoration:none;letter-spacing:-.015em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .labname a:hover{color:var(--accent-ink)}
-.kinds{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
-.labsub{font:11px var(--font-mono);color:var(--muted);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.facts{display:grid;grid-template-columns:repeat(3,auto);gap:2px 18px;text-align:right;font-variant-numeric:tabular-nums}
-.facts b{display:block;font:600 15px var(--font-mono);color:var(--ink)}
-.facts span{display:block;font:500 9.5px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.acts{display:flex;gap:4px;align-items:center}
-.acts .ub.main{min-width:108px}
+.state{flex:none;display:inline-flex;align-items:center;gap:6px;font:500 10.5px var(--font-mono);letter-spacing:.04em;
+  padding:2px 9px 2px 8px;border-radius:99px;color:var(--muted);background:var(--idle-soft)}
+.state i{width:6px;height:6px;border-radius:50%;background:currentColor}
+.state.ok{color:var(--ok);background:var(--ok-soft)} .state.ok i{box-shadow:0 0 6px var(--ok);animation:pulse 2s ease-in-out infinite}
+.state.warn{color:var(--warn);background:var(--warn-soft)}
+.state.info{color:var(--accent-ink);background:var(--accent-soft)} .state.info i{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+.labmeta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;min-width:0}
+.labmeta .sep{width:1px;height:14px;background:var(--line-strong);margin:0 2px}
+.kinds{display:contents}
+.labsub{display:flex;align-items:center;gap:6px;font:11px var(--font-mono);color:var(--muted);min-width:0}
+.labsub svg{flex:none;width:12px;height:12px;opacity:.7}
+.labsub span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.facts{display:grid;grid-template-columns:repeat(3,1fr);align-self:stretch;align-items:center;
+  border-left:1px solid var(--line);border-right:1px solid var(--line);font-variant-numeric:tabular-nums}
+.facts div{text-align:center;padding:0 4px}
+.facts div + div{border-left:1px dashed color-mix(in srgb,var(--line) 70%,transparent)}
+.facts b{display:block;font:600 18px/1.1 var(--font-display);color:var(--ink);letter-spacing:-.02em;white-space:nowrap}
+.facts b small{font:500 11px var(--font-sans);color:var(--muted);margin-left:2px;letter-spacing:0}
+.facts b em{font-style:normal;color:var(--muted);font-weight:500}
+.facts span{display:block;margin-top:4px;font:500 9.5px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.acts{display:flex;gap:4px;align-items:center;justify-content:flex-end}
+.acts .ub.main{min-width:112px}
 .acts .ub.main.go svg{color:var(--ok)} .acts .ub.main.re svg{color:var(--warn)} .acts .ub.main.halt svg{color:var(--crit)}
 .acts .chev svg{transition:transform .18s}
 .lab.open .acts .chev svg{transform:rotate(180deg)}
-@media (max-width:1060px){ .facts{display:none} }
+@media (max-width:1240px){ .lab{grid-template-columns:128px minmax(0,1fr) 190px auto} }
+@media (max-width:1060px){ .lab{grid-template-columns:128px minmax(0,1fr) auto} .facts{display:none} }
 @media (max-width:760px){
   .lab{grid-template-columns:minmax(0,1fr) auto} .thumb{display:none}
   .acts .ub.main{min-width:0}
 }
 
 /* node table */
-.nodes{margin-top:-9px;border:1px solid var(--line-strong);border-top:1px dashed var(--line);
-  border-radius:0 0 var(--r-lg) var(--r-lg);background:var(--surface);overflow-x:auto;padding:4px 8px 8px}
+.nodes{margin-top:-11px;border:1px solid var(--line-strong);border-top:1px dashed var(--line);
+  border-radius:0 0 14px 14px;background:var(--surface);box-shadow:var(--shadow);overflow-x:auto;padding:6px 10px 10px;
+  animation:rise .2s ease-out both}
 .nodes table{min-width:760px}
 .nodes td{font:12px var(--font-mono);white-space:nowrap;padding:7px 12px}
 .nodes td.nm{font-weight:600;color:var(--ink)}
@@ -171,8 +220,7 @@
   <section class="host" id="stats" aria-label="Host status"></section>
 
   <div class="listhead">
-    <div class="sech" style="margin:0;flex:none">topologies</div>
-    <span class="count" id="labcount"></span>
+    <div class="lh-title"><h2>Topologies</h2><span class="count" id="labcount"></span></div>
     <div class="tools">
       <label class="search"><span id="searchicon"></span><input class="uin" id="q" type="search" data-search placeholder="Filter by name, kind or path" aria-label="Filter labs by name, kind or path"><span class="kbd">/</span></label>
       <span id="filterseg"></span>
@@ -447,7 +495,7 @@ function setFilter(v){
 // A tiny drawing of the lab: builder positions when the topology has them,
 // otherwise the nodes on a circle. Purely decorative - the map is one click away.
 function thumb(l){
-  var W = 96, H = 60, s = svgEl("svg", {"class":"thumb", viewBox:"0 0 " + W + " " + H, "aria-hidden":"true"});
+  var W = 128, H = 76, s = svgEl("svg", {"class":"thumb", viewBox:"0 0 " + W + " " + H, "aria-hidden":"true"});
   var nodes = l.nodes || [], n = nodes.length;
   if (!n) return s;
   var pos = {}, have = nodes.filter(function(x){ return x.pos && x.pos.length === 2; }).length === n;
@@ -468,7 +516,7 @@ function thumb(l){
     var a = pos[k.a], b = pos[k.b];
     if (a && b) s.appendChild(svgEl("line", {x1:a[0], y1:a[1], x2:b[0], y2:b[1]}));
   });
-  var r = n > 14 ? 2.6 : n > 8 ? 3.2 : 4;
+  var r = n > 14 ? 3 : n > 8 ? 3.6 : 4.4;
   nodes.forEach(function(x){
     var p = pos[x.name];
     s.appendChild(svgEl("circle", {cx:p[0], cy:p[1], r:r, "class":UI.kindClass(x.kind, x.image)}));
@@ -484,7 +532,15 @@ function renderLabs(s){
     if (!q) return true;
     return ((l.name||"") + " " + l.path + " " + Object.keys(l.kinds||{}).join(" ")).toLowerCase().indexOf(q) >= 0;
   });
-  $("labcount").textContent = s.labs.length + " total · " + (host.labs_running || 0) + " running";
+  var nRun = s.labs.filter(function(l){ return l.running; }).length, cnt = $("labcount");
+  cnt.textContent = "";
+  [["", s.labs.length, s.labs.length === 1 ? "lab" : "labs"], ["on", nRun, "running"], ["", s.labs.length - nRun, "stopped"]]
+    .forEach(function(c){ var x = el("span", c[0]); if (c[0]) x.appendChild(el("i")); x.appendChild(el("b", null, String(c[1])));
+      x.appendChild(document.createTextNode(c[2])); cnt.appendChild(x); });
+  [s.labs.length, nRun, s.labs.length - nRun].forEach(function(n, i){
+    var b = $("filterseg").querySelectorAll("button")[i]; if (!b) return;
+    var t = b.querySelector(".n") || b.appendChild(el("span","n")); t.textContent = n;
+  });
 
   box.textContent = "";
   if (!s.labs.length){
@@ -527,57 +583,66 @@ function renderLabs(s){
 
     row.appendChild(thumb(l));
 
-    // --- name, badges, kinds ---
+    // --- name + state, then kinds and notes, then the path ---
     var main = el("div","labmain"), nameLine = el("div","labname");
-    nameLine.appendChild(el("span","led " + (l.running ? (partial ? "warn" : "ok") : "")));
     var nm = el("a", null, l.name || l.file);
     nm.href = drawable ? "topology.html?lab=" + encodeURIComponent(l.id) : "edit.html?lab=" + encodeURIComponent(l.id);
     nm.title = l.path;
     nameLine.appendChild(nm);
-    if (partial) nameLine.appendChild(badge("warn", l.running_count + "/" + l.node_count + " up"));
-    else if (l.running){
-      var booting = (l.containers||[]).filter(function(c){ return c.status === "starting"; }).length;
-      if (booting) nameLine.appendChild(badge("info", booting + " booting", "waiting for the routers' health checks"));
-      else nameLine.appendChild(badge("ok", "running"));
-    }
-    if (l.parse_error) nameLine.appendChild(badge("crit", "can’t parse", l.parse_error, "warn"));
-    if (l.stale_containers) nameLine.appendChild(badge("warn", "left over from a reboot",
+    var booting = l.running ? (l.containers||[]).filter(function(c){ return c.status === "starting"; }).length : 0;
+    var st = partial ? ["warn", l.running_count + "/" + l.node_count + " up"]
+           : booting ? ["info", booting + " booting", "waiting for the routers' health checks"]
+           : l.running ? ["ok", "running"] : ["", "stopped"];
+    var stp = el("span","state " + st[0]); stp.appendChild(el("i")); stp.appendChild(document.createTextNode(st[1]));
+    if (st[2]) stp.title = st[2];
+    nameLine.appendChild(stp);
+    main.appendChild(nameLine);
+
+    var meta = el("div","labmeta"), notes = [];
+    if (l.parse_error) notes.push(badge("crit", "can’t parse", l.parse_error, "warn"));
+    if (l.stale_containers) notes.push(badge("warn", "left over from a reboot",
       "Containers from a previous session exist but are stopped (the host rebooted?). "
       + "Redeploy brings the lab back; a plain start would not restart them.", "warn"));
     else if (l.stale_config && l.saved && l.saved.latest && l.saved.since_deploy)
-      nameLine.appendChild(badge(l.saved.failed.length ? "warn" : "ok",
+      notes.push(badge(l.saved.failed.length ? "warn" : "ok",
         (l.running ? "config saved " : "starts from config saved ") + whenShort(l.saved.at), savedTitle(l.saved)
         + (l.running ? "" : "\n\nStart runs deploy --reconfigure so every router boots from it."), "save"));
-    else if (l.stale_config) nameLine.appendChild(badge("warn", "changed since deploy",
+    else if (l.stale_config) notes.push(badge("warn", "changed since deploy",
       "The topology or configs changed since the last deploy. Redeploy (deploy --reconfigure) loads them; "
       + "a plain start would reuse clab-" + l.name + "/ and the old config.", "warn"));
-    if (nameCount[l.name] > 1) nameLine.appendChild(badge("", "name used by " + nameCount[l.name] + " files",
+    if (nameCount[l.name] > 1) notes.push(badge("", "name used by " + nameCount[l.name] + " files",
       "Lab name “" + l.name + "” is claimed by " + nameCount[l.name] + " topology files - only one can run at a time."));
     if (!l.running && freeMb > 0 && l.est_ram_mb > freeMb)
-      nameLine.appendChild(badge("warn", "needs " + gb(l.est_ram_mb), "only " + gb(freeMb) + " free on the host", "warn"));
+      notes.push(badge("warn", "needs " + gb(l.est_ram_mb), "only " + gb(freeMb) + " free on the host", "warn"));
     var lanOn = l.lan && l.lan.enabled, lanLive = lanOn ? l.lan.active.length : 0;
-    if (lanLive) nameLine.appendChild(badge("ok", "LAN · " + lanLive, lanLive + " management address(es) live on your LAN", "lan"));
-    main.appendChild(nameLine);
-    var kinds = el("div","kinds");
+    if (lanLive) notes.push(badge("ok", "LAN · " + lanLive, lanLive + " management address(es) live on your LAN", "lan"));
     Object.keys(l.kinds || {}).sort().forEach(function(k){
       var img = ((l.nodes || []).filter(function(n){ return n.kind === k; })[0] || {}).image;
       var t = el("span","tag " + UI.kindClass(k, img)); t.title = k;
       t.appendChild(el("i")); t.appendChild(el("b", null, l.kinds[k] + "×"));
       t.appendChild(document.createTextNode(UI.kindLabel(k, img)));
-      kinds.appendChild(t);
+      meta.appendChild(t);
     });
-    if (kinds.children.length) main.appendChild(kinds);
-    var sub = el("div","labsub", l.path);
+    if (notes.length && meta.children.length) meta.appendChild(el("span","sep"));
+    notes.forEach(function(n){ meta.appendChild(n); });
+    if (meta.children.length) main.appendChild(meta);
+    var sub = el("div","labsub"); sub.appendChild(UI.icon("file")); sub.appendChild(el("span", null, l.path));
     sub.title = l.path + (l.mgmt_subnet ? "\nmgmt " + l.mgmt_subnet : "");
     main.appendChild(sub);
     row.appendChild(main);
 
     // --- facts ---
     var facts = el("div","facts");
-    function fact(v, k){ var d = el("div"); d.appendChild(el("b", null, v)); d.appendChild(el("span", null, k)); facts.appendChild(d); }
-    fact((l.running ? l.running_count + "/" : "") + l.node_count, "nodes");
-    fact(String(l.link_count), "links");
-    fact((l.running ? "" : "~") + gb(l.est_ram_mb), "ram");
+    function fact(v, unit, k, pre){
+      var d = el("div"), b = el("b");
+      if (pre) b.appendChild(el("em", null, pre));
+      b.appendChild(document.createTextNode(v)); if (unit) b.appendChild(el("small", null, unit));
+      d.appendChild(b); d.appendChild(el("span", null, k)); facts.appendChild(d);
+    }
+    fact(l.running ? String(l.running_count) : String(l.node_count), l.running ? "/" + l.node_count : "", "nodes");
+    fact(String(l.link_count), "", "links");
+    var ram = gb(l.est_ram_mb).split(" ");
+    fact(ram[0], ram[1], l.running ? "ram" : "ram est.", l.running ? "" : "~");
     row.appendChild(facts);
 
     // --- actions: one main button, the map, everything else in the menu ---
