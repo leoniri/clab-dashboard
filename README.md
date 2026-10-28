@@ -7,8 +7,17 @@ network labs from the browser.
   memory pre-flight, in-browser CLI to every node, and an audit log of every action.
 - **Topology map** - live IGP adjacencies, BGP sessions and link traffic; fail a link or
   add delay/loss/jitter; capture packets in the browser (Wireshark-style decode, pcap
-  download); control-plane **path trace** through SR-MPLS, SRv6 and L3VPN; convergence
-  measurements.
+  download); control-plane **path trace** through SR-MPLS, SRv6 and L3VPN - every
+  equal-cost branch, each router's LFA / TI-LFA backup and where it repairs to, and the
+  path before vs. after a change; convergence measurements.
+- **What if** - the blast radius of failing any set of links or routers, from the live
+  IGP: router pairs cut off or rerouted (cost before / after), links that take over,
+  BGP sessions and VPNs hit - then fail it for real and trace whether the network agrees.
+- **Failure playbooks** - scripted failures run the same way every time (shared-risk
+  cuts, flaps, silent router freeze, netem), with a **flight recorder**: interface and
+  adjacency changes, each router's own syslog (clock-corrected), SPF runs, FIB updates,
+  path changes and traffic loss on one timeline, a per-failure reaction table, and a
+  **replay** that plays it back on the map.
 - **Builder** - drag-and-drop topologies for IOS-XE, IOS-XR (XRd), NX-OS, FRR, SR Linux and
   Linux, with generated addressing, IS-IS/OSPF, SR-MPLS, BGP (full mesh / RR) and L3VPN configs.
 - **Catalogue** - ready-to-run service-provider scenarios (Inter-AS A/B/C, CsC, SRv6,

@@ -37,6 +37,8 @@ import livestate
 import linkctl
 
 MAX_HOPS = 24
+MAX_BRANCHES = 8            # equal-cost paths followed per trace
+MAX_LOOKUPS = 120
 IP_RE = r"\d+\.\d+\.\d+\.\d+"
 ADDR_RE = r"(?:\d+\.\d+\.\d+\.\d+|[0-9a-fA-F:]*:[0-9a-fA-F:.]+)"
 
@@ -60,6 +62,13 @@ def _lab_int(x):
     return int(x) if x.isdigit() else x
 
 
+def _split_backups(res):
+    """Move repair (LFA / TI-LFA) next hops out of the forwarding paths."""
+    res["backups"] = [p for p in res["paths"] if p.get("backup")]
+    res["paths"] = [p for p in res["paths"] if not p.get("backup")]
+    return res
+
+
 def parse_xe_cef(text):
     res = {"paths": [], "via": None, "vpn_label": None, "connected": False}
     if re.search(r"attached to|receive for|, attached", text):
@@ -68,7 +77,11 @@ def parse_xe_cef(text):
     if m:
         res["via"] = m.group(1)
         res["vpn_label"] = _lab_int(m.group(2)) if m.group(2) else None
+    # "  nexthop 10.1.34.2 GigabitEthernet3 label 16002-(local:16002), repair" is
+    # the LFA / TI-LFA backup of the path above it, not an equal-cost path
     for m in re.finditer(r"^[ \t]*nexthop (%s) (\S+)(?: label (\S+))?(?:[ \t]+(\S+))?" % IP_RE, text, re.M):
+        line = text[m.start():text.find("\n", m.start()) if "\n" in text[m.start():] else len(text)]
+        backup = bool(re.search(r",\s*repair\s*$", line))
         labels = []
         if m.group(3):
             # "16004-(local:16004)", "[16003|16003]-(local:16003)", "implicit-null"
@@ -78,13 +91,26 @@ def parse_xe_cef(text):
             labels.append(int(m.group(4)))
         elif res["vpn_label"] is not None:
             labels.append(res["vpn_label"])
-        res["paths"].append({"nh": m.group(1), "out_if": m.group(2), "labels": [l for l in labels if l is not None]})
+        p = {"nh": m.group(1), "out_if": m.group(2), "labels": [l for l in labels if l is not None]}
+        if backup:
+            p.update(backup=True, kind="TI-LFA" if "TI-LFA" in line or "tunnel" in line.lower() else "repair")
+        res["paths"].append(p)
     if not res["paths"]:
         m = re.search(r"^\s*attached to (\S+)", text, re.M)
         if m:
             res["paths"].append({"nh": None, "out_if": m.group(1), "labels": []})
             res["connected"] = True
-    return res
+    return _split_backups(res)
+
+
+def _xr_via_line(text, pos):
+    """The `via ...` line a position in `show cef` output belongs to."""
+    start = None
+    for m in re.finditer(r"^[ \t]*via .*$", text, re.M):
+        if m.start() > pos:
+            break
+        start = m
+    return start.group(0) if start else ""
 
 
 def parse_xr_cef(text):
@@ -99,16 +125,33 @@ def parse_xr_cef(text):
     m = re.search(r"via (%s)/32, \d+ dependencies, recursive" % IP_RE, text)
     if m and "bgp-ext" not in text[m.start():m.start() + 120]:
         res["via"] = m.group(1)
+    m = re.search(r"^\s*Updated (\w{3} +\d+ [\d:.]+)", text, re.M)
+    if m:
+        res["updated"] = m.group(1)
+
+    def mark(p, via_line):
+        # "via 10.1.13.2/32, TenGigE0/0/0/1, ..., backup (Local-LFA) [flags 0x300]"
+        bm = re.search(r"\bbackup(?: \(([^)]*)\))?", via_line)
+        if bm:
+            p.update(backup=True, kind=bm.group(1) or "backup")
+        elif "protected" in via_line:
+            p["protected"] = True
+        return p
+
     for m in re.finditer(r"^\s*next hop (%s)/\d+ (\S+)\s+labels imposed \{([^}]*)\}" % IP_RE, text, re.M):
         labels = [_lab_int(x) for x in m.group(3).split()]
-        res["paths"].append({"nh": m.group(1), "out_if": m.group(2), "labels": [l for l in labels if l is not None]})
+        res["paths"].append(mark({"nh": m.group(1), "out_if": m.group(2),
+                                  "labels": [l for l in labels if l is not None]}, _xr_via_line(text, m.start())))
     if not res["paths"]:
         # IGP route: "via 10.10.0.5/32, GigabitEthernet0/0/0/0, ... labels imposed {16001}"
-        for m in re.finditer(r"^\s*via (%s)/\d+, (\S+?),.*?(?:labels imposed \{([^}]*)\})?" % IP_RE, text, re.M | re.S):
-            blk = text[m.start():m.start() + 400]
+        vias = list(re.finditer(r"^\s*via (%s)/\d+, (\S+?),.*$" % IP_RE, text, re.M))
+        for i, m in enumerate(vias):
+            end = vias[i + 1].start() if i + 1 < len(vias) else min(len(text), m.start() + 600)
+            blk = text[m.start():end]
             lm = re.search(r"labels imposed \{([^}]*)\}", blk)
             labels = [_lab_int(x) for x in lm.group(1).split()] if lm else []
-            res["paths"].append({"nh": m.group(1), "out_if": m.group(2), "labels": [l for l in labels if l is not None]})
+            res["paths"].append(mark({"nh": m.group(1), "out_if": m.group(2),
+                                      "labels": [l for l in labels if l is not None]}, m.group(0)))
     if not res["paths"]:
         # a route whose next hop is directly reachable (a CE learned over eBGP):
         # only the load-distribution table names the interface
@@ -120,7 +163,7 @@ def parse_xr_cef(text):
         res["vpn_label"] = bottom[0] if bottom else None
     if not res["paths"] and re.search(r"attached|local adjacency", text):
         res["connected"] = True
-    return res
+    return _split_backups(res)
 
 
 def parse_nxos_route(text):
@@ -129,7 +172,7 @@ def parse_nxos_route(text):
         if m.group(3).startswith(("direct", "local")):
             res["connected"] = True
         res["paths"].append({"nh": m.group(1), "out_if": m.group(2), "labels": []})
-    return res
+    return _split_backups(res)
 
 
 def parse_frr_route(js):
@@ -145,7 +188,12 @@ def parse_frr_route(js):
     r = routes[0]
     if r.get("protocol") in ("connected", "local"):
         res["connected"] = True
+    # a next hop whose interface just went down can still say "fib": true for a
+    # moment - when some are marked active, only those forward
+    any_active = any(nh.get("active") for nh in r.get("nexthops") or [] if not nh.get("recursive"))
     for nh in r.get("nexthops") or []:
+        if not nh.get("recursive") and any_active and not nh.get("active"):
+            continue
         if nh.get("recursive"):
             res["via"] = nh.get("ip")
             if nh.get("labels"):
@@ -161,6 +209,10 @@ def parse_frr_route(js):
             res["connected"] = True
         res["paths"].append({"nh": nh.get("ip"), "out_if": nh.get("interfaceName"),
                              "labels": [l for l in labels if l is not None]})
+    # TI-LFA in FRR: repair paths are listed apart from the next hops
+    res["backups"] = [{"nh": nh.get("ip"), "out_if": nh.get("interfaceName"), "backup": True, "kind": "TI-LFA",
+                       "labels": [l for l in (_lab_int(x) for x in nh.get("labels") or []) if l is not None]}
+                      for nh in r.get("backupNexthops") or [] if nh.get("interfaceName")]
     return res
 
 
@@ -178,6 +230,8 @@ class Tracer:
         self.ips = {}               # node -> set of its IPv4 addresses
         self.ifvrf = {}             # node -> {platform ifname: vrf}
         self.locators = {}          # node -> [ipaddress.IPv6Network] (SRv6)
+        self.cache = {}             # (node, vrf, target) -> lookup result
+        self.lookups = 0
         self.cmds = 0
 
     def platform(self, node):
@@ -331,15 +385,45 @@ class Tracer:
                 return l, l["a"], l["a_if"]
         return None, None, None
 
-    def trace(self, src, dst, src_vrf=None):
+    def trace(self, src, dst, src_vrf=None, branches=True):
+        """The path from src to dst. With branches, every equal-cost next hop
+        is followed too (each fork re-walks from the router where it splits);
+        the first path is `hops`, the others `branches`."""
         if src not in self.cont:
             raise TraceError("%s is not running" % src)
-        hops, node, vrf = [], src, src_vrf
-        target, inner, vpn_vrf, stack = dst, dst, None, []
-        srv6 = False
-        in_port = None
         t0 = time.time()
+        start = {"node": src, "in_port": None, "vrf": src_vrf, "target": dst, "inner": dst,
+                 "vpn_vrf": None, "stack": [], "srv6": False}
+        queue, done, seen = [(start, [], None)], [], set()
+        while queue and len(done) < MAX_BRANCHES and self.lookups < MAX_LOOKUPS:
+            st, hops, force = queue.pop(0)
+            hops, result = self._walk(dict(st, stack=list(st["stack"])), hops, force,
+                                      queue if branches else None)
+            key = tuple((h["node"], h.get("link")) for h in hops)
+            if key in seen:
+                continue
+            seen.add(key)
+            done.append((hops, result))
+        out = self._done(done[0][0], done[0][1], t0)
+        out["branches"] = [{"hops": h, "result": r} for h, r in done[1:]]
+        if queue:
+            out["branches_capped"] = True
+        return out
+
+    def _lookup(self, node, vrf, target):
+        k = (node, vrf, target)
+        if k not in self.cache:
+            self.lookups += 1
+            self.cache[k] = self.lookup(node, vrf, target)
+        return self.cache[k]
+
+    def _walk(self, st, hops, force, forks):
+        node, in_port, vrf = st["node"], st["in_port"], st["vrf"]
+        target, inner, vpn_vrf, stack, srv6 = st["target"], st["inner"], st["vpn_vrf"], st["stack"], st["srv6"]
         for _ in range(MAX_HOPS):
+            n0 = len(hops)
+            here = {"node": node, "in_port": in_port, "vrf": vrf, "target": target, "inner": inner,
+                    "vpn_vrf": vpn_vrf, "stack": list(stack), "srv6": srv6}
             hop = {"node": node, "in_port": in_port, "vrf": vrf, "lookup": target, "in_labels": list(stack)}
             hops.append(hop)
             owns = target in self.owned(node)
@@ -362,16 +446,24 @@ class Tracer:
                 owns = target in self.owned(node)
             if owns:
                 hop["action"] = "delivered"
-                return self._done(hops, "reached", t0)
+                return hops, "reached"
             try:
-                res = self.lookup(node, vrf, target)
+                res = self._lookup(node, vrf, target)
             except TraceError as exc:
                 hop["action"] = str(exc)
-                return self._done(hops, "unsupported", t0)
+                return hops, "unsupported"
             if not res["paths"]:
                 hop["action"] = "no route to %s%s" % (target, (" in VRF %s" % vrf) if vrf else "")
-                return self._done(hops, "no-route", t0)
-            p = res["paths"][0]
+                return hops, "no-route"
+            # this branch was forked onto one of the equal-cost next hops
+            p = force or res["paths"][0]
+            if force is None and forks is not None:
+                for alt in res["paths"][1:]:
+                    forks.append((here, [dict(h) for h in hops[:n0]], alt))
+            force = None
+            others = [x for x in res["paths"] if x is not p]
+            if res.get("updated"):
+                hop["fib_updated"] = res["updated"]
             if res.get("srv6_sids") and not srv6:
                 # SRv6 VPN: the packet is encapsulated towards the service SID;
                 # the core forwards on that IPv6 destination (its locator)
@@ -379,24 +471,24 @@ class Tracer:
                 vpn_vrf, target, srv6 = vrf, res["srv6_sids"][0], True
                 hop["out_if"], hop["nh"] = p["out_if"], p["nh"]
                 hop["out_labels"] = []
-                hop["ecmp"] = [{"out_if": x["out_if"], "nh": x["nh"], "labels": []} for x in res["paths"][1:]]
+                hop["ecmp"] = [{"out_if": x["out_if"], "nh": x["nh"], "labels": []} for x in others]
                 hop["action"] = "SRv6 H.Encaps.Red → %s" % " ".join(res["srv6_sids"])
                 hop["stack_out"] = ["DA " + target]
                 link, far, far_port = self.link_out(node, p["out_if"])
                 if link is None:
                     hop["action"] += " - %s leaves the lab" % p["out_if"]
-                    return self._done(hops, "left-lab", t0)
+                    return hops, "left-lab"
                 hop["link"] = link["id"]
                 hop["ecmp_links"] = [x["id"] for x in (self.link_out(node, e["out_if"])[0] for e in hop["ecmp"]) if x]
-                stop = self._check(hop, hops, link, t0)
-                if stop:
-                    return stop
+                self._protection(hop, node, res)
+                if self._check(hop, link):
+                    return hops, "blackhole"
                 stack = [target]
                 node, in_port = far, far_port
                 vrf = None
                 if far not in self.cont:
                     hops.append({"node": far, "in_port": far_port, "action": "not running"})
-                    return self._done(hops, "down", t0)
+                    return hops, "down"
                 continue
             if res["via"] and res["via"] != target and not stack:
                 # VPN (or recursive BGP) route: follow the BGP next hop from here on
@@ -404,20 +496,20 @@ class Tracer:
                 vpn_vrf, target = vrf, res["via"]
             hop["out_if"], hop["nh"] = p["out_if"], p["nh"]
             hop["out_labels"] = p["labels"]
-            hop["ecmp"] = [{"out_if": x["out_if"], "nh": x["nh"], "labels": x["labels"]} for x in res["paths"][1:]]
+            hop["ecmp"] = [{"out_if": x["out_if"], "nh": x["nh"], "labels": x["labels"]} for x in others]
             hop["action"] = ("forward on SRv6 DA %s" % target) if srv6 else _describe(stack, p["labels"])
             link, far, far_port = self.link_out(node, p["out_if"])
             if link is None:
                 if res["connected"] and target == inner:
                     hop["action"] = "delivered on a directly connected network"
-                    return self._done(hops, "reached", t0)
+                    return hops, "reached"
                 hop["action"] += " - %s leaves the lab" % p["out_if"]
-                return self._done(hops, "left-lab", t0)
+                return hops, "left-lab"
             hop["link"] = link["id"]
             hop["ecmp_links"] = [x["id"] for x in (self.link_out(node, e["out_if"])[0] for e in hop["ecmp"]) if x]
-            stop = self._check(hop, hops, link, t0)
-            if stop:
-                return stop
+            self._protection(hop, node, res)
+            if self._check(hop, link):
+                return hops, "blackhole"
             out = [l for l in p["labels"] if l != "pop"]
             # a label-switching router only swaps / pops the top label; what is
             # below it (the VPN label) travels on unchanged
@@ -429,12 +521,23 @@ class Tracer:
             node, in_port = far, far_port
             if far not in self.cont:
                 hops.append({"node": far, "in_port": far_port, "action": "not running"})
-                return self._done(hops, "down", t0)
+                return hops, "down"
             # plain IP arriving on a router is looked up in its incoming port's VRF
             vrf = None if stack else self.vrf_of(far, self._platform_if(far, far_port))
             if not stack and target != inner:
                 target = inner          # PHP popped the transport and there is no VPN label
-        return self._done(hops, "loop", t0)
+        return hops, "loop"
+
+    def _protection(self, hop, node, res):
+        """The repair path (LFA / TI-LFA) the router holds for this hop, if any."""
+        bks = res.get("backups") or []
+        if bks:
+            b = bks[0]
+            link, far, _ = self.link_out(node, b["out_if"])
+            hop["backup"] = {"out_if": b["out_if"], "nh": b["nh"], "labels": b.get("labels") or [],
+                             "kind": b.get("kind") or "backup", "link": link["id"] if link else None, "to": far}
+        elif self.platform(node) in ("cisco_xe", "cisco_xr"):
+            hop["unprotected"] = True
 
     def blocked(self, link_id):
         """(drop reason, warning) for forwarding out of this link right now.
@@ -448,21 +551,25 @@ class Tracer:
         if st.get("down"):
             return ("the link is down%s" % (" (failed from the dashboard, %s)" % f.get("mode") if f else ""), None)
         if st.get("igp_state") in ("lost", "down"):
-            return ("the IGP adjacency on this link is down, but the router still forwards over it "
-                    "(not converged yet) - packets are dropped here", None)
+            # the live view polls adjacencies every ~10 s: right after a link
+            # comes back it still says "lost" while the router already forwards
+            # over it again. A link that is really dead shows as down above.
+            return (None, "the live view last saw the IGP adjacency on this link down, but the router "
+                          "forwards over it - either it has just come back, or the router has not converged yet")
         if f:
             return (None, "marked failed from the dashboard (%s), but the interfaces and the IGP adjacency "
                           "are still up - the failure did not take effect" % f.get("mode"))
         return (None, None)
 
-    def _check(self, hop, hops, link, t0):
+    def _check(self, hop, link):
+        """True when the packet is dropped on this link."""
         reason, warn = self.blocked(link["id"])
         if warn:
             hop["warn"] = warn
         if reason:
             hop["blocked"] = reason
-            return self._done(hops, "blackhole", t0)
-        return None
+            return True
+        return False
 
     def _platform_if(self, node, port):
         import topoedit
@@ -497,12 +604,12 @@ def _describe(stack, out):
     return "swap %s → %s" % (stack[0], top_out)
 
 
-def trace(lab, poller, src, dst, src_vrf=None, linkstate=None):
+def trace(lab, poller, src, dst, src_vrf=None, linkstate=None, branches=True):
     try:
         ipaddress.ip_address(dst)
     except ValueError:
         raise TraceError("destination must be an IPv4 address")
-    return Tracer(lab, poller, linkstate).trace(src, dst, src_vrf)
+    return Tracer(lab, poller, linkstate).trace(src, dst, src_vrf, branches)
 
 
 def node_address(lab, poller, node):

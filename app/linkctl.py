@@ -333,6 +333,106 @@ class Links:
             self._save()
         return {"ok": True, "log": lines}
 
+    # -- several links at once (a shared-risk group, a node's links) ---------
+    def _per_node(self, lab_index_fn, lab, ls, mode, up, log):
+        """Apply to every end, one thread per router: a router gets a single
+        config push for all its interfaces, so the links go together."""
+        import devcfg
+        import topoedit
+        per = {}
+        for l in ls:
+            for node, port, cname, kind, image in self._ends(lab, l):
+                per.setdefault(node, {"cname": cname, "kind": kind, "ports": []})["ports"].append(port)
+        errors = []
+
+        def one(node, d):
+            try:
+                kind = d["kind"]
+                if mode == "shutdown" and (kind in VM_KINDS or kind == "nokia_srlinux"):
+                    names = [topoedit.node_iface(lab, node, kind, p) for p in d["ports"]]
+                    if kind == "nokia_srlinux":
+                        cfg = "\n".join("set / interface %s admin-state %s" % (n, "enable" if up else "disable")
+                                        for n in names)
+                    else:
+                        cfg = "\n".join("interface %s\n %s" % (n, "no shutdown" if up else "shutdown")
+                                        for n in names)
+                    r = devcfg.push_config(lab_index_fn(), lab["id"], node, cfg, save_startup_after=False)
+                    if not r.get("ok"):
+                        raise LinkError("%s: %s" % (node, "; ".join(r.get("errors") or ["push failed"])))
+                    log("%s: %s %s" % (node, ", ".join(names), "no shutdown" if up else "shutdown"))
+                    if not up and kind in VM_KINDS:
+                        for n in names:
+                            self._verify_down(lab_index_fn, lab, node, n, log)
+                    if up:
+                        for p in d["ports"]:
+                            self._kernel(d["cname"], p, True)
+                else:
+                    for p in d["ports"]:
+                        self._kernel(d["cname"], p, up)
+                    log("%s: %s %s" % (node, ", ".join(d["ports"]), "up" if up else "down"))
+            except Exception as exc:                    # noqa: BLE001
+                errors.append(str(exc))
+        ts = [threading.Thread(target=one, args=(n, d), daemon=True) for n, d in per.items()]
+        for t in ts:
+            t.start()
+        for t in ts:
+            t.join(timeout=180)
+        if errors:
+            raise LinkError("; ".join(errors))
+
+    def fail_many(self, lab_index_fn, lab, link_list, mode, who):
+        """Fail several links together. Links already failed are left alone."""
+        if mode not in ("cut", "shutdown"):
+            raise LinkError("mode must be cut or shutdown")
+        ls, skipped = [], []
+        for x in link_list:
+            l = self.find_link(lab, x)
+            key = "%s|%s" % (lab.get("name"), link_key(l))
+            (skipped if key in self.state else ls).append(l)
+        if not ls:
+            return {"ok": True, "log": [], "failed": [], "skipped": [link_key(l) for l in skipped]}
+        lines = []
+        self.audit("LINK-FAIL lab=%s links=%s mode=%s from=%s"
+                   % (lab.get("name"), ",".join(link_key(l) for l in ls), mode, who))
+        try:
+            self._per_node(lab_index_fn, lab, ls, mode, False, lines.append)
+        except Exception:
+            try:
+                self._per_node(lab_index_fn, lab, ls, mode, True, lines.append)
+            except Exception:                           # noqa: BLE001
+                pass
+            raise
+        now = time.time()
+        with self.lock:
+            for l in ls:
+                self.state["%s|%s" % (lab.get("name"), link_key(l))] = {
+                    "mode": mode, "since": now, "by": who, "restore_at": None,
+                    "link": {k: l[k] for k in ("a", "a_if", "b", "b_if")}}
+            self._save()
+        return {"ok": True, "log": lines, "failed": [link_key(l) for l in ls],
+                "skipped": [link_key(l) for l in skipped]}
+
+    def restore_many(self, lab_index_fn, lab, link_list, who):
+        ls = [self.find_link(lab, x) for x in link_list]
+        lines = []
+        by_mode = {}
+        for l in ls:
+            rec = self.state.get("%s|%s" % (lab.get("name"), link_key(l))) or {"mode": "cut"}
+            by_mode.setdefault(rec["mode"], []).append(l)
+        self.audit("LINK-RESTORE lab=%s links=%s from=%s"
+                   % (lab.get("name"), ",".join(link_key(l) for l in ls), who))
+        for mode, group in by_mode.items():
+            self._per_node(lab_index_fn, lab, group, mode, True, lines.append)
+        with self.lock:
+            for l in ls:
+                key = "%s|%s" % (lab.get("name"), link_key(l))
+                self.state.pop(key, None)
+                t = self.timers.pop(key, None)
+                if t:
+                    t.cancel()
+            self._save()
+        return {"ok": True, "log": lines}
+
     def _arm(self, key, delay, lab_index_fn):
         def fire():
             rec = self.state.get(key)

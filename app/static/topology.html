@@ -116,6 +116,7 @@ body{overflow:hidden}
 .tracing .lk .flowp,.tracing .lk .rate{display:none}
 .tracing .lk:not(.onpath){opacity:.2}
 .tracing .node:not(.onpath){opacity:.3}
+.tracing .node.onrep{opacity:.7}
 .tracing .bgp{opacity:.15}
 .trglow{fill:none;stroke:var(--trace);stroke-width:4;stroke-linecap:round;opacity:.22;filter:blur(2.5px);pointer-events:none}
 .trline{fill:none;stroke:var(--trace);stroke-width:1.4;stroke-linecap:round;pointer-events:none;transition:stroke-width .15s}
@@ -157,6 +158,122 @@ body{overflow:hidden}
   color:var(--crit);background:var(--crit-soft)}
 .hop .why.warn{color:var(--warn);background:var(--warn-soft)}
 @media (prefers-reduced-motion:reduce){ .trpulse{display:none} }
+/* trace: other equal-cost branches, backup paths, the path before it changed */
+.trbrl{fill:none;stroke:var(--trace);stroke-width:1.1;stroke-dasharray:4 4;opacity:.65;pointer-events:none;transition:stroke-width .15s,opacity .15s}
+.trbr.hl .trbrl{stroke-width:2;opacity:1;stroke-dasharray:none}
+.trchev.br{stroke:var(--trace);opacity:.7}
+.trrepl{fill:none;stroke:var(--warn);stroke-width:1.2;stroke-dasharray:6 4;opacity:.7;stroke-linecap:round;pointer-events:none}
+.trrep.hl .trrepl{stroke-width:2;opacity:1}
+.trchev.rep{stroke:var(--warn);opacity:.85}
+.trreptag rect{fill:var(--surface);stroke:color-mix(in srgb,var(--warn) 70%,transparent);stroke-width:.8}
+.trreptag text{font:700 7.5px var(--font-mono);letter-spacing:.06em;fill:var(--warn)}
+.troldl{fill:none;stroke:var(--muted);stroke-width:1.2;stroke-dasharray:2 5;stroke-linecap:round;opacity:.9;pointer-events:none}
+.trchev.old{stroke:var(--muted)}
+.chain{display:inline-flex;flex-wrap:wrap;align-items:center;gap:3px;font:11px var(--font-mono);color:var(--ink-2)}
+.chain > span{padding:1px 6px;border-radius:5px;background:var(--surface-2);border:1px solid var(--line)}
+.chain > span.chg{background:var(--warn-soft);color:var(--warn);border-color:transparent;font-weight:600}
+.chain em{color:var(--muted);font-style:normal}
+i.res{font:600 9px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;font-style:normal;padding:1px 6px;border-radius:99px;
+  margin-left:4px;color:var(--warn);background:var(--warn-soft)}
+i.res.reached{color:var(--ok);background:var(--ok-soft)} i.res.blackhole,i.res.no-route,i.res.down{color:var(--crit);background:var(--crit-soft)}
+.trcmp{margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);background:var(--warn-soft)}
+.trcmp .h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.trcmp .h b{font:600 13px var(--font-display);color:var(--warn)} .trcmp .h span{font:11px var(--font-mono);color:var(--muted)}
+.trcmp .rows{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center}
+.trcmp .k{font:600 9px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.trcmp .foot{font-size:11px;color:var(--muted);margin-top:8px}
+.trbrs,.trhist{display:flex;flex-direction:column;gap:4px;margin-bottom:6px}
+.trbrs .row,.trhist .row{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:7px;border:1px solid var(--line);background:var(--surface)}
+.trbrs .row:hover{border-color:var(--trace)}
+.trbrs .n{font:700 10px var(--font-mono);color:var(--trace-ink);width:16px;height:16px;border-radius:50%;display:inline-flex;
+  align-items:center;justify-content:center;border:1px solid var(--trace);flex:none}
+.trbrs .row.main .n{background:var(--trace);color:var(--on-trace)}
+.trhist .t{font:10.5px var(--font-mono);color:var(--muted);flex:none}
+.trhist .row.cur{border-color:color-mix(in srgb,var(--trace) 50%,transparent)}
+.hop .bk{font:11px var(--font-mono)} .hop .bk .kind{font:700 9px var(--font-mono);font-style:normal;letter-spacing:.05em;
+  color:var(--warn);background:var(--warn-soft);padding:1px 6px;border-radius:99px}
+.hop .bk .lbls{color:var(--muted)}
+.hop .why.rep{color:var(--ink-2);background:color-mix(in srgb,var(--warn) 10%,transparent);border-left:2px solid var(--warn)}
+.hop .why.mute{color:var(--muted);background:var(--surface-2)}
+
+/* what if */
+.whatif .lk .link{stroke:var(--line-strong) !important;filter:none !important;transition:none !important}
+.whatif .lk .flowp,.whatif .lk .rate,.whatif .lk .badge{display:none}
+.whatif .bgp{opacity:.12}
+.whatif .lk,.whatif .node{cursor:crosshair}
+.imfail path:not(.x){fill:none;stroke:var(--crit);stroke-width:1.6;stroke-dasharray:4 4;pointer-events:none}
+.imfail circle{fill:var(--crit);stroke:var(--canvas);stroke-width:1.5}
+.imfail path.x{stroke:#fff;stroke-width:1.6;stroke-linecap:round}
+.imfail{pointer-events:none}
+.imload{pointer-events:none}
+.imload > path{fill:none;stroke:var(--warn);stroke-linecap:round;opacity:.55}
+.imload rect{fill:var(--surface);stroke:color-mix(in srgb,var(--warn) 60%,transparent);stroke-width:.8}
+.imload text{font:700 7.5px var(--font-mono);fill:var(--warn)}
+.impair{pointer-events:none}
+.impair path.imold{fill:none;stroke:var(--muted);stroke-width:1.3;stroke-dasharray:3 4}
+.impair path.imnew{fill:none;stroke:var(--trace);stroke-width:1.7;filter:drop-shadow(0 0 3px color-mix(in srgb,var(--trace) 60%,transparent))}
+.impair .trchev.imold{stroke:var(--muted);fill:none} .impair .trchev.imnew{stroke:var(--trace-ink);fill:none;filter:none}
+.node.imdown{opacity:.35} .node.imdown .halo{opacity:1;stroke:var(--crit);stroke-width:1.4;stroke-dasharray:3 3}
+.imchips{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 6px}
+.imchips .chip{display:inline-flex;align-items:center;gap:6px;padding:3px 4px 3px 9px;border-radius:99px;font:600 11.5px var(--font-mono);
+  background:var(--crit-soft);color:var(--crit);border:1px solid color-mix(in srgb,var(--crit) 40%,transparent)}
+.imchips .chip i{width:12px;height:2px;background:var(--crit);border-radius:1px}
+.imchips .chip.node i{width:8px;height:8px;border-radius:50%}
+.imchips .chip button{border:0;background:none;color:inherit;cursor:pointer;font-size:11px;padding:0 4px;border-radius:50%}
+.imchips .chip button:hover{background:color-mix(in srgb,var(--crit) 25%,transparent)}
+.imtiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:10px 0}
+.imtiles > div{padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--surface)}
+.imtiles b{display:block;font:600 17px var(--font-display);letter-spacing:-.01em}
+.imtiles span{font:500 9px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.imtiles .bad b{color:var(--crit)} .imtiles .warn b{color:var(--warn)} .imtiles .good b{color:var(--ok)}
+.impairs{display:flex;flex-direction:column;gap:5px;margin-bottom:6px}
+.impairs .row{padding:7px 9px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;
+  border-left:3px solid var(--line-strong);display:flex;flex-direction:column;gap:5px}
+.impairs .row.lost{border-left-color:var(--crit)} .impairs .row.rerouted{border-left-color:var(--warn)}
+.impairs .row:hover,.impairs .row.pin{border-color:var(--trace);border-left-width:3px}
+.impairs .top{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.impairs .top b{font:600 12px var(--font-mono)} .impairs .cost{font:10.5px var(--font-mono);color:var(--muted);margin-left:auto}
+.impairs .none{font:11px var(--font-mono);color:var(--crit)}
+.impairs .ver{font:11px var(--font-mono);padding:4px 7px;border-radius:6px}
+.impairs .ver.ok{color:var(--ok);background:var(--ok-soft)} .impairs .ver.bad{color:var(--crit);background:var(--crit-soft)}
+.imload-list{display:flex;flex-direction:column;gap:3px;margin-bottom:6px}
+.imload-list .row{display:flex;justify-content:space-between;gap:8px;font:11.5px var(--font-mono);padding:4px 2px;border-bottom:1px solid var(--line)}
+.imload-list .row b{color:var(--warn);font-weight:600} .imload-list .row i{color:var(--muted);font-style:normal;text-align:right}
+
+/* replay */
+.rpbar{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;z-index:7;display:flex;align-items:center;gap:8px;
+  padding:6px 8px;width:min(760px,calc(100% - 140px))}
+.rpbar .ub.icon{width:32px;height:32px;flex:none}
+.rpbar .sp{width:64px;height:30px;padding:0 6px;flex:none}
+.rptrack{position:relative;flex:1;height:30px;min-width:0}
+.rptrack .ticks{position:absolute;left:8px;right:8px;top:2px;height:8px;pointer-events:none}
+.rptrack .ticks i{position:absolute;top:0;width:2px;height:8px;margin-left:-1px;border-radius:1px;pointer-events:auto}
+.rptrack .ticks i.step{background:var(--ink);height:9px} .rptrack .ticks i.path{background:var(--trace)}
+.rptrack .ticks i.log{background:var(--muted);width:1px;opacity:.6;height:6px;top:2px}
+.rptrack .ticks i.loss{background:var(--crit);opacity:.5;height:4px;top:4px;margin-left:0;border-radius:2px}
+.rptrack input[type=range]{position:absolute;left:0;right:0;bottom:2px;width:100%;margin:0;accent-color:var(--trace)}
+.rptime{font:600 11.5px var(--font-mono);color:var(--ink-2);white-space:nowrap;min-width:92px;text-align:right;font-variant-numeric:tabular-nums}
+.rpcall{pointer-events:none}
+.rpcall rect{fill:var(--surface);stroke:var(--line-strong);stroke-width:.8;filter:drop-shadow(0 2px 6px rgba(0,0,0,.25))}
+.rpcall text{font:500 8.5px var(--font-mono);fill:var(--ink)}
+.rpcall.step rect{stroke:var(--ink-2)}
+.rpflash{fill:none;stroke-width:7;stroke-linecap:round;pointer-events:none;stroke:var(--crit);filter:blur(2px)}
+.rpflash.igp,.rpflash.ldp,.rpflash.bfd{stroke:var(--warn)} .rpflash.fib,.rpflash.spf{stroke:var(--ok)}
+.node.frozen .ic{filter:grayscale(1);opacity:.45}
+.node.frozen .halo{opacity:1;stroke:#7DD3FC;stroke-width:1.3;stroke-dasharray:2 3}
+.rplegend{display:flex;flex-wrap:wrap;gap:4px 10px;margin:10px 0 8px;font:10.5px var(--font-mono);color:var(--muted)}
+.rplegend i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:0}
+.rpev{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:9px;max-height:46vh;overflow:auto;background:var(--surface)}
+.rpev .row{display:grid;grid-template-columns:46px 1fr;gap:8px;padding:5px 8px;font:11px/1.4 var(--font-mono);cursor:pointer;
+  border-bottom:1px solid var(--line);opacity:.45}
+.rpev .row.past{opacity:1} .rpev .row:hover{background:var(--surface-2)}
+.rpev .row.cur{background:color-mix(in srgb,var(--trace) 14%,transparent)}
+.rpev .t{color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.rpev .tag{font:700 8.5px var(--font-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--c);margin-right:6px}
+.rpev .x{color:var(--ink-2);overflow-wrap:anywhere} .rpev .x b{color:var(--ink);font-weight:600}
+.rpev .row.step .x{color:var(--ink);font-weight:600}
+@media (max-width:860px){ .rpbar{width:calc(100% - 24px);bottom:62px} }
+
 
 /* ---------- edit mode ---------- */
 .node.new .halo{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6;stroke-dasharray:5 3;opacity:1}
@@ -325,8 +442,8 @@ body{overflow:hidden}
 .op.fwd{color:var(--ink-2);background:var(--surface-3)} .op.done{color:var(--trace-ink);background:color-mix(in srgb,var(--trace) 14%,transparent)}
 .op.encap{color:var(--xe);background:var(--xe-soft)} .op.err{color:var(--crit);background:var(--crit-soft)}
 .hop .hkv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin-top:8px;font:11px var(--font-mono);color:var(--ink-2)}
-.hop .hkv span:nth-child(odd){color:var(--muted);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;padding-top:1px}
-.hop .hkv span{min-width:0;overflow-wrap:anywhere}
+.hop .hkv > span:nth-child(odd){color:var(--muted);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;padding-top:1px}
+.hop .hkv > span{min-width:0;overflow-wrap:anywhere}
 .pkt{display:inline-flex;border-radius:5px;overflow:hidden;border:1px solid var(--line-strong);vertical-align:middle}
 .pkt i{font:700 10px var(--font-mono);font-style:normal;padding:1px 6px}
 .pkt i.lb{background:var(--accent-soft);color:var(--trace-ink)} .pkt i.lb + i.lb{border-left:1px solid var(--line-strong)}
@@ -421,6 +538,7 @@ body{overflow:hidden}
         <g id="world">
           <g id="gtraceu"></g>
           <g id="glinks"></g>
+          <g id="gimp"></g>
           <g id="gbgp"></g>
           <g id="gtrace"></g>
           <g id="gnodes"></g>
@@ -431,6 +549,7 @@ body{overflow:hidden}
         <button class="ub" id="t_view" aria-haspopup="menu" title="what the map shows"></button>
         <span class="tsep"></span>
         <button class="ub" id="t_trace" aria-pressed="false" title="trace the path between two nodes through the forwarding tables (p)"></button>
+        <button class="ub" id="t_whatif" aria-pressed="false" title="what if a link or router fails - the blast radius, worked out before you fail it (w)"></button>
         <button class="ub" id="t_guide" aria-pressed="false" title="what this lab is for, the role of each node and checks to run (l)" hidden></button>
         <button class="ub" id="t_edit" aria-pressed="false" title="add or remove nodes and links (e)"></button>
       </div>
@@ -500,9 +619,16 @@ var world = document.getElementById("world");
 var gNodes = document.getElementById("gnodes");
 var gLinks = document.getElementById("glinks");
 var gBgp = document.getElementById("gbgp");
-var gTrace = document.getElementById("gtrace"), gTraceU = document.getElementById("gtraceu");
+var gTrace = document.getElementById("gtrace"), gTraceU = document.getElementById("gtraceu"), gImp = document.getElementById("gimp");
 // path trace: the form, the last result, and "follow" (re-trace every few s)
-var trace = {open:false, src:"", dst:"", ip:"", res:null, err:null, busy:false, follow:false, timer:null};
+var trace = {open:false, src:"", dst:"", ip:"", res:null, err:null, busy:false, follow:false, timer:null,
+             prev:null, base:null, hist:{}, repair:true};
+// what-if: a failure set, worked out by the server's IGP model (impact.py)
+var imp = {open:false, links:[], nodes:[], res:null, busy:false, err:null, hover:null, pin:null, seq:0,
+           failed:[], verify:null, vbusy:false};
+// replay of a recorded playbook run (?replay=<run id>)
+var rp = {id:new URLSearchParams(location.search).get("replay")||"", run:null, t:0, playing:false, speed:2,
+          pair:null, last:0, sig:"", live:null, nodes:{}, follow:true};
 // lab guide (lab-guide.json written by the catalogue's scenarios, else the README)
 var guide = {open:false, data:null, readme:null, loaded:false, tab:"checks", res:{}, busy:{}, exp:{}, all:false};
 // live protocol state (api/live), polled while the lab runs and "live" is on
@@ -967,7 +1093,9 @@ function render(){
       }
       g.addEventListener("pointerdown",function(ev){ ev.stopPropagation(); });
       g.addEventListener("click",function(ev){
-        ev.stopPropagation(); selLink=l; sel=null; revealPanel(); render();
+        ev.stopPropagation();
+        if(imp.open){ if(!ext) impactToggle("links", l.id); return; }
+        selLink=l; sel=null; revealPanel(); render();
       });
       gLinks.appendChild(g);
     });
@@ -999,13 +1127,16 @@ function render(){
   gTrace.textContent=""; gTraceU.textContent="";
   stage.classList.toggle("tracing", !!(trace.open && trace.res));
   if(trace.open && trace.res) drawTrace(byName);
+  drawImpact(byName);
 
   nodes.forEach(function(n){
     var st=statusOf(n), type=NodeIcons.classify(n), ip=nodeIp(n), b=n._box;
     var isSel = sel && sel.name===n.name;
     var inLink = selLink && (selLink.a===n.name || selLink.b===n.name);
+    var rn=rp.run && rp.nodes[n.name];
     var g=svgEl("g",{class:"node "+(n.external?"ext ":"")+kcls(n.kind,n.image)+(isSel||inLink?" sel":"")
-                     +(n._new?" new":"")+(n._del?" del":""),
+                     +(n._new?" new":"")+(n._del?" del":"")+(rn&&rn.frozen?" frozen":"")
+                     +(imp.open&&imp.nodes.indexOf(n.name)>=0?" imdown":""),
                      transform:"translate("+n.x.toFixed(1)+","+n.y.toFixed(1)+")"});
     g.appendChild(svgEl("ellipse",{class:"halo",cx:0,cy:0,rx:R_ICON+6,ry:R_ICON-1}));
     var icg=svgEl("g",{class:"ic"});
@@ -1032,6 +1163,7 @@ function render(){
     gNodes.appendChild(g);
   });
   markTrace();
+  if(rp.run) drawReplay(byName);
 
   renderInspector();
   updateHud();
@@ -1060,8 +1192,9 @@ function nodeLink(name){
 // ---------- link: live state and actions ----------
 var VM_KINDS={cisco_c8000v:1, cisco_csr1000v:1, cisco_xrd_vrouter:1, cisco_n9kv:1};
 function liveOf(l){
-  if(!live.on || !live.data || !live.data.links || !l.id) return null;
-  var d=live.data.links[l.id]; if(!d) return null;
+  var src = rp.run ? rp.live : (live.on && live.data);
+  if(!src || !src.links || !l.id) return null;
+  var d=src.links[l.id]; if(!d) return null;
   var st = d.down ? "down" : (d.igp_state || null);
   return {st:st, d:d};
 }
@@ -1184,6 +1317,13 @@ function linkFail(box, l, d, byName){
   ms.title="fail this link while probing traffic, and measure how long it stops";
   fr.appendChild(ms);
   box.appendChild(fr);
+  var wi=el("div","actrow"); wi.style.marginTop="8px";
+  wi.appendChild(UI.button("What would this break?","",function(){ impactStart("links", l.id); },"warn"));
+  var pb=el("a","ub quiet"); pb.appendChild(UI.icon("play")); pb.appendChild(document.createTextNode("Playbook…"));
+  pb.href="experiments.html?lab="+encodeURIComponent(labId)+"&new="+encodeURIComponent(JSON.stringify({links:[linkRef(l)]}));
+  pb.title="script failures of this link (flaps, with other links, with a router) and record what the network does";
+  wi.appendChild(pb);
+  box.appendChild(wi);
 }
 function linkImpair(box, l, d){
   var cur=[];
@@ -1332,8 +1472,9 @@ function pathLen(d){ var p=svgEl("path",{d:d}); gTrace.appendChild(p); var L=p.g
 function drawTrace(byName){
   var geo=traceGeom(byName), still=window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   // the line, per hop (hover target, faint glow, hairline, one small chevron)
+  var hasBr=!!geo.r.branches;
   geo.segs.forEach(function(sg){
-    (sg.h.ecmp_links||[]).forEach(function(id){
+    if(!hasBr) (sg.h.ecmp_links||[]).forEach(function(id){
       var l=linkById(id), o=l&&orientSeg(l, sg.st.node); if(!o) return;
       gTraceU.appendChild(svgEl("path",{d:"M"+P_(o[0])+" Q"+P_(o[1])+" "+P_(o[2]),class:"tralt"}));
     });
@@ -1355,6 +1496,7 @@ function drawTrace(byName){
       transform:"translate("+P_(cp)+") rotate("+ca.toFixed(1)+") scale("+LS.toFixed(3)+")"}));
     gTraceU.appendChild(g);
   });
+  drawTraceExtras(geo);
   // the pulse - on the page clock, so a redraw does not restart it
   if(geo.full && !still){
     var L=pathLen(geo.full), speed=300*LS, travel=(L+180*LS)/speed, dur=travel+0.7, span=(L+180*LS)*dur/travel;
@@ -1413,8 +1555,13 @@ function drawTrace(byName){
 function markTrace(){
   if(!(trace.open && trace.res)) return;
   var onN={}, onL={};
-  (trace.res.hops||[]).forEach(function(h){ onN[h.node]=1; if(h.link) onL[h.link]=1; (h.ecmp_links||[]).forEach(function(x){ onL[x]=1; }); });
-  gNodes.querySelectorAll("g.node").forEach(function(g){ if(onN[g.getAttribute("data-node")]) g.classList.add("onpath"); });
+  var all=(trace.res.hops||[]).slice();
+  (trace.res.branches||[]).forEach(function(b){ all=all.concat(b.hops||[]); });
+  all.forEach(function(h){ onN[h.node]=1; if(h.link) onL[h.link]=1; (h.ecmp_links||[]).forEach(function(x){ onL[x]=1; }); });
+  var repN={};
+  if(trace.repair) (trace.res.hops||[]).forEach(function(h){ ((h.backup&&h.backup.repair)||[]).forEach(function(x){ repN[x.node]=1; }); });
+  gNodes.querySelectorAll("g.node").forEach(function(g){ var nm=g.getAttribute("data-node");
+    if(onN[nm]) g.classList.add("onpath"); else if(repN[nm]) g.classList.add("onrep"); });
   gLinks.querySelectorAll("g.lk").forEach(function(g){ if(onL[g.getAttribute("data-lid")]) g.classList.add("onpath"); });
 }
 function traceHover(i, node, on){
@@ -1425,13 +1572,15 @@ function runTrace(){
   if(!trace.src || !(trace.dst || trace.ip)){ trace.err="pick a source and a destination"; renderInspector(true); return; }
   trace.busy=true; trace.err=null; renderInspector(true);
   post("api/trace",{lab_id:labId, src:trace.src, dst:trace.ip || trace.dst})
-    .then(function(r){ trace.res=r; })
+    .then(function(r){ traceRemember(r); trace.res=r; })
     .catch(function(e){ trace.err=e.message; trace.res=null; })
     .then(function(){ trace.busy=false; render();
       clearTimeout(trace.timer);
       if(trace.follow && trace.open) trace.timer=setTimeout(runTrace, 5000); });
 }
 function setTrace(on){
+  if(rp.run) return;
+  if(on && imp.open) setImpact(false);
   trace.open=on; $("t_trace").setAttribute("aria-pressed", on?"true":"false");
   if(on && guide.open){ guide.open=false; $("t_guide").setAttribute("aria-pressed","false"); $("main").classList.remove("wide"); }
   if(on) revealPanel();
@@ -1474,11 +1623,25 @@ function renderTracePanel(box){
     var rev=UI.button("","quiet",function(){ if(trace.ip){ return; } var t=trace.src; trace.src=trace.dst; trace.dst=t; runTrace(); },"shuffle");
     rev.title="reverse direction"; rev.disabled=!!trace.ip; ar.appendChild(rev);
   }
+  if(trace.res){
+    var pin=UI.button(trace.base?"Baseline pinned":"Pin baseline","quiet",function(){
+      trace.base = trace.base ? null : trace.res; render(); },"save");
+    pin.setAttribute("aria-pressed", trace.base?"true":"false");
+    pin.title=trace.base?"unpin - compare with the previous trace again":"compare every later trace of this pair with this one";
+    ar.appendChild(pin);
+    if((trace.res.hops||[]).some(function(h){ return h.backup && h.backup.repair; })){
+      var pr=UI.button("Backup paths","quiet",function(){ trace.repair=!trace.repair; render(); },"layers");
+      pr.setAttribute("aria-pressed", trace.repair?"true":"false");
+      pr.title="show where each router's LFA / TI-LFA backup sends the traffic if its link fails";
+      ar.appendChild(pr);
+    }
+  }
   box.appendChild(ar);
   if(trace.err){ box.appendChild(el("p","te-note err",trace.err)); return; }
   var r=trace.res; if(!r) { box.appendChild(el("p","hint","Pick two nodes. The trace follows each router's lookup — the "
     +"VRF of the incoming port, the BGP next hop through the core, the label stack pushed, swapped and popped.")); return; }
   var ok=r.result==="reached", steps=traceSteps(r), N=steps.length;
+  var anyProt=(r.hops||[]).some(function(h){ return h.backup; });
   var labelOps=steps.filter(function(st){ return /push|swap|pop/.test(opOf(st.h.action)); }).length;
   // summary
   var sum=el("div","trsum"), ends=el("div","ends");
@@ -1492,6 +1655,7 @@ function renderTracePanel(box){
   var rs=el("div","res"); rs.appendChild(el("span","pill "+(ok?"ok":r.result==="blackhole"?"crit":"warn"), RESULT_TEXT[r.result]||r.result));
   rs.appendChild(document.createTextNode(r.commands+" show commands")); sum.appendChild(rs);
   box.appendChild(sum);
+  traceCompareBox(box, r);
   // the path as one line: router, the header on the wire, router, …
   var line=el("div","trline");
   steps.forEach(function(st, i){
@@ -1526,7 +1690,14 @@ function renderTracePanel(box){
     if(h.lookup) row_("lookup", h.lookup + (h.via ? "  via BGP nh "+h.via : ""));
     if(h.out_if) row_("out", h.out_if+(h.nh?"  →  "+h.nh:""));
     if(h.link) row_("wire", pkt(wireOf(h, r.dst).map(function(x){ return x.t; })));
+    if(h.backup) row_("backup", backupEl(h.backup));
+    if(h.fib_updated) row_("fib", "updated "+h.fib_updated);
     if(kv.children.length) card.appendChild(kv);
+    if(h.backup && h.backup.repair && h.backup.repair.length>1) card.appendChild(el("div","why rep",
+      "If "+(h.out_if||"this link")+" fails, "+h.node+" switches to the "+h.backup.kind+" path at once: "
+      +h.backup.repair.map(function(x){ return x.node; }).join(" › ")+" — dashed amber on the map — until the IGP converges."));
+    else if(h.unprotected && anyProt && h.link) card.appendChild(el("div","why mute",
+      "No backup path in the FIB for this hop: if the link fails, traffic is dropped until the IGP converges."));
     if(h.blocked) card.appendChild(el("div","why","Dropped: "+h.blocked+"."));
     if(h.warn) card.appendChild(el("div","why warn",h.warn.charAt(0).toUpperCase()+h.warn.slice(1)+"."));
     if(h.ecmp && h.ecmp.length) card.appendChild(el("div","ecmp","+ "+h.ecmp.length+" equal-cost path"+(h.ecmp.length>1?"s":"")
@@ -1537,11 +1708,533 @@ function renderTracePanel(box){
     hl.appendChild(row);
   });
   box.appendChild(hl);
+  traceBranchesBox(box, r);
+  traceHistoryBox(box, r);
 }
 function pkt(parts){
   var p=el("span","pkt");
   parts.forEach(function(x, j){ p.appendChild(el("i", j===parts.length-1?"pl":"lb", String(x))); });
   return p;
+}
+
+
+// ---------- path trace: branches, backup paths, before / after ----------
+function segOf(id, from){
+  var l=linkById(id), o=l&&orientSeg(l, from); if(!o) return null;
+  return {l:l, sg:{p0:o[0],p1:o[1],p2:o[2]}, d:"M"+P_(o[0])+" Q"+P_(o[1])+" "+P_(o[2])};
+}
+function chevAt(sg, t, cls){
+  var cp=qpt(sg,t), ca=travelAng(sg,t)*180/Math.PI;
+  return svgEl("path",{d:"M-2.2,-3 L1.4,0 L-2.2,3",class:cls||"trchev",
+    transform:"translate("+P_(cp)+") rotate("+ca.toFixed(1)+") scale("+LS.toFixed(3)+")"});
+}
+function traceKey(r){ return r ? r.src+">"+(r.dst_node||r.dst) : ""; }
+function traceSig(r){ return r ? r.result+"|"+(r.hops||[]).map(function(h){ return h.node+":"+(h.link||""); }).join(",") : ""; }
+function routeOf(r){ return traceSteps(r).map(function(st){ return st.node; }); }
+// keep what the path was, so a change shows as before / after
+function traceRemember(r){
+  var k=traceKey(r), old=trace.res;
+  if(old && traceKey(old)===k && traceSig(old)!==traceSig(r)) trace.prev=old;
+  else if(!old || traceKey(old)!==k){ trace.prev=null; if(trace.base && traceKey(trace.base)!==k) trace.base=null; }
+  var h=trace.hist[k]=trace.hist[k]||[];
+  if(!h.length || h[h.length-1].sig!==traceSig(r)) h.push({sig:traceSig(r), when:r.when, route:routeOf(r), result:r.result});
+  if(h.length>8) h.shift();
+}
+function traceCmp(){
+  var r=trace.res; if(!r) return null;
+  var b=(trace.base && traceKey(trace.base)===traceKey(r)) ? trace.base : trace.prev;
+  if(!b || traceKey(b)!==traceKey(r) || traceSig(b)===traceSig(r)) return null;
+  return {old:b, pinned:b===trace.base};
+}
+function chainEl(names, mark){
+  var c=el("span","chain");
+  names.forEach(function(n, i){ if(i) c.appendChild(el("em",null,"›"));
+    c.appendChild(el("span", mark&&mark[n]?"chg":null, n)); });
+  return c;
+}
+function traceCompareBox(box, r){
+  var cmp=traceCmp(); if(!cmp) return;
+  var was=routeOf(cmp.old), now=routeOf(r), inOld={}, inNew={};
+  was.forEach(function(n){ inOld[n]=1; }); now.forEach(function(n){ inNew[n]=1; });
+  var nw={}, gone={}; now.forEach(function(n){ if(!inOld[n]) nw[n]=1; }); was.forEach(function(n){ if(!inNew[n]) gone[n]=1; });
+  var b=el("div","trcmp");
+  var h=el("div","h"); h.appendChild(el("b",null,"The path changed"));
+  h.appendChild(el("span",null,(cmp.pinned?"against the pinned baseline · ":"since the trace at ")
+    +new Date(cmp.old.when*1000).toLocaleTimeString()));
+  b.appendChild(h);
+  var g=el("div","rows");
+  g.appendChild(el("span","k","was")); var w=chainEl(was, gone); w.appendChild(el("i","res "+cmp.old.result, cmp.old.result)); g.appendChild(w);
+  g.appendChild(el("span","k","now")); var n=chainEl(now, nw); n.appendChild(el("i","res "+r.result, r.result)); g.appendChild(n);
+  b.appendChild(g);
+  b.appendChild(el("div","foot","the old path is drawn dashed grey on the map"));
+  box.appendChild(b);
+}
+function traceBranchesBox(box, r){
+  var br=r.branches||[]; if(!br.length) return;
+  box.appendChild(el("div","subh",(br.length+1)+" equal-cost paths"+(r.branches_capped?" (more not followed)":"")));
+  var list=el("div","trbrs");
+  [{hops:r.hops, result:r.result}].concat(br).forEach(function(b, i){
+    var row=el("div","row"+(i?"":" main"));
+    row.appendChild(el("span","n",i?String(i+1):"1"));
+    row.appendChild(chainEl(routeOf({hops:b.hops})));
+    if(b.result!=="reached") row.appendChild(el("i","res "+b.result, b.result));
+    if(i){
+      row.addEventListener("mouseenter",function(){ document.querySelectorAll('#gtraceu .trbr[data-br="'+(i-1)+'"]').forEach(function(x){ x.classList.add("hl"); }); });
+      row.addEventListener("mouseleave",function(){ document.querySelectorAll('#gtraceu .trbr.hl').forEach(function(x){ x.classList.remove("hl"); }); });
+    }
+    list.appendChild(row);
+  });
+  box.appendChild(list);
+  box.appendChild(el("p","hint","The routers hash each flow onto one of these. The first is drawn solid, the others dashed."));
+}
+function traceHistoryBox(box, r){
+  var h=trace.hist[traceKey(r)]||[]; if(h.length<2) return;
+  box.appendChild(el("div","subh","Path history"));
+  var list=el("div","trhist");
+  h.slice().reverse().forEach(function(x, i){
+    var row=el("div","row"+(i?"":" cur"));
+    row.appendChild(el("span","t",new Date(x.when*1000).toLocaleTimeString()));
+    var c=chainEl(x.route); c.appendChild(el("i","res "+x.result, x.result)); row.appendChild(c);
+    list.appendChild(row);
+  });
+  box.appendChild(list);
+}
+function backupEl(b){
+  var s=el("span","bk");
+  s.appendChild(el("i","kind",b.kind));
+  s.appendChild(document.createTextNode(" "+(b.out_if||"")+(b.to?" → "+b.to:"")));
+  if(b.labels && b.labels.length) s.appendChild(el("span","lbls"," push "+b.labels.join(" ")));
+  return s;
+}
+function drawTraceExtras(geo){
+  var r=geo.r, mainL={};
+  geo.segs.forEach(function(s){ mainL[s.l.id]=1; });
+  // the other equal-cost branches, where they leave the main path
+  (r.branches||[]).forEach(function(b, bi){
+    (b.hops||[]).forEach(function(h){
+      if(!h.link || mainL[h.link]) return;
+      var x=segOf(h.link, h.node); if(!x) return;
+      var g=svgEl("g",{class:"trbr","data-br":bi});
+      g.appendChild(svgEl("path",{d:x.d,class:"trbrl"}));
+      g.appendChild(chevAt(x.sg, 0.5, "trchev br"));
+      gTraceU.appendChild(g);
+    });
+  });
+  // backup (LFA / TI-LFA) paths: where each protecting router sends the traffic
+  if(trace.repair) geo.steps.forEach(function(st, i){
+    var bk=st.h.backup; if(!bk || !bk.repair) return;
+    var g=svgEl("g",{class:"trrep","data-step":i}), first=null;
+    bk.repair.forEach(function(x){
+      if(!x.link) return;
+      var sx=segOf(x.link, x.node); if(!sx) return;
+      if(!first) first=sx;
+      g.appendChild(svgEl("path",{d:sx.d,class:"trrepl"}));
+      g.appendChild(chevAt(sx.sg, 0.62, "trchev rep"));
+    });
+    if(first){
+      var m=qpt(first.sg,0.3), ang=tangentAng(first.sg,0.3), off=-12*LS, txt=bk.kind.toUpperCase(), w=txt.length*5.2+10;
+      var tg=svgEl("g",{class:"trreptag",transform:"translate("+(m.x-Math.sin(ang)*off).toFixed(1)+","
+        +(m.y+Math.cos(ang)*off).toFixed(1)+") scale("+LS.toFixed(3)+")"});
+      tg.appendChild(svgEl("rect",{x:-w/2,y:-6.5,width:w,height:13,rx:6.5}));
+      var t=svgEl("text",{x:0,y:2.8,"text-anchor":"middle"}); t.textContent=txt; tg.appendChild(t);
+      var tt=svgEl("title",{}); tt.textContent=st.h.node+": "+bk.kind+" backup via "+bk.out_if
+        +(bk.labels&&bk.labels.length?" (push "+bk.labels.join(" ")+")":"")+" — repair path "+bk.repair.map(function(x){ return x.node; }).join(" › ");
+      tg.appendChild(tt); g.appendChild(tg);
+    }
+    gTraceU.appendChild(g);
+  });
+  // the path before it changed, where it differs
+  var cmp=traceCmp();
+  if(cmp) (cmp.old.hops||[]).forEach(function(h){
+    if(!h.link || mainL[h.link]) return;
+    var x=segOf(h.link, h.node); if(!x) return;
+    var g=svgEl("g",{class:"trold"});
+    g.appendChild(svgEl("path",{d:x.d,class:"troldl"}));
+    g.appendChild(chevAt(x.sg, 0.5, "trchev old"));
+    gTraceU.appendChild(g);
+  });
+}
+
+// ---------- what if: blast radius of a failure ----------
+function setImpact(on){
+  imp.open=on;
+  if(on){
+    if(trace.open){ trace.open=false; trace.res=null; trace.follow=false; clearTimeout(trace.timer); $("t_trace").setAttribute("aria-pressed","false"); }
+    if(guide.open){ guide.open=false; $("t_guide").setAttribute("aria-pressed","false"); $("main").classList.remove("wide"); }
+    sel=null; selLink=null; revealPanel();
+  } else { imp.links=[]; imp.nodes=[]; imp.res=null; imp.err=null; imp.hover=null; imp.pin=null; imp.verify=null; }
+  var b=$("t_whatif"); if(b) b.setAttribute("aria-pressed", on?"true":"false");
+  render();
+}
+function impactStart(kind, x){
+  if(!imp.open) setImpact(true);
+  if(imp[kind].indexOf(x)<0) imp[kind].push(x);
+  runImpact();
+}
+function impactToggle(kind, x){
+  var i=imp[kind].indexOf(x);
+  if(i>=0) imp[kind].splice(i,1); else imp[kind].push(x);
+  imp.verify=null; imp.pin=null; imp.hover=null;
+  runImpact();
+}
+function runImpact(){
+  var seq=++imp.seq;
+  if(!imp.links.length && !imp.nodes.length){ imp.res=null; imp.busy=false; render(); return; }
+  imp.busy=true; imp.err=null; render();
+  post("api/impact",{lab_id:labId, links:imp.links.map(function(id){ return linkRef(linkById(id)); }), nodes:imp.nodes})
+    .then(function(r){ if(seq===imp.seq) imp.res=r; })
+    .catch(function(e){ if(seq===imp.seq){ imp.err=e.message; imp.res=null; } })
+    .then(function(){ if(seq===imp.seq){ imp.busy=false; render(); } });
+}
+function impPathD(path, cls, g){
+  (path||[]).forEach(function(h){
+    if(!h.link) return;
+    var x=segOf(h.link, h.node); if(!x) return;
+    g.appendChild(svgEl("path",{d:x.d,class:cls}));
+    g.appendChild(chevAt(x.sg, 0.5, "trchev "+cls));
+  });
+}
+function drawImpact(byName){
+  gImp.textContent="";
+  stage.classList.toggle("whatif", imp.open);
+  if(!imp.open) return;
+  var res=imp.res;
+  if(res) res.load.forEach(function(x){
+    var l=linkById(x.link); if(!l||!l._seg) return;
+    var sg=l._seg, d="M"+P_(sg.p0)+" Q"+P_(sg.p1)+" "+P_(sg.p2), more=x.after-x.before;
+    var g=svgEl("g",{class:"imload"});
+    var p=svgEl("path",{d:d}); p.style.strokeWidth=(1.2+Math.min(4.5,more*0.55)).toFixed(2); g.appendChild(p);
+    var m=qpt(sg,0.5), ang=tangentAng(sg,0.5), txt="+"+(Math.round(more*10)/10)+" pairs", w=txt.length*5.3+10;
+    var off=(Math.abs(Math.sin(ang))*w/2+Math.abs(Math.cos(ang))*7+5)*LS;
+    var tg=svgEl("g",{transform:"translate("+(m.x-Math.sin(ang)*off).toFixed(1)+","+(m.y+Math.cos(ang)*off).toFixed(1)+") scale("+LS.toFixed(3)+")"});
+    tg.appendChild(svgEl("rect",{x:-w/2,y:-6.5,width:w,height:13,rx:6.5}));
+    var t=svgEl("text",{x:0,y:2.8,"text-anchor":"middle"}); t.textContent=txt; tg.appendChild(t);
+    g.appendChild(tg); gImp.appendChild(g);
+  });
+  imp.links.forEach(function(id){
+    var l=linkById(id); if(!l||!l._seg) return;
+    var sg=l._seg, g=svgEl("g",{class:"imfail"});
+    g.appendChild(svgEl("path",{d:"M"+P_(sg.p0)+" Q"+P_(sg.p1)+" "+P_(sg.p2)}));
+    var xg=svgEl("g",{transform:"translate("+P_(qpt(sg,0.5))+") scale("+LS.toFixed(3)+")"});
+    xg.appendChild(svgEl("circle",{r:7})); xg.appendChild(svgEl("path",{d:"M-2.7,-2.7 L2.7,2.7 M2.7,-2.7 L-2.7,2.7",class:"x"}));
+    g.appendChild(xg); gImp.appendChild(g);
+  });
+  var p=imp.hover||imp.pin;
+  if(p){
+    var g=svgEl("g",{class:"impair"});
+    impPathD(p.before&&p.before[0], "imold", g);
+    impPathD(p.after&&p.after[0], "imnew", g);
+    [p.src,p.dst].forEach(function(nm){ var n=byName[nm]; if(n) g.appendChild(svgEl("ellipse",{cx:n.x,cy:n.y,rx:R_ICON+6,ry:R_ICON-2,class:"trend"})); });
+    gImp.appendChild(g);
+  }
+}
+function impHover(p, on){
+  imp.hover = on ? p : null;
+  var byName={}; nodes.forEach(function(n){ byName[n.name]=n; });
+  drawImpact(byName);
+}
+var IMP_ST={lost:["crit","lost"], rerouted:["warn","rerouted"], ecmp:["idle","fewer ECMP"]};
+function renderImpactPanel(box){
+  var ph=el("div","ph"); ph.appendChild(el("span","ttl","What if…"));
+  var x=UI.button("","quiet sm",function(){ setImpact(false); },"x"); x.title="close"; x.style.marginLeft="auto"; ph.appendChild(x);
+  box.appendChild(ph);
+  box.appendChild(el("div","psub","blast radius, before you fail anything"));
+  if(!lab || !lab.running){ box.appendChild(el("p","hint","Start the lab first.")); return; }
+  var chips=el("div","imchips");
+  imp.links.forEach(function(id){ var l=linkById(id); if(!l) return;
+    var c=el("span","chip link"); c.appendChild(el("i")); c.appendChild(document.createTextNode(l.a+" – "+l.b));
+    var b=el("button",null,"✕"); b.title="take it out"; b.addEventListener("click",function(){ impactToggle("links", id); }); c.appendChild(b);
+    chips.appendChild(c); });
+  imp.nodes.forEach(function(nm){
+    var c=el("span","chip node"); c.appendChild(el("i")); c.appendChild(document.createTextNode(nm));
+    var b=el("button",null,"✕"); b.addEventListener("click",function(){ impactToggle("nodes", nm); }); c.appendChild(b);
+    chips.appendChild(c); });
+  box.appendChild(chips);
+  box.appendChild(el("p","hint",(imp.links.length||imp.nodes.length ? "Click more links or routers on the map to fail them together — a shared fibre duct, a site."
+    : "Click a link or a router on the map to fail it in the model.")+" Nothing in the lab changes."));
+  if(imp.busy){ var w=el("p","hint"); w.appendChild(el("span","spin")); w.appendChild(document.createTextNode(" working it out from the IGP…")); box.appendChild(w); }
+  if(imp.err){ box.appendChild(el("p","te-note err",imp.err)); return; }
+  var r=imp.res; if(!r) return;
+  var c={lost:0,rerouted:0,ecmp:0}; r.pairs.forEach(function(p){ c[p.status]++; });
+  var tiles=el("div","imtiles");
+  [[c.lost,"pairs cut off",c.lost?"bad":"good"],[c.rerouted,"rerouted",c.rerouted?"warn":""],
+   [r.unchanged,"unaffected",""],[r.bgp.lost.length+"/"+r.bgp.total,"BGP sessions lost",r.bgp.lost.length?"bad":""]]
+    .forEach(function(t){ var d=el("div",t[2]); d.appendChild(el("b",null,String(t[0]))); d.appendChild(el("span",null,t[1])); tiles.appendChild(d); });
+  box.appendChild(tiles);
+  if(r.routers_lost.length) box.appendChild(el("p","te-note","Traffic to and from "+r.routers_lost.join(", ")+" is gone with "+(r.routers_lost.length>1?"them":"it")+"."));
+  if(r.pairs.length){
+    box.appendChild(el("div","subh","Router pairs"));
+    var list=el("div","impairs");
+    r.pairs.forEach(function(p){
+      var row=el("div","row "+p.status+(imp.pin===p?" pin":""));
+      var top=el("div","top"); top.appendChild(el("b",null,p.src+" → "+p.dst));
+      top.appendChild(el("span","pill "+IMP_ST[p.status][0], IMP_ST[p.status][1]));
+      if(p.cost_after!=null) top.appendChild(el("span","cost","cost "+p.cost_before+" → "+p.cost_after));
+      row.appendChild(top);
+      var after=p.after&&p.after[0];
+      row.appendChild(after ? chainEl(after.map(function(h){ return h.node; })) : el("span","none","no path — black-holed"));
+      var v=imp.verify&&imp.verify[p.src+">"+p.dst];
+      if(v) row.appendChild(el("div","ver "+(v.match?"ok":"bad"), (v.match?"✓ the network did this: ":"✗ the network did something else: ")+v.text));
+      row.addEventListener("mouseenter",function(){ impHover(p,true); });
+      row.addEventListener("mouseleave",function(){ impHover(p,false); });
+      row.addEventListener("click",function(){ imp.pin = imp.pin===p ? null : p; render(); });
+      list.appendChild(row);
+    });
+    box.appendChild(list);
+    box.appendChild(el("p","hint","Point at a pair to draw it: dashed grey is the path now, blue the path after the failure."));
+  } else box.appendChild(el("p","te-note","No router pair changes path — the failure is fully redundant (or it only touches links without an IGP)."));
+  if(r.load.length){
+    box.appendChild(el("div","subh","Links that take over"));
+    var ll=el("div","imload-list");
+    r.load.slice(0,8).forEach(function(x){ var l=linkById(x.link); if(!l) return;
+      var row=el("div","row"); row.appendChild(el("span",null,l.a+" – "+l.b));
+      row.appendChild(el("b",null,x.before+" → "+x.after+" pairs")); ll.appendChild(row); });
+    box.appendChild(ll);
+  }
+  if(r.bgp.lost.length){
+    box.appendChild(el("div","subh","BGP sessions that drop"));
+    var bl=el("div","imload-list");
+    r.bgp.lost.forEach(function(s){ var row=el("div","row");
+      row.appendChild(el("span",null,s.a+" – "+s.b+(s.vrf?" (vrf "+s.vrf+")":""))); row.appendChild(el("i",null,s.why)); bl.appendChild(row); });
+    box.appendChild(bl);
+  }
+  if(r.vpns.length){
+    box.appendChild(el("div","subh","VPNs hit"));
+    r.vpns.forEach(function(v){
+      box.appendChild(el("p","te-note","VRF "+v.vrf+": "+(v.pe_pairs_cut.length ? "PEs cut off from each other: "
+        +v.pe_pairs_cut.map(function(x){ return x.join("–"); }).join(", ")+". " : "")
+        +(v.sites_lost.length ? "Sites lost: "+v.sites_lost.map(function(x){ return x.join("–"); }).join(", ")+"." : "")));
+    });
+  }
+  var notes=["Model: "+(r.proto||[]).join(" + ").toUpperCase()+" as the routers run it now, with their interface costs. "
+    +"It does not know LDP-IGP sync, FRR repair paths, static routes or policy — so check it against the real network."]
+    .concat(r.notes||[]);
+  notes.forEach(function(n){ box.appendChild(el("p","hint",n)); });
+  var ar=el("div","actrow");
+  if(imp.failed.length){
+    ar.appendChild(UI.button(imp.vbusy?"Tracing…":"Trace the affected pairs","primary",impactVerify,"route")).disabled=imp.vbusy;
+    ar.appendChild(UI.button("Restore","",impactRestore,"redo"));
+  } else if(imp.links.length && !imp.nodes.length){
+    ar.appendChild(UI.button("Fail it for real","danger",function(){
+      UI.confirm("Fail "+imp.links.length+" link"+(imp.links.length>1?"s":"")+"?","Each end is shut down on the router. Restore them from here or from the link.",
+        {ok:"Fail",danger:true}).then(function(ok){ if(ok) impactFailNow(); }); },"bolt"));
+  }
+  if(imp.nodes.length || imp.links.length){
+    var pl=el("a","ub"); pl.appendChild(UI.icon("play")); pl.appendChild(document.createTextNode("As a playbook…"));
+    pl.href="experiments.html?lab="+encodeURIComponent(labId)+"&new="+encodeURIComponent(JSON.stringify(
+      {links:imp.links.map(function(id){ return linkRef(linkById(id)); }), nodes:imp.nodes}));
+    pl.title="run this failure with the flight recorder on - and replay it on the map";
+    ar.appendChild(pl);
+  }
+  if(ar.children.length) box.appendChild(ar);
+}
+function impactFailNow(){
+  var ids=imp.links.slice(), done=[];
+  (function next(){
+    if(!ids.length){ imp.failed=done; UI.toast(done.length+" link(s) failed — give the IGP a moment, then trace","warn"); render(); return; }
+    var id=ids.shift();
+    post("api/link",{op:"fail", mode:"shutdown", duration:0, link:linkRef(linkById(id))})
+      .then(function(){ done.push(id); }).catch(function(e){ UI.toast(e.message,"crit"); }).then(next);
+  })();
+}
+function impactRestore(){
+  var ids=imp.failed.slice();
+  (function next(){
+    if(!ids.length){ imp.failed=[]; imp.verify=null; UI.toast("restored","ok"); render(); return; }
+    post("api/link",{op:"restore", link:linkRef(linkById(ids.shift()))}).catch(function(e){ UI.toast(e.message,"crit"); }).then(next);
+  })();
+}
+function impactVerify(){
+  var r=imp.res; if(!r) return;
+  var todo=r.pairs.filter(function(p){ return p.status!=="ecmp"; }).slice(0,8);
+  imp.vbusy=true; imp.verify={}; render();
+  (function next(){
+    if(!todo.length){ imp.vbusy=false; render(); return; }
+    var p=todo.shift();
+    post("api/trace",{lab_id:labId, src:p.src, dst:p.dst, branches:false}).then(function(t){
+      var got=(t.hops||[]).filter(function(h){ return h.link; }).map(function(h){ return h.link; }).join(",");
+      var match = p.status==="lost" ? t.result!=="reached"
+        : t.result==="reached" && (p.after||[]).some(function(a){ return a.filter(function(h){ return h.link; }).map(function(h){ return h.link; }).join(",")===got; });
+      imp.verify[p.src+">"+p.dst]={match:match, text:routeOf(t).join(" › ")+" ("+t.result+")"};
+    }).catch(function(e){ imp.verify[p.src+">"+p.dst]={match:false, text:e.message}; })
+      .then(function(){ renderInspector(true); next(); });
+  })();
+}
+
+// ---------- replay of a recorded playbook run ----------
+var EV_COLOR={step:"var(--ink)", log:"var(--accent-2)", kernel:"var(--crit)", live:"var(--warn)", path:"var(--trace)",
+  fib:"var(--ok)", spf:"var(--xe)", probe:"var(--crit)"};
+function loadReplay(){
+  fetch("api/experiments/run?lab="+encodeURIComponent(labId)+"&id="+encodeURIComponent(rp.id),{cache:"no-store"})
+    .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||r.status); return j; }); })
+    .then(function(run){
+      run.changes.sort(function(a,b){ return a[0]-b[0]; });
+      rp.run=run; rp.pair=Object.keys(run.paths||{})[0]||null;
+      rp.t=Math.max(0, Math.min(run.duration, +(new URLSearchParams(location.search).get("t"))||0));
+      trace.open=true; $("t_trace").setAttribute("aria-pressed","true");
+      buildReplayBar(); revealPanel(); replayApply(true);
+    })
+    .catch(function(e){ UI.toast("could not load the recording: "+e.message,"crit"); });
+}
+function replayAt(T){
+  var links={}, nst={};
+  rp.run.changes.forEach(function(c){
+    if(c[0]>T) return;
+    if(c[2]==="frozen"||c[2]==="isolated"){ (nst[c[1]]=nst[c[1]]||{})[c[2]]=c[3]; return; }
+    (links[c[1]]=links[c[1]]||{})[c[2]]=c[3];
+  });
+  var data={links:{}, bgp_edges:[]};
+  Object.keys(links).forEach(function(id){ var e=links[id];
+    data.links[id]={down:!!e.down, igp_state:e.igp||null, failed:e.failed?{mode:e.failed}:null, impaired:!!e.impaired, igp:[]}; });
+  return {live:data, nodes:nst};
+}
+function replayPath(T){
+  var lst=(rp.run.paths||{})[rp.pair]||[], cur=null, idx=-1;
+  lst.forEach(function(p, i){ if(p.t<=T || i===0){ cur=p; idx=i; } });
+  return {p:cur, i:idx};
+}
+function replayApply(force){
+  var T=rp.t, st=replayAt(T), pp=replayPath(T);
+  rp.live=st.live; rp.nodes=st.nodes;
+  if(pp.p){
+    var pr=rp.pair.split(">");
+    trace.res={hops:pp.p.hops, result:pp.p.result, src:pr[0], dst:pp.p.dst_ip||pr[1], dst_node:pr[1],
+               when:rp.run.when+pp.p.t, seconds:0, commands:0, branches:[]};
+  } else trace.res=null;
+  var nch=rp.run.changes.filter(function(c){ return c[0]<=T; }).length;
+  var recent=rp.run.events.filter(function(e){ return e.t<=T && e.t>T-1.6 && e.node; }).length;
+  var past=rp.run.events.filter(function(e){ return e.t<=T; }).length;
+  var sig=nch+"|"+pp.i+"|"+recent+"|"+past+"|"+rp.pair;
+  var bar=$("rpbar");
+  if(bar){
+    $("rprange").value=T; $("rptime").textContent=fmtT(T)+" / "+fmtT(rp.run.duration);
+    $("rpplay").textContent=""; $("rpplay").appendChild(UI.icon(rp.playing?"stop":"play"));
+  }
+  if(force || sig!==rp.sig){ rp.sig=sig; render(); }
+}
+function fmtT(t){ return (t<0?"-":"")+Math.abs(t).toFixed(1)+" s"; }
+function replayLoop(now){
+  if(!rp.playing) return;
+  var dt=rp.last ? (now-rp.last)/1000 : 0; rp.last=now;
+  rp.t=Math.min(rp.run.duration, rp.t+dt*rp.speed);
+  if(rp.t>=rp.run.duration) rp.playing=false;
+  replayApply(false);
+  if(rp.playing) requestAnimationFrame(replayLoop);
+}
+function replayPlay(on){
+  rp.playing=on; rp.last=0;
+  if(on){ if(rp.t>=rp.run.duration) rp.t=0; requestAnimationFrame(replayLoop); }
+  replayApply(true);
+}
+function replaySeek(T){ rp.t=Math.max(0, Math.min(rp.run.duration, T)); replayApply(true); }
+function closeReplay(){
+  rp.playing=false; rp.run=null; rp.live=null; rp.nodes={};
+  var b=$("rpbar"); if(b) b.remove();
+  trace.open=false; trace.res=null; $("t_trace").setAttribute("aria-pressed","false");
+  history.replaceState(null,"","topology.html?lab="+encodeURIComponent(labId));
+  render();
+}
+function buildReplayBar(){
+  var old=$("rpbar"); if(old) old.remove();
+  var bar=el("div","rpbar glass"); bar.id="rpbar";
+  var play=el("button","ub icon"); play.id="rpplay"; play.title="play / pause (space)";
+  play.addEventListener("click",function(){ replayPlay(!rp.playing); }); bar.appendChild(play);
+  var sp=document.createElement("select"); sp.className="uin sp"; sp.title="speed";
+  [0.25,0.5,1,2,5,10].forEach(function(v){ var o=el("option",null,v+"×"); o.value=v; o.selected=v===rp.speed; sp.appendChild(o); });
+  sp.addEventListener("change",function(){ rp.speed=+sp.value; }); bar.appendChild(sp);
+  var tr=el("div","rptrack"), D=rp.run.duration||1;
+  var ticks=el("div","ticks");
+  (rp.run.probe&&rp.run.probe.outages||[]).forEach(function(o){
+    var b=el("i","loss"); b.style.left=(o.from/D*100)+"%"; b.style.width=Math.max(0.4,(o.to-o.from)/D*100)+"%";
+    b.title="traffic lost "+o.ms+" ms"; ticks.appendChild(b); });
+  rp.run.events.forEach(function(e){
+    if(e.t<0 || e.t>D) return;
+    var k=e.src==="step"?"step":e.kind==="path"?"path":e.src==="log"||e.src==="kernel"?"log":null; if(!k) return;
+    var t=el("i",k); t.style.left=(e.t/D*100)+"%"; t.title=fmtT(e.t)+"  "+e.text; ticks.appendChild(t); });
+  tr.appendChild(ticks);
+  var rg=el("input"); rg.type="range"; rg.id="rprange"; rg.min=0; rg.max=D; rg.step=0.05; rg.value=0;
+  rg.addEventListener("input",function(){ rp.playing=false; replaySeek(+rg.value); });
+  tr.appendChild(rg); bar.appendChild(tr);
+  bar.appendChild(el("span","rptime")).id="rptime";
+  var x=el("button","ub icon quiet"); x.appendChild(UI.icon("x")); x.title="leave the replay"; x.addEventListener("click",closeReplay);
+  bar.appendChild(x);
+  stage.appendChild(bar);
+}
+function drawReplay(byName){
+  var T=rp.t, byNode={};
+  rp.run.events.forEach(function(e){
+    if(!e.node || e.t>T || e.t<=T-1.6 || e.src==="probe") return;
+    (byNode[e.node]=byNode[e.node]||[]).push(e);
+  });
+  Object.keys(byNode).forEach(function(nm){
+    var n=byName[nm]; if(!n) return;
+    byNode[nm].slice(-2).reverse().forEach(function(e, i){
+      var txt=e.text.length>58 ? e.text.slice(0,57)+"…" : e.text, w=txt.length*5.5+22, age=(T-e.t)/1.6;
+      var g=svgEl("g",{class:"rpcall "+e.src,transform:"translate("+n.x.toFixed(1)+","+(n.y-R_ICON-34*LS-i*19*LS).toFixed(1)+") scale("+LS.toFixed(3)+")"});
+      g.style.opacity=(1-age*0.65).toFixed(2);
+      g.appendChild(svgEl("rect",{x:-w/2,y:-8,width:w,height:16,rx:4}));
+      g.appendChild(svgEl("circle",{cx:-w/2+8,cy:0,r:2.6,style:"fill:"+(EV_COLOR[e.src]||"var(--muted)")}));
+      var t=svgEl("text",{x:-w/2+15,y:3.2}); t.textContent=txt; g.appendChild(t);
+      gTrace.appendChild(g);
+    });
+  });
+  // a link that just changed flashes
+  rp.run.events.forEach(function(e){
+    if(!e.link || e.t>T || e.t<=T-0.9) return;
+    var l=linkById(e.link); if(!l||!l._seg) return;
+    var sg=l._seg, p=svgEl("path",{d:"M"+P_(sg.p0)+" Q"+P_(sg.p1)+" "+P_(sg.p2),class:"rpflash "+e.kind});
+    p.style.opacity=(1-(T-e.t)/0.9).toFixed(2); gTraceU.appendChild(p);
+  });
+}
+function probeAt(T){
+  var s=rp.run.probe&&rp.run.probe.series; if(!s||!s.length) return null;
+  var cur=null; s.forEach(function(x){ if(x[0]<=T) cur=x; }); return cur;
+}
+function renderReplayPanel(box){
+  var run=rp.run, T=rp.t;
+  var ph=el("div","ph"); ph.appendChild(el("span","kicker","Replay"));
+  var x=UI.button("","quiet sm",closeReplay,"x"); x.title="leave the replay"; x.style.marginLeft="auto"; ph.appendChild(x);
+  box.appendChild(ph);
+  var t=el("div","ph"); t.appendChild(el("span","ttl",run.playbook.name)); box.appendChild(t);
+  box.appendChild(el("div","psub",new Date(run.when*1000).toLocaleString()+" · "+run.duration+" s"+(run.error?" · "+run.error:"")));
+  var tiles=el("div","imtiles");
+  var pr=probeAt(T), pp=replayPath(T).p;
+  [[fmtT(T),"time",""],
+   pr ? [pr[1]>0.5?"lost":pr[1]>0?Math.round(pr[1]*100)+"% loss":"flowing","traffic"+(pr[2]!=null?" · "+pr[2]+" ms":""),pr[1]>0?"bad":"good"]
+      : ["—","no probe",""],
+   pp ? [pp.result,"watched path",pp.result==="reached"?"good":"bad"] : ["—","no watched path",""]]
+    .forEach(function(x){ var d=el("div",x[2]); d.appendChild(el("b",null,x[0])); d.appendChild(el("span",null,x[1])); tiles.appendChild(d); });
+  box.appendChild(tiles);
+  var pairs=Object.keys(run.paths||{});
+  if(pairs.length>1){
+    var s=document.createElement("select"); s.className="uin"; s.style.width="100%";
+    pairs.forEach(function(k){ var o=el("option",null,"path "+k.replace(">"," → ")); o.value=k; o.selected=k===rp.pair; s.appendChild(o); });
+    s.addEventListener("change",function(){ rp.pair=s.value; replayApply(true); });
+    box.appendChild(s);
+  }
+  var lg=el("div","rplegend");
+  [["step","playbook"],["kernel","interface"],["log","router log"],["spf","SPF"],["fib","FIB"],["live","live view"],["path","path"],["probe","traffic"]]
+    .forEach(function(k){ var sp=el("span"); var i=el("i"); i.style.background=EV_COLOR[k[0]]; sp.appendChild(i); sp.appendChild(document.createTextNode(k[1])); lg.appendChild(sp); });
+  box.appendChild(lg);
+  var list=el("div","rpev"), cur=null;
+  run.events.forEach(function(e){
+    var row=el("div","row "+e.src+(e.t<=T?" past":""));
+    row.appendChild(el("span","t",(e.t>=0?"+":"")+e.t.toFixed(2)));
+    var tx=el("span","x");
+    var tag=el("span","tag",e.src); tag.style.setProperty("--c",EV_COLOR[e.src]||"var(--muted)"); tx.appendChild(tag);
+    if(e.node) tx.appendChild(el("b",null,e.node+" "));
+    tx.appendChild(document.createTextNode(e.text+(e.approx?" (≈)":""))); row.appendChild(tx);
+    row.title=(e.code?e.code+"\n":"")+(e.approx?"time is approximate (polled, or to the second)":"");
+    row.addEventListener("click",function(){ rp.playing=false; replaySeek(e.t); });
+    if(e.t<=T) cur=row;
+    list.appendChild(row);
+  });
+  if(cur) cur.classList.add("cur");
+  box.appendChild(list);
+  var a=el("a","ub"); a.appendChild(UI.icon("list")); a.appendChild(document.createTextNode("Run report"));
+  a.href="experiments.html?lab="+encodeURIComponent(labId)+"&run="+encodeURIComponent(run.id);
+  var ar=el("div","actrow"); ar.appendChild(a); box.appendChild(ar);
+  if(cur) setTimeout(function(){ var top=cur.offsetTop-list.offsetTop; if(top<list.scrollTop||top>list.scrollTop+list.clientHeight-30) list.scrollTop=top-list.clientHeight/2; }, 0);
 }
 
 
@@ -1818,7 +2511,9 @@ function renderInspector(force){
     bl.addEventListener("click",function(){ sel=null; selLink=null; render(); });
     box.appendChild(bl);
   }
-  if(selLink) renderLinkPanel(box, selLink);
+  if(rp.run) renderReplayPanel(box);
+  else if(imp.open) renderImpactPanel(box);
+  else if(selLink) renderLinkPanel(box, selLink);
   else if(sel) renderNodePanel(box, sel);
   else if(guide.open) renderGuidePanel(box);
   else if(trace.open) renderTracePanel(box);
@@ -1896,6 +2591,11 @@ function renderNodePanel(box, n){
       var cfg=UI.button("Configure","",function(){ DeviceConfig.open(lab, n.name); },"gear");
       cfg.disabled=!running; cfg.title=running?"running config, push configuration, save to startup":"the node has to be running";
       ar.appendChild(cfg);
+    }
+    if(running && canConfigure(n)){
+      var wf=UI.button("What if it fails?","",function(){ impactStart("nodes", n.name); },"warn");
+      wf.title="which router pairs, BGP sessions and VPNs lose their path if "+n.name+" goes down";
+      ar.appendChild(wf);
     }
     ar.appendChild(UI.moreButton(function(){ return [
       {label:"CLI in a new tab", icon:"external", disabled:!running,
@@ -1995,6 +2695,7 @@ function renderLabHeader(){
     b.title="clab deploy --reconfigure - boots from the configs saved "+when(lab.saved.at);
   labAct.appendChild(b);
   labAct.appendChild(UI.moreButton(function(){ return [
+    {label:"Failure playbooks", icon:"play", href:"experiments.html?lab="+encodeURIComponent(lab.id)},
     {label:"Convergence tests", icon:"bolt", href:"convergence.html?lab="+encodeURIComponent(lab.id)},
     {label:"Snapshots…", icon:"snapshot", onClick:openSnapshots},
     {label:"Export as zip", icon:"download", href:"api/lab/export?lab="+encodeURIComponent(lab.id)},
@@ -2043,6 +2744,7 @@ function renderLegend(){
 var drag=null, pan=null;
 function startDragNode(e,n){
   e.preventDefault(); e.stopPropagation();
+  if(imp.open && !editing){ if(!n.external) impactToggle("nodes", n.name); return; }
   var p=toWorld(e);
   drag={n:n, dx:p.x-n.x, dy:p.y-n.y, moved:false};
   sel=n; selLink=null; render();
@@ -2099,6 +2801,8 @@ stage.addEventListener("wheel",function(e){
 function setIcon(id, ic, label){ var b=$(id); b.textContent=""; b.appendChild(UI.icon(ic)); if(label) b.appendChild(el("span","tl",label)); }
 setIcon("t_view","layers","View"); setIcon("t_edit","edit","Edit topology"); setIcon("t_trace","route","Trace path");
 $("t_trace").addEventListener("click",function(){ setTrace(!trace.open); });
+setIcon("t_whatif","warn","What if");
+$("t_whatif").addEventListener("click",function(){ if(!rp.run) setImpact(!imp.open); });
 setIcon("t_guide","guide","Lab guide");
 $("t_guide").addEventListener("click",function(){ setGuide(!guide.open); });
 setIcon("t_zin","plus"); setIcon("t_zout","minus"); setIcon("t_fit","fit"); setIcon("t_relayout","shuffle");
@@ -2162,6 +2866,9 @@ document.addEventListener("keydown",function(e){
   if(k==="f"){ fit(); }
   else if(k==="i"){ setPanel(!panelOpen); }
   else if(k==="p"){ setTrace(!trace.open); }
+  else if(k==="w" && !rp.run){ setImpact(!imp.open); }
+  else if(k===" " && rp.run){ replayPlay(!rp.playing); }
+  else if((k==="ArrowRight"||k==="ArrowLeft") && rp.run){ rp.playing=false; replaySeek(rp.t+(k==="ArrowRight"?1:-1)*(e.shiftKey?5:0.5)); }
   else if(k==="l" && (guide.data||guide.readme)){ setGuide(!guide.open); }
   else if(k==="e"){ setEditing(!editing); }
   else if(k==="+"||k==="="){ zoomBy(1.2); }
@@ -2170,7 +2877,8 @@ document.addEventListener("keydown",function(e){
   e.preventDefault();
 });
 UI.keys([{keys:"f", label:"fit the map to the screen"},{keys:"+ -", label:"zoom in / out"},
-         {keys:"i", label:"show / hide the inspector"},{keys:"p", label:"path trace"},{keys:"l", label:"lab guide"},
+         {keys:"i", label:"show / hide the inspector"},{keys:"p", label:"path trace"},{keys:"w", label:"what if… (blast radius)"},
+         {keys:"Space ← →", label:"replay: play / pause, step"},{keys:"l", label:"lab guide"},
          {keys:"e", label:"edit topology"},{keys:"Del", label:"in edit mode: remove the selected node or link"},
          {keys:"Esc", label:"clear the selection"}]);
 UI.commands([
@@ -2186,6 +2894,9 @@ UI.commands([
   {label:"Snapshots…", icon:"snapshot", run:function(){ if(lab) openSnapshots(); }},
   {label:"Save current config", sub:"running configs + layout become the next start", icon:"save",
    run:function(){ if(lab && lab.running && !window._busy) saveLab(false); }},
+  {label:"What if a link or router fails…", icon:"warn", hint:"w", run:function(){ setImpact(true); }},
+  {label:"Failure playbooks", sub:"scripted failures, flight recorder, replay", icon:"play",
+   run:function(){ location.href="experiments.html?lab="+encodeURIComponent(labId); }},
   {label:"Convergence tests", icon:"bolt", run:function(){ location.href="convergence.html?lab="+encodeURIComponent(labId); }},
   {label:"Edit lab files", icon:"file", run:function(){ location.href="edit.html?lab="+encodeURIComponent(labId); }},
   {label:"Export lab as zip", icon:"download", run:function(){ location.href="api/lab/export?lab="+encodeURIComponent(labId); }},
@@ -2218,7 +2929,7 @@ $("term_reload").addEventListener("click",function(){
 });
 $("termwrap").addEventListener("click",function(e){ if(e.target===$("termwrap")) closeTerm(); });
 document.addEventListener("keydown",function(e){
-  if(e.key==="Escape"){ if(!$("termwrap").hidden) closeTerm(); else { sel=null; selLink=null; render(); } }
+  if(e.key==="Escape"){ if(!$("termwrap").hidden) closeTerm(); else if(imp.open && !document.querySelector(".scrim")) setImpact(false); else { sel=null; selLink=null; render(); } }
 });
 
 // ---------- edit mode ----------
@@ -2819,6 +3530,7 @@ function tick(now){
       renderLegend();
       render(); fit();
       pollLive(true);
+      if(rp.id) loadReplay();
     }
     nodes.forEach(function(n){ n.container=cby[n.name]||null; });
     if(sel){ sel=nodes.filter(function(n){return n.name===sel.name;})[0]||null; }

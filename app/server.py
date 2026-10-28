@@ -52,8 +52,10 @@ import capture
 import convergence
 import devcfg
 import editor
+import experiments
 import guide
 import images
+import impact
 import labio
 import lanexpose
 import linkctl
@@ -1124,8 +1126,12 @@ class Handler(BaseHTTPRequestHandler):
             except (ValueError, lanexpose.LanError, topoedit.TopoError, linkctl.LinkError) as exc:
                 status, body = 400, {"error": str(exc)}
             except (capture.CaptureError, snapshots.SnapError, labio.ImportError_,
-                    convergence.ConvError) as exc:
+                    convergence.ConvError, experiments.ExpError) as exc:
                 status, body = exc.status, {"error": str(exc)}
+            except impact.ImpactError as exc:
+                status, body = 409, {"error": str(exc)}
+            except pathtrace.TraceError as exc:
+                status, body = 400, {"error": str(exc)}
             except devcfg.DevError as exc:
                 status, body = getattr(exc, "status", 400), {"error": str(exc)}
             except editor.EditError as exc:
@@ -1325,6 +1331,23 @@ class Handler(BaseHTTPRequestHandler):
                             "scenarios": convergence.load(lab), "runs": convergence.runs(lab),
                             "probe_nodes": convergence.probe_nodes(lab), "running": bool(lab.get("running")),
                             "current": cur, "busy": JOBS.busy(),
+                            "links": [l for l in lab.get("links") or [] if l.get("a_known") and l.get("b_known")],
+                            "nodes": [{"name": n["name"], "kind": n["kind"], "image": n.get("image")}
+                                      for n in lab.get("nodes") or []]})
+        elif u.path in ("/api/experiments", "/api/experiments/run"):
+            lab = COLLECTOR.index().get(q.get("lab", ""))
+            if lab is None:
+                self._json({"error": "unknown lab id"}, 404)
+            elif u.path == "/api/experiments/run":
+                try:
+                    self._json(experiments.runs(lab, q.get("id")))
+                except experiments.ExpError as exc:
+                    self._json({"error": str(exc)}, exc.status)
+            else:
+                self._json({"lab_name": lab.get("name"), "running": bool(lab.get("running")),
+                            "playbooks": experiments.load(lab), "runs": experiments.runs(lab),
+                            "current": experiments.current(lab["id"]), "busy": JOBS.busy(),
+                            "probe_nodes": convergence.probe_nodes(lab),
                             "links": [l for l in lab.get("links") or [] if l.get("a_known") and l.get("b_known")],
                             "nodes": [{"name": n["name"], "kind": n["kind"], "image": n.get("image")}
                                       for n in lab.get("nodes") or []]})
@@ -2230,11 +2253,84 @@ def _trace_post(handler, p):
         if rec:
             linkstate.setdefault(l["id"], {})["failed"] = rec
     try:
-        res = pathtrace.trace(lab, poller, src, dst, p.get("src_vrf") or None, linkstate)
+        res = pathtrace.trace(lab, poller, src, dst, p.get("src_vrf") or None, linkstate,
+                              branches=p.get("branches", True) is not False)
     except pathtrace.TraceError as exc:
         return 400, {"error": str(exc)}
     res.update({"src": src, "dst": dst, "dst_node": dst_node, "when": time.time()})
+    _trace_repairs(lab, poller, snap, res)
     return 200, res
+
+
+def _trace_repairs(lab, poller, snap, res):
+    """Where each protected hop's backup takes the traffic: the post-convergence
+    path from that router to the hop's destination with the link taken out
+    (the path TI-LFA steers onto), from the IGP model."""
+    hops = [h for h in res.get("hops") or [] if h.get("backup") and h.get("link")]
+    if not hops:
+        return
+    try:
+        g = impact.build(lab, poller, snap)
+    except Exception:                                   # noqa: BLE001
+        return
+    t = pathtrace.Tracer(lab, poller)
+    for h in hops:
+        owner = t.owner_of(h.get("lookup") or "")
+        if not owner:
+            continue
+        p = impact.repair_path(g, h["node"], owner, h["link"])
+        if p:
+            h["backup"]["repair"] = p
+            h["backup"]["to_node"] = owner
+
+
+def _experiments_post(handler, p):
+    lab = COLLECTOR.index().get(p.get("lab_id"))
+    if lab is None:
+        return 404, {"error": "unknown lab id"}
+    op, who = p.get("op"), handler._who()
+    if op == "save":
+        return 200, experiments.save(lab, p.get("playbook") or {})
+    if op == "delete":
+        return 200, experiments.delete(lab, p.get("id"))
+    if op == "delete_run":
+        return 200, experiments.delete_run(lab, p.get("id"))
+    if op == "stop":
+        audit("PLAYBOOK-STOP lab=%s from=%s" % (lab.get("name"), who))
+        return 200, experiments.stop(lab["id"])
+    if op == "run":
+        if not lab.get("running"):
+            return 409, {"error": "the lab is not running"}
+        pb = experiments.validate(lab, p.get("playbook") or {})
+        audit("REQUEST playbook lab=%s playbook=%r steps=%d from=%s"
+              % (lab.get("name"), pb["name"], len(pb["steps"]), who))
+        job, err = JOBS.start(lab, "playbook", [("playbook %r" % pb["name"],
+            lambda log: experiments.Runner(COLLECTOR.index, lab["id"], pb, LINKS, LIVE, audit, log).run())])
+        return (409, {"error": err}) if job is None else (200, {"job_id": job.id})
+    return 400, {"error": "unknown op"}
+
+
+def _impact_post(handler, p):
+    """Blast radius of failing some links and / or nodes - a prediction, nothing is touched."""
+    lab = COLLECTOR.index().get(p.get("lab_id"))
+    if lab is None:
+        return 404, {"error": "unknown lab id"}
+    if not lab.get("running"):
+        return 409, {"error": "the lab is not running"}
+    names = {n["name"] for n in lab.get("nodes") or []}
+    fl = []
+    for x in (p.get("links") or [])[:32]:
+        fl.append(linkctl.Links.find_link(lab, x)["id"])
+    fn = [n for n in (p.get("nodes") or [])[:16] if n in names]
+    if not fl and not fn:
+        return 400, {"error": "pick at least one link or node"}
+    snap = {}
+    for _ in range(10):
+        snap = LIVE.get(lab["id"]) or {}
+        if snap.get("links") and snap.get("proto_updated"):
+            break
+        time.sleep(1)
+    return 200, impact.analyse(lab, LIVE.poller(lab["id"]), snap, fl, fn)
 
 
 def _conv_post(handler, p):
@@ -2293,6 +2389,8 @@ MANAGE_POST = {
     "/api/trace": _trace_post,
     "/api/guide/run": _guide_run_post,
     "/api/convergence": _conv_post,
+    "/api/experiments": _experiments_post,
+    "/api/impact": _impact_post,
     "/api/snapshots": _snap_post,
     "/api/lab/import": _import_post,
     "/api/link": _link_post,

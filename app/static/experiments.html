@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playbooks · Containerlab</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script>try{if(localStorage.getItem("clabd-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
+<link rel="stylesheet" href="ui.css">
+<style>
+:root{--trace:#5B9BFF;--trace-ink:#CFE0FF}
+:root[data-theme="light"]{--trace:#1D4ED8;--trace-ink:#1E40AF}
+.layout{display:grid;grid-template-columns:292px minmax(0,1fr);min-height:calc(100vh - 55px)}
+.side{background:var(--surface);border-right:1px solid var(--line);padding:18px 12px;position:sticky;top:55px;
+  height:calc(100vh - 55px);overflow:auto}
+.side-h{display:flex;align-items:center;gap:8px;margin:0 4px 4px}
+.side-h h2{font:600 15px var(--font-display);margin:0}
+.side .hint{margin:0 4px 12px}
+.pbs{display:flex;flex-direction:column;gap:4px}
+.pb{position:relative;border:1px solid transparent;border-radius:var(--r);padding:9px 11px;cursor:pointer}
+.pb:hover{background:var(--surface-2)}
+.pb[aria-current="true"]{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 50%,transparent)}
+.pb b{display:block;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pb span{font:11px var(--font-mono);color:var(--muted)}
+.main{padding:22px clamp(14px,2.5vw,30px) 70px;min-width:0;max-width:1280px}
+.card{padding:18px 20px;margin-bottom:16px}
+.card h2{font:600 16px var(--font-display);margin:0 0 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;letter-spacing:-.01em}
+.card h2 .hint{font-weight:400;font-family:var(--font-mono);font-size:11.5px}
+.card h2 .r{margin-left:auto;display:flex;gap:6px}
+.msg{font-size:12.5px;color:var(--crit);margin:0 0 10px;white-space:pre-wrap}
+.msg:empty{display:none}
+
+/* templates */
+.tpls{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.tpl{border:1px solid var(--line);border-radius:var(--r-lg);padding:13px 14px;cursor:pointer;background:var(--surface)}
+.tpl:hover{border-color:var(--accent)}
+.tpl b{display:block;font:600 13.5px var(--font-display);margin-bottom:4px}
+.tpl p{margin:0;font-size:12px;color:var(--ink-2);line-height:1.45}
+
+/* editor */
+.top{display:grid;grid-template-columns:minmax(0,1fr) 140px;gap:12px;margin-bottom:14px}
+.lbl{display:block;font:600 10px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.steps{display:flex;flex-direction:column;gap:6px;counter-reset:st}
+.step{display:grid;grid-template-columns:26px 150px minmax(0,1fr) auto;gap:10px;align-items:start;padding:9px 10px;
+  border:1px solid var(--line);border-radius:10px;background:var(--surface);border-left:3px solid var(--c,var(--line-strong))}
+.step .no{font:700 11px var(--font-mono);color:var(--muted);padding-top:7px;text-align:center}
+.step .args{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
+.step .args .uin{height:30px}
+.step .args input.num{width:64px}
+.step .args .u{font:11px var(--font-mono);color:var(--muted)}
+.step .tools{display:flex;gap:2px}
+.step .tools .ub{width:28px;height:28px;padding:0}
+.step .why{grid-column:3/4;font-size:11.5px;color:var(--muted);margin-top:-2px;line-height:1.4}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{display:inline-flex;align-items:center;gap:4px;font:600 11px var(--font-mono);padding:3px 4px 3px 8px;border-radius:99px;
+  background:var(--surface-2);border:1px solid var(--line-strong)}
+.chip button{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 4px;font-size:11px}
+.chip button:hover{color:var(--crit)}
+.addrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.addrow .ub{height:30px}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:16px}
+.box{border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 14px;background:var(--canvas)}
+.box .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.box .row .uin{height:30px;min-width:0}
+.box .hint{margin:6px 0 0}
+.pv{margin-top:16px}
+.pvbar{display:flex;height:26px;border-radius:7px;overflow:hidden;border:1px solid var(--line);background:var(--canvas)}
+.pvbar div{display:flex;align-items:center;justify-content:center;font:600 10px var(--font-mono);min-width:3px;overflow:hidden;
+  white-space:nowrap;border-right:1px solid var(--canvas);color:#fff}
+.pvbar .wait{background:var(--surface-3);color:var(--muted)}
+.pvbar .settle{background:repeating-linear-gradient(135deg,var(--surface-2) 0 5px,transparent 5px 10px);color:var(--muted)}
+.acts{display:flex;gap:8px;align-items:center;margin-top:16px;flex-wrap:wrap}
+.acts .hint{margin-left:auto;font-family:var(--font-mono);font-size:11.5px}
+
+/* live */
+.prog{height:6px;border-radius:3px;background:var(--surface-3);overflow:hidden;margin:6px 0 10px}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--trace));transition:width .4s}
+.feed{font:11.5px/1.55 var(--font-mono);max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--canvas)}
+.feed div{display:grid;grid-template-columns:60px 56px 1fr;gap:8px;padding:2px 10px;border-bottom:1px solid var(--line)}
+.log{font:11.5px/1.55 var(--font-mono);white-space:pre-wrap;background:var(--console-bg);color:var(--console-ink);
+  border-radius:var(--r);padding:10px 12px;max-height:200px;overflow:auto;margin-top:10px}
+.log:empty::before{content:"waiting for output…";color:var(--console-dim)}
+
+/* report */
+.miles{width:100%;border-collapse:collapse;font-size:12.5px}
+.miles th{font:600 9.5px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 8px;
+  border-bottom:1px solid var(--line)}
+.miles td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.miles td.d{font:600 12.5px var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.miles td.d small{display:block;font:400 10.5px var(--font-sans);color:var(--muted);white-space:normal;max-width:180px}
+.miles td.d.none{color:var(--muted);font-weight:400}
+.miles td.d.bad{color:var(--crit)}
+.chartwrap{position:relative;background:var(--canvas);border:1px solid var(--line);border-radius:var(--r-lg);padding:6px 4px;overflow:hidden}
+#tl{width:100%;display:block}
+.tl-lane{font:600 10px var(--font-mono);fill:var(--muted)}
+.tl-grid{stroke:var(--grid);stroke-width:1}
+.tl-axis{font:10px var(--font-mono);fill:var(--muted)}
+.tl-step{stroke:var(--ink-2);stroke-width:1;stroke-dasharray:3 3;opacity:.6}
+.tl-steplbl{font:600 10.5px var(--font-sans);fill:var(--ink)}
+.tl-loss{fill:var(--crit)}
+.tl-ev{stroke:var(--canvas);stroke-width:1;cursor:pointer}
+.tl-ev:hover{stroke:var(--ink);stroke-width:1.5}
+.tl-path{stroke-width:7;stroke-linecap:butt}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line-strong);border-radius:7px;
+  padding:5px 9px;font:11.5px var(--font-mono);box-shadow:var(--shadow);max-width:440px;z-index:3}
+.key{display:flex;gap:14px;font-size:11.5px;color:var(--ink-2);margin-top:10px;flex-wrap:wrap}
+.key i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 10px}
+.filters button{font:600 10.5px var(--font-mono);border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-2);
+  border-radius:99px;padding:3px 10px;cursor:pointer}
+.filters button[aria-pressed="false"]{opacity:.45}
+.filters button i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px}
+.evt{width:100%;border-collapse:collapse;font:11.5px/1.45 var(--font-mono)}
+.evt td{padding:4px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.evt td.t{text-align:right;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.evt td.s{font-weight:700;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+.evt td.n{white-space:nowrap;font-weight:600}
+.evt tr.isstep td{background:var(--surface-2)} .evt tr.isstep td.x{font-weight:600;color:var(--ink)}
+.evt td.x{color:var(--ink-2);overflow-wrap:anywhere}
+.runs{width:100%}
+.runs tbody tr{cursor:pointer}
+.runs tbody tr[aria-current="true"] td{background:var(--accent-soft)}
+.runs td.num{font-family:var(--font-mono);font-size:12px}
+.note{font-size:12px;color:var(--muted);margin:10px 0 0}
+@media (max-width:980px){ .grid2{grid-template-columns:1fr} .step{grid-template-columns:22px minmax(0,1fr) auto} .step .args{grid-column:2/3} .step .why{grid-column:2/3} }
+@media (max-width:820px){ .layout{grid-template-columns:1fr} .side{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)} }
+</style>
+</head>
+<body>
+<header id="appbar"></header>
+<div class="layout">
+  <aside class="side">
+    <div class="side-h"><h2>Playbooks</h2><span id="newbtn" style="margin-left:auto"></span></div>
+    <p class="hint">Scripted failures with a flight recorder: run them the same way every time, then replay what the network did.</p>
+    <div class="pbs" id="pbs"></div>
+  </aside>
+  <main class="main" id="main"><div class="empty plain"><span class="spin"></span>&nbsp; loading…</div></main>
+</div>
+<script src="ui.js"></script>
+<script>
+(function(){
+"use strict";
+function $(id){ return document.getElementById(id); }
+function el(t,c,x){ var e=document.createElement(t); if(c)e.className=c; if(x!==undefined&&x!==null)e.textContent=x; return e; }
+function svgEl(t,a){ var e=document.createElementNS("http://www.w3.org/2000/svg",t); for(var k in a) e.setAttribute(k,a[k]); return e; }
+function getJ(u){ return fetch(u,{cache:"no-store"}).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||r.status); return j; }); }); }
+function post(u,b){ return fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)})
+  .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||r.status); return j; }); }); }
+var qs=new URLSearchParams(location.search), labId=qs.get("lab");
+var data=null, cur=null, draft=null, report=null, jobId=null, jobLines=0, logBox=null, timer=null, filt={};
+
+var crumbLab={label:"…", href:"topology.html?lab="+encodeURIComponent(labId||""), id:"crumblab"};
+UI.appbar($("appbar"), {crumbs:[{label:"Labs", href:"/"}, crumbLab, {label:"Playbooks"}]});
+$("newbtn").appendChild(UI.button("New","sm",function(){ newDraft(); },"plus"));
+
+var OPS={
+  fail:{label:"Fail links", c:"var(--crit)"},
+  restore:{label:"Restore", c:"var(--ok)"},
+  flap:{label:"Flap a link", c:"var(--warn)"},
+  node_fail:{label:"Fail a router", c:"var(--crit)"},
+  node_restore:{label:"Bring router back", c:"var(--ok)"},
+  impair:{label:"Impair a link", c:"var(--warn)"},
+  wait:{label:"Wait", c:"var(--line-strong)"}
+};
+var EV_COLOR={step:"var(--ink)", log:"var(--accent-2)", kernel:"var(--crit)", live:"var(--warn)", path:"var(--trace)",
+  fib:"var(--ok)", spf:"var(--xe)", probe:"var(--crit)"};
+var EV_NAME={step:"playbook", kernel:"interface", log:"router log", spf:"SPF", fib:"FIB", live:"live view", path:"path", probe:"traffic"};
+
+function lkKey(l){ return l.a+":"+l.a_if+"|"+l.b+":"+l.b_if; }
+function lkLabel(l){ return l.a+" "+l.a_if+" ↔ "+l.b+" "+l.b_if; }
+function lkShort(l){ return l.a+"–"+l.b; }
+function ref(l){ return {a:l.a,a_if:l.a_if,b:l.b,b_if:l.b_if}; }
+function findLink(x){ return (data.links||[]).filter(function(l){ return lkKey(l)===lkKey(x); })[0]; }
+function routers(){ return (data.nodes||[]).map(function(n){ return n.name; }); }
+function fmtS(s){ return s>=60 ? Math.floor(s/60)+"m "+(s%60?(s%60)+"s":"") : s+" s"; }
+function fmtMs(ms){ return ms==null ? "—" : Math.abs(ms)>=10000 ? (ms/1000).toFixed(1)+" s" : Math.round(ms)+" ms"; }
+function when(t){ var d=new Date(t*1000); return d.toLocaleDateString()+" "+d.toLocaleTimeString(); }
+
+function duration(pb){
+  var t=0; (pb.steps||[]).forEach(function(s){ if(s.op==="wait") t+=+s.s||0; else if(s.op==="flap") t+=(+s.count||0)*((+s.down_s||0)+(+s.up_s||0)); });
+  return t+(+pb.settle_s||0);
+}
+
+// ---------- data ----------
+function load(){
+  return getJ("api/experiments?lab="+encodeURIComponent(labId)).then(function(d){
+    data=d;
+    if(cur) cur=data.playbooks.filter(function(p){ return p.id===cur.id; })[0]||null;
+    render();
+  }).catch(function(e){ $("main").textContent=""; $("main").appendChild(el("div","empty",e.message)); });
+}
+
+// ---------- side list ----------
+function lastRun(pid){ return (data.runs||[]).filter(function(r){ return r.playbook && r.playbook.id===pid; })[0]; }
+function renderList(){
+  var box=$("pbs"); box.textContent="";
+  if(!data.playbooks.length) box.appendChild(el("p","hint","No playbooks yet."));
+  data.playbooks.forEach(function(p){
+    var d=el("div","pb"); d.setAttribute("aria-current", cur && cur.id===p.id ? "true" : "false");
+    d.appendChild(el("b",null,p.name));
+    var lr=lastRun(p.id);
+    d.appendChild(el("span",null,p.steps.length+" steps · "+fmtS(duration(p))+(lr?" · ran "+new Date(lr.when*1000).toLocaleDateString():"")));
+    d.addEventListener("click",function(){ open(p); });
+    box.appendChild(d);
+  });
+}
+function open(p){ cur=p; draft=JSON.parse(JSON.stringify(p)); report=null; render();
+  var lr=lastRun(p.id); if(lr) openRun(lr.id); }
+
+// ---------- templates ----------
+function firstLink(){ return data.links[0] ? ref(data.links[0]) : null; }
+var TEMPLATES=[
+  {name:"Link flap", text:"A link goes down and up a few times — does the IGP dampen it, does traffic follow?",
+   make:function(){ var l=firstLink(); return {name:"Link flap", steps:[{op:"flap",links:l?[l]:[],mode:"shutdown",count:3,down_s:5,up_s:10}], settle_s:10}; }},
+  {name:"Shared-risk cut", text:"Two links in one fibre duct are cut at the same instant. Pick the links that share the risk.",
+   make:function(){ var ls=data.links.slice(0,2).map(ref);
+     return {name:"Shared-risk cut", steps:[{op:"fail",links:ls,mode:"cut",label:"duct A"},{op:"wait",s:30},{op:"restore",links:[]},{op:"wait",s:20}], settle_s:5}; }},
+  {name:"Silent router failure", text:"A router freezes: no carrier loss, its neighbours only notice when the hellos stop.",
+   make:function(){ var n=routers()[0];
+     return {name:"Silent router failure", steps:[{op:"node_fail",node:n,mode:"freeze"},{op:"wait",s:45},{op:"node_restore",node:n},{op:"wait",s:30}], settle_s:5}; }},
+  {name:"Rolling failures", text:"One link, then a second while the first is still down, then both come back.",
+   make:function(){ var ls=data.links.map(ref);
+     return {name:"Rolling failures", steps:[{op:"fail",links:ls.slice(0,1),mode:"shutdown"},{op:"wait",s:15},
+       {op:"fail",links:ls.slice(1,2),mode:"shutdown"},{op:"wait",s:20},{op:"restore",links:[]},{op:"wait",s:20}], settle_s:5}; }}
+];
+function newDraft(tpl){
+  cur=null; report=null;
+  var base=tpl ? tpl.make() : {name:"", steps:[], settle_s:10};
+  base.watch = base.watch || defaultWatch();
+  base.probe = base.probe || null;
+  draft=base; render();
+}
+function defaultWatch(){
+  var r=(data.nodes||[]).filter(function(n){ return /xr|c8000|csr|n9k|srl/.test(n.kind) || /frr/.test(n.image||""); }).map(function(n){ return n.name; });
+  if(r.length<2) r=routers();
+  return r.length>=2 ? [{src:r[0], dst:r[r.length-1]}] : [];
+}
+// from the topology map: ?new={"links":[...],"nodes":[...]}
+function fromMap(spec){
+  var steps=[];
+  if(spec.links && spec.links.length) steps.push({op:"fail",links:spec.links,mode:spec.links.length>1?"cut":"shutdown",
+    label:spec.links.length>1?"shared risk":""});
+  (spec.nodes||[]).forEach(function(n){ steps.push({op:"node_fail",node:n,mode:"freeze"}); });
+  steps.push({op:"wait",s:30});
+  (spec.nodes||[]).forEach(function(n){ steps.push({op:"node_restore",node:n}); });
+  if(spec.links && spec.links.length) steps.push({op:"restore",links:[]});
+  steps.push({op:"wait",s:20});
+  var nm=(spec.nodes||[]).concat((spec.links||[]).map(lkShort)).join(", ");
+  draft={name:"Fail "+nm, steps:steps, settle_s:5, watch:defaultWatch(), probe:null};
+  cur=null; report=null;
+}
+
+// ---------- render ----------
+function render(){
+  if(!data) return;
+  $("crumblab").textContent=data.lab_name||"lab";
+  renderList();
+  var main=$("main"); main.textContent="";
+  if(!data.running) main.appendChild(el("div","card note","The lab is not running — you can write playbooks, but not run them."));
+  renderLive(main);
+  if(report) renderReport(main);
+  if(draft) renderEditor(main);
+  else if(!report) renderWelcome(main);
+  if(cur) renderRuns(main);
+}
+function renderWelcome(main){
+  var c=el("section","card"); c.appendChild(el("h2",null,"Start from a template"));
+  var g=el("div","tpls");
+  TEMPLATES.forEach(function(t){ var d=el("div","tpl"); d.appendChild(el("b",null,t.name)); d.appendChild(el("p",null,t.text));
+    d.addEventListener("click",function(){ newDraft(t); }); g.appendChild(d); });
+  var d=el("div","tpl"); d.appendChild(el("b",null,"Empty playbook")); d.appendChild(el("p",null,"Write the steps yourself."));
+  d.addEventListener("click",function(){ newDraft(); }); g.appendChild(d);
+  c.appendChild(g);
+  c.appendChild(el("p","note","Every run records a timeline — what the playbook did, interface and adjacency changes, each router's own log "
+    +"(clock-corrected), SPF runs, FIB updates, path changes and traffic loss — and can be replayed on the map. Whatever a run breaks is put back at the end."));
+  main.appendChild(c);
+}
+
+// ---------- editor ----------
+function sel(opts, val, onch, blank){
+  var s=document.createElement("select"); s.className="uin";
+  if(blank!==undefined){ var o0=el("option",null,blank); o0.value=""; s.appendChild(o0); }
+  opts.forEach(function(o){ var v=Array.isArray(o)?o[0]:o, t=Array.isArray(o)?o[1]:o;
+    var op=el("option",null,t); op.value=v; op.selected=String(v)===String(val); s.appendChild(op); });
+  s.addEventListener("change",function(){ onch(s.value); }); return s;
+}
+function num(val, onch, w){ var i=el("input","uin num"); i.type="number"; i.value=val; if(w) i.style.width=w;
+  i.addEventListener("input",function(){ onch(i.value===""?"":+i.value); }); return i; }
+function linkSel(val, onch, blank){
+  return sel(data.links.map(function(l){ return [lkKey(l), lkLabel(l)]; }), val?lkKey(val):"", function(v){
+    var l=data.links.filter(function(x){ return lkKey(x)===v; })[0]; onch(l?ref(l):null); }, blank||"— link —");
+}
+function linkChips(list, onch){
+  var w=el("div","chips");
+  list.forEach(function(x, i){ var c=el("span","chip",lkShort(x)); c.title=lkLabel(x);
+    var b=el("button",null,"✕"); b.addEventListener("click",function(){ list.splice(i,1); onch(); }); c.appendChild(b); w.appendChild(c); });
+  return w;
+}
+var NODE_MODES=[["freeze","freeze (silent)"],["cut","cut all its links"],["shutdown","shut all its links"]];
+var NODE_WHY={freeze:"docker pause: no carrier loss — the neighbours notice only when the hellos time out. A VM router stops completely; on an FRR / Linux container the kernel keeps forwarding and only the routing daemons hang.",
+  cut:"Every link of the router goes down on the container side. Native neighbours lose carrier at once; VM neighbours wait for hellos.",
+  shutdown:"Every interface of the router is shut on both ends: everyone sees the ports go down at once."};
+function stepArgs(s, args, why, redraw){
+  var nodes=routers();
+  if(s.op==="fail"||s.op==="restore"){
+    s.links=s.links||[];
+    args.appendChild(linkChips(s.links, redraw));
+    args.appendChild(linkSel(null, function(l){ if(l && !s.links.some(function(x){ return lkKey(x)===lkKey(l); })) s.links.push(l); redraw(); },
+      s.links.length?"+ add a link":(s.op==="restore"?"everything still down":"— pick a link —")));
+    if(s.op==="fail"){
+      args.appendChild(sel([["shutdown","shutdown"],["cut","cut (silent)"]], s.mode||"shutdown", function(v){ s.mode=v; redraw(); }));
+      if(s.links.length>1){ var lb=el("input","uin"); lb.placeholder="group name (duct, site…)"; lb.value=s.label||""; lb.style.width="170px";
+        lb.addEventListener("input",function(){ s.label=lb.value; }); args.appendChild(lb);
+        why.textContent="A shared-risk group: all "+s.links.length+" links fail at the same instant (one config push per router, in parallel)."; }
+      else if(s.mode==="cut") why.textContent="Cut: the container ports go down; a VM router keeps carrier and notices only when hellos time out.";
+    } else if(!s.links.length) why.textContent="Brings back every link this run has failed so far.";
+  } else if(s.op==="flap"){
+    args.appendChild(linkSel(s.links&&s.links[0], function(l){ s.links=l?[l]:[]; redraw(); }));
+    args.appendChild(sel([["shutdown","shutdown"],["cut","cut"]], s.mode||"shutdown", function(v){ s.mode=v; }));
+    args.appendChild(num(s.count, function(v){ s.count=v; redraw(); })); args.appendChild(el("span","u","times, down"));
+    args.appendChild(num(s.down_s, function(v){ s.down_s=v; redraw(); })); args.appendChild(el("span","u","s, up"));
+    args.appendChild(num(s.up_s, function(v){ s.up_s=v; redraw(); })); args.appendChild(el("span","u","s"));
+  } else if(s.op==="node_fail"){
+    args.appendChild(sel(nodes, s.node, function(v){ s.node=v; }, "— router —"));
+    args.appendChild(sel(NODE_MODES, s.mode||"freeze", function(v){ s.mode=v; redraw(); }));
+    why.textContent=NODE_WHY[s.mode||"freeze"];
+  } else if(s.op==="node_restore"){
+    args.appendChild(sel(nodes, s.node, function(v){ s.node=v; }, "— router —"));
+  } else if(s.op==="impair"){
+    s.params=s.params||{};
+    args.appendChild(linkSel(s.links&&s.links[0], function(l){ s.links=l?[l]:[]; }));
+    args.appendChild(sel([["both","both ways"],["a","A side sends"],["b","B side sends"]], s.direction||"both", function(v){ s.direction=v; }));
+    [["delay_ms","delay ms"],["jitter_ms","jitter ms"],["loss_pct","loss %"],["rate_kbit","rate kb/s"]].forEach(function(k){
+      var i=num(s.params[k[0]]==null?"":s.params[k[0]], function(v){ if(v==="") delete s.params[k[0]]; else s.params[k[0]]=v; }, "72px");
+      i.placeholder=k[1]; i.title=k[1]; args.appendChild(i); });
+    why.textContent="netem on the link. Leave every field empty to clear it.";
+  } else if(s.op==="wait"){
+    args.appendChild(num(s.s, function(v){ s.s=v; redraw(); })); args.appendChild(el("span","u","seconds"));
+  }
+}
+function defaults(op){
+  var l=firstLink();
+  return {fail:{op:op,links:l?[l]:[],mode:"shutdown"}, restore:{op:op,links:[]}, flap:{op:op,links:l?[l]:[],mode:"shutdown",count:3,down_s:5,up_s:10},
+    node_fail:{op:op,node:routers()[0],mode:"freeze"}, node_restore:{op:op,node:routers()[0]},
+    impair:{op:op,links:l?[l]:[],direction:"both",params:{delay_ms:50}}, wait:{op:op,s:20}}[op];
+}
+function renderEditor(main){
+  var c=el("section","card");
+  var h=el("h2",null,cur?"Playbook":"New playbook");
+  c.appendChild(h);
+  var msg=el("p","msg"); c.appendChild(msg);
+  var top=el("div","top");
+  var a=el("div"); a.appendChild(el("label","lbl","name"));
+  var nm=el("input","uin"); nm.style.width="100%"; nm.value=draft.name||""; nm.placeholder="e.g. Core ring: cut the long-haul pair";
+  nm.addEventListener("input",function(){ draft.name=nm.value; }); a.appendChild(nm); top.appendChild(a);
+  var b=el("div"); b.appendChild(el("label","lbl","settle after (s)"));
+  var st=num(draft.settle_s, function(v){ draft.settle_s=v; redraw(); }); st.style.width="100%"; b.appendChild(st); top.appendChild(b);
+  c.appendChild(top);
+  c.appendChild(el("label","lbl","steps — run in order"));
+  var stepsBox=el("div","steps"); c.appendChild(stepsBox);
+  var pv=el("div","pv");
+  function redraw(){ drawSteps(); drawPreview(); }
+  function drawSteps(){
+    stepsBox.textContent="";
+    draft.steps.forEach(function(s, i){
+      var row=el("div","step"); row.style.setProperty("--c", OPS[s.op].c);
+      row.appendChild(el("span","no",String(i+1)));
+      row.appendChild(sel(Object.keys(OPS).map(function(k){ return [k, OPS[k].label]; }), s.op, function(v){ draft.steps[i]=defaults(v); redraw(); }));
+      var args=el("div","args"), why=el("div","why");
+      stepArgs(s, args, why, redraw);
+      row.appendChild(args);
+      var t=el("div","tools");
+      var up=UI.button("","quiet",function(){ if(i){ var x=draft.steps[i-1]; draft.steps[i-1]=s; draft.steps[i]=x; redraw(); } },"back");
+      up.title="move up"; up.style.transform="rotate(90deg)"; up.disabled=!i; t.appendChild(up);
+      var dn=UI.button("","quiet",function(){ if(i<draft.steps.length-1){ var x=draft.steps[i+1]; draft.steps[i+1]=s; draft.steps[i]=x; redraw(); } },"back");
+      dn.title="move down"; dn.style.transform="rotate(-90deg)"; dn.disabled=i===draft.steps.length-1; t.appendChild(dn);
+      var rm=UI.button("","quiet",function(){ draft.steps.splice(i,1); redraw(); },"trash"); rm.title="remove"; t.appendChild(rm);
+      row.appendChild(t);
+      if(why.textContent) row.appendChild(why);
+      stepsBox.appendChild(row);
+    });
+    if(!draft.steps.length) stepsBox.appendChild(el("p","hint","No steps yet — add one below."));
+  }
+  var add=el("div","addrow");
+  Object.keys(OPS).forEach(function(op){ add.appendChild(UI.button(OPS[op].label,"sm",function(){ draft.steps.push(defaults(op)); redraw(); },"plus")); });
+  c.appendChild(add);
+
+  // probe + watched paths
+  var g=el("div","grid2");
+  var pb=el("div","box"); pb.appendChild(el("label","lbl","traffic probe (optional)"));
+  var pr=el("div","row"), probeNodes=data.probe_nodes||[];
+  var on=el("input"); on.type="checkbox"; on.checked=!!draft.probe; on.disabled=!probeNodes.length;
+  on.addEventListener("change",function(){ draft.probe = on.checked ? {src:probeNodes[0], dst:routers().filter(function(n){ return n!==probeNodes[0]; }).slice(-1)[0]||"", interval_ms:10} : null; render(); });
+  pr.appendChild(on); pr.appendChild(document.createTextNode(" ping every "));
+  if(draft.probe){
+    pr.appendChild(num(draft.probe.interval_ms, function(v){ draft.probe.interval_ms=v; }, "60px"));
+    pr.appendChild(document.createTextNode(" ms from "));
+    pr.appendChild(sel(probeNodes, draft.probe.src, function(v){ draft.probe.src=v; }));
+    pr.appendChild(document.createTextNode(" to "));
+    pr.appendChild(sel(routers(), draft.probe.dst, function(v){ draft.probe.dst=v; }, "— node —"));
+  } else pr.appendChild(document.createTextNode("… (off)"));
+  pb.appendChild(pr);
+  pb.appendChild(el("p","hint", probeNodes.length ? "Measures loss to the millisecond. The source must be an FRR or Linux node."
+    : "No FRR / Linux node in this lab to send from — the recorder still captures everything else."));
+  g.appendChild(pb);
+  var wb=el("div","box"); wb.appendChild(el("label","lbl","paths to watch (traced over and over)"));
+  draft.watch=draft.watch||[];
+  draft.watch.forEach(function(w, i){
+    var r=el("div","row");
+    r.appendChild(sel(routers(), w.src, function(v){ w.src=v; }));
+    r.appendChild(document.createTextNode(" → "));
+    r.appendChild(sel(routers(), w.dst, function(v){ w.dst=v; }));
+    r.appendChild(UI.button("","quiet sm",function(){ draft.watch.splice(i,1); render(); },"x"));
+    wb.appendChild(r);
+  });
+  if(draft.watch.length<4){ var ar=el("div","row"); ar.appendChild(UI.button("Add a path","sm",function(){
+    var n=routers(); draft.watch.push({src:n[0], dst:n[n.length-1]}); render(); },"plus")); wb.appendChild(ar); }
+  wb.appendChild(el("p","hint","Each change of path — and of each router's FIB entry on it — goes on the timeline, and the replay draws it."));
+  g.appendChild(wb);
+  c.appendChild(g);
+  c.appendChild(pv);
+  function drawPreview(){
+    pv.textContent="";
+    var tot=duration(draft)||1;
+    pv.appendChild(el("label","lbl","timeline — about "+fmtS(duration(draft)+2)+" plus reading the routers' logs"));
+    var bar=el("div","pvbar");
+    var lead=el("div","wait","2s"); lead.style.flex="2"; bar.appendChild(lead);
+    draft.steps.forEach(function(s){
+      var w = s.op==="wait" ? +s.s||0 : s.op==="flap" ? (+s.count||0)*((+s.down_s||0)+(+s.up_s||0)) : 0;
+      var d=el("div", s.op==="wait"?"wait":"", s.op==="wait"?(w+"s"):s.op==="flap"?"flap ×"+s.count:"");
+      if(s.op!=="wait") d.style.background=OPS[s.op].c;
+      d.style.flex = w ? String(w) : "0 0 6px";
+      d.title=OPS[s.op].label+(w?" · "+w+" s":"");
+      bar.appendChild(d);
+    });
+    if(+draft.settle_s){ var se=el("div","settle","settle"); se.style.flex=String(draft.settle_s); bar.appendChild(se); }
+    pv.appendChild(bar);
+  }
+  redraw();
+  var acts=el("div","acts");
+  var save=UI.button("Save","",function(){ saveDraft().then(function(){ UI.toast("saved","ok"); }); },"save");
+  var run=UI.button("Run","primary",function(){ runDraft(); },"play");
+  run.disabled=!data.running || data.busy || !!data.current;
+  run.title=!data.running?"start the lab first":data.busy?"another action is running":"";
+  acts.appendChild(run); acts.appendChild(save);
+  if(cur) acts.appendChild(UI.button("Delete","quiet",function(){
+    UI.confirm("Delete "+cur.name+"?","Its recorded runs stay until you delete them.",{ok:"Delete",danger:true}).then(function(ok){
+      if(!ok) return; post("api/experiments",{lab_id:labId, op:"delete", id:cur.id}).then(function(){ cur=null; draft=null; load(); }); }); },"trash"));
+  acts.appendChild(el("span","hint","everything the run breaks is put back at the end"));
+  c.appendChild(acts);
+  main.appendChild(c);
+  function saveDraft(){
+    msg.textContent="";
+    return post("api/experiments",{lab_id:labId, op:"save", playbook:draft}).then(function(p){
+      cur=p; draft=JSON.parse(JSON.stringify(p)); return load().then(function(){ return p; });
+    }).catch(function(e){ msg.textContent=e.message; throw e; });
+  }
+  function runDraft(){
+    saveDraft().then(function(p){
+      return post("api/experiments",{lab_id:labId, op:"run", playbook:p});
+    }).then(function(j){ jobId=j.job_id; jobLines=0; report=null; load().then(watch); })
+      .catch(function(e){ if(!msg.textContent) msg.textContent=e.message; });
+  }
+}
+
+// ---------- live ----------
+function renderLive(main){
+  var r=data.current; if(!r && !jobId) return;
+  var c=el("section","card");
+  var h=el("h2"); h.appendChild(el("span","led ok pulse")); h.appendChild(document.createTextNode(r ? "Running "+r.playbook.name : "Finishing…"));
+  if(r){ var rr=el("span","r"); rr.appendChild(UI.button("Stop","danger sm",function(){
+    post("api/experiments",{lab_id:labId, op:"stop"}).then(function(){ UI.toast("stopping - putting everything back","warn"); }); },"stop")); h.appendChild(rr); }
+  c.appendChild(h);
+  if(r){
+    var pct=Math.min(100, (r.elapsed/Math.max(1,r.total_s+2))*100);
+    c.appendChild(el("div","hint","step "+r.step+" of "+r.playbook.steps.length+" · "+r.elapsed+" s of about "+(r.total_s+2)+" s"));
+    var p=el("div","prog"); var i=el("i"); i.style.width=pct+"%"; p.appendChild(i); c.appendChild(p);
+    var f=el("div","feed");
+    (r.events||[]).slice().reverse().forEach(function(e){
+      var d=el("div"); d.appendChild(el("span",null,e.t!=null?"+"+e.t.toFixed(1)+"s":""));
+      var s=el("span",null,e.src); s.style.color=EV_COLOR[e.src]; d.appendChild(s);
+      d.appendChild(el("span",null,(e.node?e.node+": ":"")+e.text)); f.appendChild(d); });
+    if(!(r.events||[]).length) f.appendChild(el("div",null,"recording…"));
+    c.appendChild(f);
+  }
+  logBox=el("div","log"); c.appendChild(logBox);
+  main.appendChild(c);
+}
+function watch(){
+  clearTimeout(timer);
+  getJ("api/experiments?lab="+encodeURIComponent(labId)).then(function(d){
+    data=d;
+    var keep=logBox?logBox.textContent:"";
+    render(); if(logBox) logBox.textContent=keep;
+    if(jobId) getJ("api/job/"+jobId+"?since="+jobLines).then(function(j){
+      if(logBox) (j.lines||[]).forEach(function(line){ logBox.appendChild(document.createTextNode(line+"\n")); });
+      if(logBox) logBox.scrollTop=logBox.scrollHeight;
+      jobLines=j.total_lines||jobLines;
+      if(!j.running){
+        jobId=null;
+        if(j.rc!==0) UI.toast("The run ended with an error: "+(j.lines||[]).slice(-3).join(" "),"crit");
+        else UI.toast("Run recorded","ok");
+        load().then(function(){ var lr=cur && lastRun(cur.id); if(lr) openRun(lr.id); });
+      }
+    });
+    if(d.current || jobId) timer=setTimeout(watch, 1000);
+  });
+}
+
+// ---------- runs ----------
+function renderRuns(main){
+  var rs=(data.runs||[]).filter(function(r){ return r.playbook && r.playbook.id===cur.id; });
+  if(!rs.length) return;
+  var c=el("section","card"); c.appendChild(el("h2",null,"Runs"));
+  var t=el("table","tbl runs"), tb=el("tbody");
+  var th=el("thead"), hr=el("tr"); ["when","took","result",""].forEach(function(x){ hr.appendChild(el("th",null,x)); }); th.appendChild(hr); t.appendChild(th);
+  rs.forEach(function(r){
+    var tr=el("tr"); tr.setAttribute("aria-current", report && report.id===r.id ? "true":"false");
+    tr.appendChild(el("td",null,when(r.when)));
+    tr.appendChild(el("td","num",r.duration+" s"));
+    var td=el("td"); if(!r.ok) td.appendChild(el("span","pill crit",r.error||"error")); td.appendChild(document.createTextNode(" "+(r.summary||""))); tr.appendChild(td);
+    var x=el("td"); var del=UI.button("","quiet sm",function(ev){ ev.stopPropagation();
+      post("api/experiments",{lab_id:labId, op:"delete_run", id:r.id}).then(function(){ if(report&&report.id===r.id) report=null; load(); }); },"trash");
+    del.title="delete this run"; x.appendChild(del); tr.appendChild(x);
+    tr.addEventListener("click",function(){ openRun(r.id); });
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); c.appendChild(t); main.appendChild(c);
+}
+function openRun(id){
+  return getJ("api/experiments/run?lab="+encodeURIComponent(labId)+"&id="+encodeURIComponent(id)).then(function(r){
+    report=r;
+    if(!cur || cur.id!==r.playbook.id){ cur=data.playbooks.filter(function(p){ return p.id===r.playbook.id; })[0]||null; }
+    draft=null; render(); window.scrollTo({top:0, behavior:"smooth"});
+  }).catch(function(e){ UI.toast(e.message,"crit"); });
+}
+
+// ---------- report ----------
+// for each failure step: how long until each part of the network reacted
+function milestones(r){
+  var steps=r.events.filter(function(e){ return e.src==="step" && /fail/.test(e.kind); });
+  return steps.map(function(s, i){
+    var next=(steps[i+1]||{t:1e9}).t, lids={}, nodes={};
+    (s.links||[]).forEach(function(id){ lids[id]=1; });
+    // a router failure: its links, and the routers at their far ends, are where it shows
+    if(s.node){ nodes[s.node]=1; (data.links||[]).forEach(function(l){ if(l.a===s.node||l.b===s.node) lids[l.id]=1; }); }
+    (data.links||[]).forEach(function(l){ if(lids[l.id]){ nodes[l.a]=1; nodes[l.b]=1; } });
+    function first(fn){ return r.events.filter(function(e){ return e.t>=s.t-0.05 && e.t<next && fn(e); })[0]; }
+    var touch=function(e){ return (e.link && lids[e.link]) || (e.node && nodes[e.node]); };
+    var row={step:s,
+      detect:first(function(e){ return e.src==="log" && /link|igp|bfd/.test(e.kind) && touch(e); }),
+      igp:first(function(e){ return e.src==="log" && e.kind==="igp" && /DOWN|Down|down/.test(e.text); }),
+      spf:first(function(e){ return e.kind==="spf"; }),
+      fib:first(function(e){ return e.kind==="fib"; }),
+      path:first(function(e){ return e.kind==="path"; })};
+    if(r.probe){
+      var lost=r.probe.outages.filter(function(o){ return o.from>=s.t-0.05 && o.from<next; });
+      row.loss=lost.reduce(function(a,o){ return a+o.ms; },0); row.lossParts=lost.length;
+    }
+    return row;
+  });
+}
+function cell(tr, e, s, what){
+  var td=el("td","d"+(e?"":" none"));
+  if(e){ td.textContent="+"+fmtMs((e.t-s.t)*1000)+(e.approx?" ≈":""); td.appendChild(el("small",null,(e.node?e.node+": ":"")+e.text)); }
+  else td.textContent=what||"—";
+  tr.appendChild(td);
+}
+function renderReport(main){
+  var r=report;
+  var c=el("section","card");
+  var h=el("h2",null,r.playbook.name);
+  h.appendChild(el("span","hint",when(r.when)+" · "+r.duration+" s"));
+  var rr=el("span","r");
+  var rep=el("a","ub primary sm"); rep.appendChild(UI.icon("play")); rep.appendChild(document.createTextNode("Replay on the map"));
+  rep.href="topology.html?lab="+encodeURIComponent(labId)+"&replay="+encodeURIComponent(r.id); rr.appendChild(rep);
+  rr.appendChild(UI.button("Edit playbook","sm",function(){ if(cur){ draft=JSON.parse(JSON.stringify(cur)); report=null; render(); } },"edit"));
+  h.appendChild(rr);
+  c.appendChild(h);
+  if(r.error) c.appendChild(el("p","msg",r.error));
+  // milestones
+  var ms=milestones(r);
+  if(ms.length){
+    c.appendChild(el("label","lbl","reaction after each failure"));
+    var t=el("table","miles"), th=el("tr");
+    ["failure","first router saw it","IGP adjacency down","SPF ran","FIB updated","path moved"].concat(r.probe?["traffic lost"]:[])
+      .forEach(function(x){ th.appendChild(el("th",null,x)); });
+    t.appendChild(th);
+    ms.forEach(function(m){
+      var tr=el("tr");
+      var td=el("td"); td.appendChild(el("b",null,"+"+m.step.t.toFixed(1)+" s ")); td.appendChild(document.createTextNode(m.step.text)); tr.appendChild(td);
+      cell(tr,m.detect,m.step,"not in the logs"); cell(tr,m.igp,m.step); cell(tr,m.spf,m.step); cell(tr,m.fib,m.step,"—"); cell(tr,m.path,m.step,"unchanged");
+      if(r.probe){ var lt=el("td","d"+(m.loss?" bad":"")); lt.textContent=m.loss?fmtMs(m.loss):"none";
+        if(m.lossParts>1) lt.appendChild(el("small",null,m.lossParts+" separate gaps")); tr.appendChild(lt); }
+      t.appendChild(tr);
+    });
+    c.appendChild(t);
+    c.appendChild(el("p","note","Times from the moment the dashboard made the change. Router log times are corrected by each router's clock offset"
+      +(Object.keys(r.clock_ms||{}).length?" ("+Object.keys(r.clock_ms).map(function(k){ return k+" "+(r.clock_ms[k]>0?"+":"")+r.clock_ms[k]+" ms"; }).join(", ")+")":"")
+      +"; ≈ marks times known only to the second (OSPF SPF statistics) or from polling."));
+  }
+  c.appendChild(el("label","lbl","timeline")).style.marginTop="16px";
+  var cw=el("div","chartwrap"); c.appendChild(cw);
+  drawTimeline(cw, r);
+  var key=el("div","key");
+  Object.keys(EV_NAME).forEach(function(k){ var s=el("span"); var i=el("i"); i.style.background=EV_COLOR[k]; s.appendChild(i); s.appendChild(document.createTextNode(EV_NAME[k])); key.appendChild(s); });
+  c.appendChild(key);
+  if(r.cleanup && r.cleanup.length) c.appendChild(el("p","note","Put back at the end: "+r.cleanup.join("; ")+"."));
+  main.appendChild(c);
+  // events
+  var c2=el("section","card"); c2.appendChild(el("h2",null,"Events"));
+  var fl=el("div","filters");
+  Object.keys(EV_NAME).forEach(function(k){
+    if(!r.events.some(function(e){ return e.src===k; })) return;
+    var b=el("button"); var i=el("i"); i.style.background=EV_COLOR[k]; b.appendChild(i); b.appendChild(document.createTextNode(EV_NAME[k]));
+    b.setAttribute("aria-pressed", filt[k]===false?"false":"true");
+    b.addEventListener("click",function(){ filt[k]=filt[k]===false; render(); }); fl.appendChild(b); });
+  c2.appendChild(fl);
+  var t2=el("table","evt"), lastStep=null;
+  r.events.forEach(function(e){
+    if(e.src==="step") lastStep=e;
+    if(filt[e.src]===false) return;
+    var tr=el("tr",e.src==="step"?"isstep":"");
+    tr.appendChild(el("td","t",(e.t>=0?"+":"")+e.t.toFixed(3)+" s"));
+    tr.appendChild(el("td","t",lastStep && e!==lastStep && e.t>=lastStep.t ? "+"+fmtMs((e.t-lastStep.t)*1000) : ""));
+    var s=el("td","s",e.src); s.style.color=EV_COLOR[e.src]; tr.appendChild(s);
+    tr.appendChild(el("td","n",e.node||""));
+    var x=el("td","x",e.text+(e.approx?" (≈)":"")); if(e.code) x.title=e.code; tr.appendChild(x);
+    t2.appendChild(tr);
+  });
+  c2.appendChild(t2);
+  main.appendChild(c2);
+}
+function drawTimeline(box, r){
+  var D=Math.max(1, r.duration), W=Math.max(640, box.clientWidth||1000), L=96, R=16;
+  var nodesL=[]; r.events.forEach(function(e){ if(e.node && e.src!=="step" && e.src!=="path" && nodesL.indexOf(e.node)<0) nodesL.push(e.node); });
+  nodesL.sort();
+  var pairs=Object.keys(r.paths||{});
+  var lanes=[{k:"steps",h:34}].concat(r.probe?[{k:"traffic",h:30}]:[]).concat(pairs.map(function(p){ return {k:"path",p:p,h:20}; }))
+    .concat(nodesL.map(function(n){ return {k:"node",n:n,h:22}; }));
+  var H=lanes.reduce(function(a,l){ return a+l.h; },0)+30;
+  var s=svgEl("svg",{id:"tl",viewBox:"0 0 "+W+" "+H,height:H});
+  function X(t){ return L+(Math.max(-1,Math.min(D,t))/D)*(W-L-R); }
+  // grid + axis
+  var step=D>300?60:D>120?20:D>40?10:5;
+  for(var t=0;t<=D;t+=step){
+    s.appendChild(svgEl("line",{x1:X(t),x2:X(t),y1:0,y2:H-22,class:"tl-grid"}));
+    var tx=svgEl("text",{x:X(t),y:H-8,"text-anchor":"middle",class:"tl-axis"}); tx.textContent=t+"s"; s.appendChild(tx);
+  }
+  var tip=el("div","tip"); tip.hidden=true; box.appendChild(tip);
+  function hover(node, text){
+    node.addEventListener("mousemove",function(ev){ var b=box.getBoundingClientRect(); tip.hidden=false; tip.textContent=text;
+      tip.style.left=Math.min(b.width-300, ev.clientX-b.left+12)+"px"; tip.style.top=(ev.clientY-b.top+12)+"px"; });
+    node.addEventListener("mouseleave",function(){ tip.hidden=true; });
+  }
+  var y=0;
+  lanes.forEach(function(ln){
+    var lbl=svgEl("text",{x:8,y:y+ln.h/2+3.5,class:"tl-lane"});
+    lbl.textContent=ln.k==="steps"?"PLAYBOOK":ln.k==="traffic"?"TRAFFIC":ln.k==="path"?ln.p.replace(">","→"):ln.n;
+    s.appendChild(lbl);
+    if(ln.k==="steps"){
+      r.events.filter(function(e){ return e.src==="step"; }).forEach(function(e, i){
+        s.appendChild(svgEl("line",{x1:X(e.t),x2:X(e.t),y1:y+4,y2:H-22,class:"tl-step"}));
+        var c=svgEl("circle",{cx:X(e.t),cy:y+10,r:4.5,class:"tl-ev",fill:/restore/.test(e.kind)?"var(--ok)":"var(--crit)"});
+        hover(c, "+"+e.t.toFixed(2)+" s  "+e.text); s.appendChild(c);
+        var tl=svgEl("text",{x:X(e.t)+7,y:y+(i%2?28:14),class:"tl-steplbl"}); tl.textContent=e.text.length>34?e.text.slice(0,33)+"…":e.text; s.appendChild(tl);
+      });
+    } else if(ln.k==="traffic"){
+      s.appendChild(svgEl("rect",{x:L,y:y+ln.h-6,width:W-L-R,height:1,fill:"var(--line)"}));
+      r.probe.series.forEach(function(p, i){
+        if(!p[1]) return;
+        var nx=(r.probe.series[i+1]||[p[0]+0.1])[0];
+        var rc=svgEl("rect",{x:X(p[0]),y:y+ln.h-6-p[1]*(ln.h-10),width:Math.max(1,X(nx)-X(p[0])),height:p[1]*(ln.h-10),class:"tl-loss"});
+        s.appendChild(rc);
+      });
+      r.probe.outages.forEach(function(o){ var hit=svgEl("rect",{x:X(o.from),y:y+2,width:Math.max(3,X(o.to)-X(o.from)),height:ln.h-6,fill:"transparent"});
+        hover(hit,"+"+o.from.toFixed(2)+" s  traffic lost for "+o.ms+" ms"); s.appendChild(hit); });
+    } else if(ln.k==="path"){
+      var lst=r.paths[ln.p];
+      lst.forEach(function(p, i){
+        var t0=Math.max(0,p.t), t1=(lst[i+1]||{t:D}).t;
+        var col=p.result==="reached"?"var(--trace)":"var(--crit)";
+        var seg=svgEl("line",{x1:X(t0),x2:X(t1),y1:y+ln.h/2,y2:y+ln.h/2,class:"tl-path",stroke:col,opacity:i%2?0.75:1});
+        hover(seg,"+"+p.t.toFixed(2)+" s  "+p.hops.filter(function(h,j){ return h.link||j===p.hops.length-1; }).map(function(h){ return h.node; }).join(" › ")+"  ("+p.result+")");
+        s.appendChild(seg);
+      });
+    } else {
+      s.appendChild(svgEl("line",{x1:L,x2:W-R,y1:y+ln.h/2,y2:y+ln.h/2,stroke:"var(--line)"}));
+      r.events.filter(function(e){ return e.node===ln.n && e.src!=="step" && e.src!=="path"; }).forEach(function(e){
+        var c=svgEl("circle",{cx:X(e.t),cy:y+ln.h/2,r:e.src==="log"?3.6:3,class:"tl-ev",fill:EV_COLOR[e.src]||"var(--muted)"});
+        if(e.approx) c.setAttribute("fill-opacity",".55");
+        hover(c,"+"+e.t.toFixed(3)+" s  "+EV_NAME[e.src]+"  "+e.text); s.appendChild(c);
+      });
+    }
+    y+=ln.h;
+  });
+  box.appendChild(s);
+}
+
+UI.commands([
+  {label:"New playbook", icon:"plus", hint:"n", run:function(){ if(data) newDraft(); }},
+  {label:"Back to the topology", icon:"map", run:function(){ location.href="topology.html?lab="+encodeURIComponent(labId||""); }}
+]);
+UI.keys([{keys:"n", label:"new playbook"}]);
+document.addEventListener("keydown",function(e){
+  if(e.ctrlKey||e.metaKey||e.altKey||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if(document.querySelector(".scrim,.cmdk")) return;
+  if(e.key==="n" && data){ e.preventDefault(); newDraft(); }
+});
+
+if(!labId){ $("main").textContent=""; $("main").appendChild(el("div","empty","no lab selected")); }
+else load().then(function(){
+  if(!data) return;
+  var nw=qs.get("new"), run=qs.get("run");
+  if(nw){ try{ fromMap(JSON.parse(nw)); render(); }catch(e){} }
+  if(run) openRun(run);
+  if(data.current) watch();
+});
+})();
+</script>
+</body>
+</html>

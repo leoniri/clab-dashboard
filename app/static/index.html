@@ -711,6 +711,7 @@ function renderLabs(s){
       return [
         drawable ? {label: expanded.has(l.id) ? "Hide nodes" : "Nodes and CLI", icon:"list", onClick:function(){ toggle(l); }} : null,
         drawable ? {label:"Topology map", icon:"map", href:"topology.html?lab=" + encodeURIComponent(l.id)} : null,
+        drawable ? {label:"Failure playbooks", icon:"play", href:"experiments.html?lab=" + encodeURIComponent(l.id)} : null,
         drawable ? {label:"Convergence tests", icon:"bolt", href:"convergence.html?lab=" + encodeURIComponent(l.id)} : null,
         !gone ? {label:"Edit files", icon:"file", href:"edit.html?lab=" + encodeURIComponent(l.id)} : null,
         drawable ? {label:"LAN access…", icon:"lan", hint: lanOn ? (lanLive ? lanLive + " live" : "on") : "",
