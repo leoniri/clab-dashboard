@@ -1358,7 +1358,7 @@ function drawTrace(byName){
   // the pulse - on the page clock, so a redraw does not restart it
   if(geo.full && !still){
     var L=pathLen(geo.full), speed=300*LS, travel=(L+180*LS)/speed, dur=travel+0.7, span=(L+180*LS)*dur/travel;
-    [["p1",170],["p2",95],["p3",42],["p4",10]].forEach(function(c){
+    [["p1",190],["p2",110],["p3",56],["p4",18]].forEach(function(c){
       var len=c[1]*LS, p=svgEl("path",{d:geo.full,class:"trpulse "+c[0]});
       p.style.setProperty("--len",len.toFixed(1)); p.style.setProperty("--o0",len.toFixed(1));
       p.style.setProperty("--o1",(len-span).toFixed(1)); p.style.setProperty("--dur",dur.toFixed(2)+"s");
