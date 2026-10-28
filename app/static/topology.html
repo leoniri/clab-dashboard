@@ -103,35 +103,49 @@ body{overflow:hidden}
 .node circle.st{stroke:var(--canvas);stroke-width:2.5}
 
 /* ---------- path trace ----------
-   Off-path nodes and links step back; the path is a ribbon coloured from
-   source (accent) to destination (accent-2), with marching dashes and a
-   packet running along it; every router on it carries its operation. */
-.tracing .lk:not(.onpath){opacity:.22}
-.tracing .node:not(.onpath){opacity:.32}
+   Quiet by design: off-path elements step back, the path is one thin accent
+   line over a soft blur, and a single comet (bright head, fading tail)
+   glides along it, passing behind each router. */
+.tracing .lk:not(.onpath){opacity:.18}
+.tracing .node:not(.onpath){opacity:.28}
 .tracing .lk.onpath .link{stroke:transparent}
-.trpath{fill:none;stroke-width:6;stroke-linecap:round;pointer-events:none;opacity:.95}
-.trglow{fill:none;stroke-width:14;stroke-linecap:round;pointer-events:none;opacity:.18}
-.trdash{fill:none;stroke:#fff;stroke-width:1.6;stroke-linecap:round;stroke-dasharray:1.5 9;pointer-events:none;opacity:.75;
-  animation:trmarch .7s linear infinite}
-:root[data-theme="light"] .trdash{opacity:.9}
-@keyframes trmarch{to{stroke-dashoffset:-10.5}}
-.tralt{fill:none;stroke-width:2.5;stroke-dasharray:4 5;opacity:.6;pointer-events:none}
-.trpkt{fill:#fff;pointer-events:none;filter:drop-shadow(0 0 4px var(--accent))}
-.trpkt-ring{fill:none;stroke:var(--accent);stroke-width:2;pointer-events:none}
-.trseg.hl .trpath{stroke-width:8} .trseg.hl .trglow{opacity:.4}
-.trhdr rect{fill:var(--surface);stroke:var(--line-strong);stroke-width:1}
-.trhdr .lb{fill:var(--accent)} .trhdr .pl{fill:var(--surface-3)}
-.trhdr text{font-family:var(--font-mono);font-size:9.5px;font-weight:700;pointer-events:none}
-.trhdr text.lbt{fill:var(--on-accent)} .trhdr text.plt{fill:var(--ink-2)}
-.trop{pointer-events:none}
-.trop rect{fill:var(--surface);stroke-width:1.4}
-.trop circle{stroke:none}
-.trop text{font-family:var(--font-mono);font-size:10px;font-weight:600;fill:var(--ink)}
-.trop text.n{fill:var(--on-accent);font-weight:700;font-size:9.5px}
-.trop.hl rect{stroke-width:2.4}
-.trflag rect{stroke:none} .trflag text{font-family:var(--font-mono);font-size:8.5px;font-weight:700;letter-spacing:.08em;fill:var(--on-accent)}
+.tracing .bgp{opacity:.15}
+.trglow{fill:none;stroke:var(--accent);stroke-width:9;stroke-linecap:round;opacity:.22;filter:blur(5px);pointer-events:none}
+.trcore{fill:none;stroke:var(--accent);stroke-width:2.4;stroke-linecap:round;pointer-events:none;transition:stroke-width .2s}
+.trseg.hl .trcore{stroke-width:4}
+.trseg.hl .trglow{opacity:.45}
+.tralt{fill:none;stroke:var(--accent);stroke-width:1.6;stroke-dasharray:3 5;opacity:.45;pointer-events:none}
+.trchev{fill:none;stroke:var(--accent-ink);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.trcomet{fill:none;stroke-linecap:round;pointer-events:none;animation:trcomet var(--dur) linear infinite;
+  stroke-dasharray:var(--len) 100000;stroke-dashoffset:var(--o0)}
+.trcomet.t1{stroke:var(--accent);stroke-width:2.6;opacity:.16}
+.trcomet.t2{stroke:var(--accent);stroke-width:2.8;opacity:.3}
+.trcomet.t3{stroke:var(--accent-ink);stroke-width:3;opacity:.55}
+.trcomet.t4{stroke:var(--accent-ink);stroke-width:3.2;opacity:.85;filter:drop-shadow(0 0 3px var(--accent))}
+.trcomet.t5{stroke:#fff;stroke-width:3.6;filter:drop-shadow(0 0 4px var(--accent)) drop-shadow(0 0 10px var(--accent))}
+:root[data-theme="light"] .trcomet.t5{stroke:var(--accent-ink);filter:drop-shadow(0 0 4px var(--accent))}
+:root[data-theme="light"] .trcomet.t4{stroke:var(--accent)}
+@keyframes trcomet{from{stroke-dashoffset:var(--o0)} to{stroke-dashoffset:var(--o1)}}
+.trring{fill:color-mix(in srgb,var(--accent) 7%,transparent);stroke:var(--accent);stroke-width:1.3;opacity:.75;pointer-events:none}
+.trring.src{stroke-width:2;opacity:1}
+.trring.dst2{fill:none;opacity:.45}
+.trripple{fill:none;stroke:var(--accent);stroke-width:1.5;pointer-events:none;transform-box:fill-box;transform-origin:center;
+  animation:trripple 2.6s cubic-bezier(.2,.6,.3,1) infinite}
+@keyframes trripple{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.9);opacity:0}}
 .node.trhl .halo{opacity:1;stroke:var(--accent);stroke-width:2}
-@media (prefers-reduced-motion:reduce){ .trdash{animation:none} }
+.trop{pointer-events:none}
+.trop rect.bg{fill:color-mix(in srgb,var(--surface) 92%,transparent);stroke:var(--line-strong);stroke-width:1}
+.trop circle.num{fill:var(--accent)}
+.trop text.n{font-family:var(--font-mono);font-size:9px;font-weight:700;fill:var(--on-accent)}
+.trop text.t{font-family:var(--font-mono);font-size:9.5px;font-weight:600;letter-spacing:.06em;fill:var(--ink)}
+.trop circle.dot{stroke:none}
+.trop.hl rect.bg{stroke:var(--accent)}
+.trhdr{pointer-events:auto}
+.trhdr rect.bg{fill:color-mix(in srgb,var(--surface) 92%,transparent);stroke:var(--line);stroke-width:1}
+.trhdr text{font-family:var(--font-mono);font-size:9px;font-weight:600}
+.trhdr text.lb{fill:var(--accent-ink)} .trhdr text.pl{fill:var(--muted)} .trhdr text.sep{fill:var(--line-strong)}
+.trhdr.hl rect.bg{stroke:var(--accent)}
+@media (prefers-reduced-motion:reduce){ .trcomet{display:none} .trripple{animation:none;opacity:0} }
 
 /* ---------- edit mode ---------- */
 .node.new .halo{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6;stroke-dasharray:5 3;opacity:1}
@@ -266,27 +280,28 @@ body{overflow:hidden}
   background:linear-gradient(180deg,color-mix(in srgb,var(--surface-2) 60%,var(--surface)),var(--surface))}
 .trsum .ends{display:flex !important;flex-direction:row;align-items:center;gap:10px;white-space:nowrap;font:600 15px var(--font-display);letter-spacing:-.01em;flex-wrap:wrap}
 .trsum .ends > span{display:inline-block}
-.trsum .ends .ar{flex:1;display:block !important;min-width:24px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--accent-2));position:relative}
-.trsum .ends .ar::after{content:"";position:absolute;right:-1px;top:-4px;border:5px solid transparent;border-left:7px solid var(--accent-2);border-right:0}
+.trsum .ends .ar{flex:1;display:block !important;min-width:24px;height:1.5px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--accent));position:relative}
+.trsum .ends .ar::after{content:"";position:absolute;right:-1px;top:-4px;border:5px solid transparent;border-left:7px solid var(--accent);border-right:0}
 .trsum .dip{font:400 11px var(--font-mono);color:var(--muted);margin-top:2px}
 .trsum .st{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap}
 .trsum .st div{font:600 15px var(--font-display);color:var(--ink)}
 .trsum .st span{display:block;font:500 9px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:1px}
 .trsum .res{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:11.5px;color:var(--ink-2)}
 .trline{display:flex;align-items:center;flex-wrap:wrap;gap:4px 0;margin:4px 0 12px}
-.trline .st{display:inline-flex;align-items:center;gap:5px;font:600 11px var(--font-mono);padding:3px 8px;border-radius:99px;
-  border:1.5px solid var(--c);color:var(--ink);background:color-mix(in srgb,var(--c) 12%,transparent);cursor:default}
+.trline .st{display:inline-flex;align-items:center;gap:5px;font:600 11px var(--font-mono);padding:3px 9px;border-radius:99px;
+  border:1px solid var(--line-strong);color:var(--ink);background:var(--surface-2);cursor:default;transition:border-color .15s}
+.trline .st:hover{border-color:var(--accent)}
 .trline .lk{display:inline-flex;align-items:center;font:600 9.5px var(--font-mono);color:var(--muted);padding:0 2px}
 .trline .lk::before,.trline .lk::after{content:"";width:8px;height:2px;background:var(--line-strong)}
 .trline .lk i{font-style:normal;padding:1px 5px;border-radius:4px;background:var(--surface-3);color:var(--ink-2);margin:0 2px}
 .hops{display:flex;flex-direction:column;gap:0;position:relative}
 .hop{position:relative;display:grid;grid-template-columns:26px 1fr;gap:12px;padding:0 0 14px}
-.hop::before{content:"";position:absolute;left:12px;top:26px;bottom:0;width:2px;border-radius:2px;
-  background:linear-gradient(var(--c),var(--c2))}
+.hop::before{content:"";position:absolute;left:12px;top:26px;bottom:0;width:1.5px;border-radius:2px;
+  background:color-mix(in srgb,var(--accent) 55%,var(--line))}
 .hop:last-child::before{display:none}
-.hop .n{width:26px;height:26px;border-radius:50%;background:var(--c);color:var(--on-accent);
-  font:700 11px var(--font-mono);display:flex;align-items:center;justify-content:center;
-  box-shadow:0 0 0 3px var(--surface),0 0 12px color-mix(in srgb,var(--c) 55%,transparent)}
+.hop .n{width:24px;height:24px;margin:1px;border-radius:50%;background:var(--surface);color:var(--accent-ink);border:1.5px solid var(--accent);
+  font:700 10.5px var(--font-mono);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px var(--surface)}
+.hop:first-child .n,.hop:last-child .n{background:var(--accent);color:var(--on-accent)}
 .hop .card{border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--surface-2);transition:border-color .15s,box-shadow .15s}
 .hop:hover .card{border-color:var(--c);box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 40%,transparent)}
 .hop .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -1243,7 +1258,7 @@ function traceSteps(r){
   });
   return steps;
 }
-function trColor(f){ return "color-mix(in srgb, var(--accent-2) "+Math.round(Math.max(0,Math.min(1,f))*100)+"%, var(--accent))"; }
+function trColor(){ return "var(--accent)"; }
 function opOf(a){
   a=a||"";
   if(/^push/.test(a)) return "push";
@@ -1277,76 +1292,90 @@ function orientSeg(l, from){
   var sg=l._seg; if(!sg) return null;
   return l._A===from ? [sg.p0,sg.p1,sg.p2] : [sg.p2,sg.p1,sg.p0];
 }
+var OP_COLOR={push:"var(--ok)", swap:"var(--warn)", pop:"var(--accent-2)", done:"var(--accent)",
+  fwd:"var(--muted)", encap:"var(--xe)", err:"var(--crit)"};
 function drawTrace(byName){
-  var r=trace.res, steps=traceSteps(r), N=steps.length;
-  var clock=(performance.now()/1000);
-  var pktD="", lastEnd=null;
+  var r=trace.res, steps=traceSteps(r), N=steps.length, ok=r.result==="reached";
+  var full="", started=false;
+  function P(p){ return p.x.toFixed(1)+","+p.y.toFixed(1); }
+  // rings behind the routers on the path (under the links layer)
   steps.forEach(function(st, i){
-    var h=st.h, f0=N>1?i/(N-1):0, f1=N>1?(i+1)/(N-1):1, col=trColor((f0+f1)/2);
+    var n=byName[st.node]; if(!n) return;
+    var rr=R_ICON+7;
+    gTraceU.appendChild(svgEl("ellipse",{cx:n.x,cy:n.y,rx:rr,ry:rr-6,class:"trring"+(i===0?" src":""),"data-step":i}));
+    if(i===N-1 && N>1 && ok){
+      gTraceU.appendChild(svgEl("ellipse",{cx:n.x,cy:n.y,rx:rr+6,ry:rr,class:"trring dst2"}));
+      gTraceU.appendChild(svgEl("ellipse",{cx:n.x,cy:n.y,rx:rr,ry:rr-6,class:"trripple"}));
+    }
+  });
+  steps.forEach(function(st, i){
+    var h=st.h;
     (h.ecmp_links||[]).forEach(function(id){
       var l=linkById(id), o=l&&orientSeg(l,st.node); if(!o) return;
-      gTraceU.appendChild(svgEl("path",{d:"M"+o[0].x+","+o[0].y+" Q"+o[1].x+","+o[1].y+" "+o[2].x+","+o[2].y,
-        class:"tralt", style:"stroke:"+col}));
+      gTraceU.appendChild(svgEl("path",{d:"M"+P(o[0])+" Q"+P(o[1])+" "+P(o[2]), class:"tralt"}));
     });
     var l=h.link&&linkById(h.link), o=l&&orientSeg(l, st.node);
     if(!o) return;
-    var d="M"+o[0].x.toFixed(1)+","+o[0].y.toFixed(1)+" Q"+o[1].x.toFixed(1)+","+o[1].y.toFixed(1)+" "+o[2].x.toFixed(1)+","+o[2].y.toFixed(1);
+    var d="M"+P(o[0])+" Q"+P(o[1])+" "+P(o[2]);
     var g=svgEl("g",{class:"trseg","data-step":i});
-    g.appendChild(svgEl("path",{d:d,class:"trglow",style:"stroke:"+col}));
-    g.appendChild(svgEl("path",{d:d,class:"trpath",style:"stroke:"+col}));
-    var dash=svgEl("path",{d:d,class:"trdash"}); dash.style.animationDelay=(-(clock%0.7)).toFixed(2)+"s";
-    g.appendChild(dash);
-    gTraceU.appendChild(g);       // under the links, so the interface pills stay on top
-    // packet route: into the router's centre, then out along the next link
+    g.appendChild(svgEl("path",{d:d,class:"trglow"}));
+    g.appendChild(svgEl("path",{d:d,class:"trcore"}));
+    // one small chevron a third of the way along, pointing the way the packet goes
+    var sg={p0:o[0],p1:o[1],p2:o[2]}, cp=qpt(sg,0.3), ca=tangentAng(sg,0.3)*180/Math.PI;
+    g.appendChild(svgEl("path",{d:"M-3.5,-4.5 L1.5,0 L-3.5,4.5", class:"trchev",
+      transform:"translate("+P(cp)+") rotate("+ca.toFixed(1)+") scale("+LS.toFixed(3)+")"}));
+    gTraceU.appendChild(g);
+    // the comet's route runs through each router's centre
     var A=byName[st.node];
-    pktD += (pktD ? " L"+A.x.toFixed(1)+","+A.y.toFixed(1)+" L" : "M") + o[0].x.toFixed(1)+","+o[0].y.toFixed(1)
-          + " Q"+o[1].x.toFixed(1)+","+o[1].y.toFixed(1)+" "+o[2].x.toFixed(1)+","+o[2].y.toFixed(1);
-    lastEnd=o[2];
-    // the packet header on this link, beside its middle
-    var sg={p0:o[0],p1:o[1],p2:o[2]}, m=qpt(sg,0.5), ang=tangentAng(sg,0.5), off=17*LS;
-    var w=wireOf(h, r.dst), widths=w.map(function(x){ return x.t.length*6+10; }), tw=widths.reduce(function(a,b){ return a+b; },0);
-    var hx=m.x-Math.sin(ang)*off, hy=m.y+Math.cos(ang)*off;
-    var hg=svgEl("g",{class:"trhdr","data-step":i,transform:"translate("+hx.toFixed(1)+","+hy.toFixed(1)+") scale("+LS.toFixed(3)+")"});
-    hg.appendChild(svgEl("rect",{x:-tw/2-1,y:-9,width:tw+2,height:18,rx:5}));
-    var x=-tw/2;
-    w.forEach(function(p, j){
-      var bx=svgEl("rect",{x:x,y:-8,width:widths[j],height:16,rx:j===0?4:0,class:p.k});
-      if(p.k==="lb") bx.setAttribute("style","fill:"+col);
-      hg.appendChild(bx);
-      var t=svgEl("text",{x:x+widths[j]/2,y:3.5,"text-anchor":"middle",class:p.k+"t"}); t.textContent=p.t; hg.appendChild(t);
-      x+=widths[j];
+    full += (started ? " L"+P(A)+" L" : "M"+P(A)+" L") + P(o[0]) + " Q"+P(o[1])+" "+P(o[2]);
+    started=true;
+    // what is on the wire, beside the middle of the link: labels (top first) · payload
+    var m=qpt(sg,0.5), ang=tangentAng(sg,0.5), off=15*LS;
+    var w=wireOf(h, r.dst), parts=[];
+    w.forEach(function(x, j){ if(j) parts.push({t:"·",k:"sep"}); parts.push({t:x.t,k:x.k}); });
+    var tw=parts.reduce(function(a,x){ return a+x.t.length*5.6+(x.k==="sep"?4:0); },0)+14;
+    var hg=svgEl("g",{class:"trhdr","data-step":i,transform:"translate("+(m.x-Math.sin(ang)*off).toFixed(1)+","
+      +(m.y+Math.cos(ang)*off).toFixed(1)+") scale("+LS.toFixed(3)+")"});
+    hg.appendChild(svgEl("rect",{x:-tw/2,y:-8,width:tw,height:16,rx:8,class:"bg"}));
+    var x=-tw/2+7;
+    parts.forEach(function(p){
+      var pw=p.t.length*5.6+(p.k==="sep"?4:0);
+      var t=svgEl("text",{x:(x+pw/2).toFixed(1),y:3.2,"text-anchor":"middle",class:p.k}); t.textContent=p.t; hg.appendChild(t);
+      x+=pw;
     });
-    var tt=svgEl("title",{}); tt.textContent=st.node+" → "+(l.a===st.node?l.b:l.a)+": "+w.map(function(x){ return x.t; }).join(" | ")
-      +"\n(top label first)"; hg.appendChild(tt);
+    var tt=svgEl("title",{}); tt.textContent="on the wire "+st.node+" → "+(l.a===st.node?l.b:l.a)+":  "
+      +w.map(function(x){ return x.t; }).join(" | ")+"   (top label first)"; hg.appendChild(tt);
     gTrace.appendChild(hg);
   });
-  // a packet travelling the whole path; SMIL runs on document time, so the
-  // phase survives the map being redrawn
-  var dstStep=steps[N-1];
-  if(pktD && dstStep && byName[dstStep.node] && !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)){
-    var D=byName[dstStep.node]; pktD+=" L"+D.x.toFixed(1)+","+D.y.toFixed(1);
-    var dur=Math.max(2.4, N*1.1).toFixed(1)+"s";
-    var pk=svgEl("g",{});
-    pk.appendChild(svgEl("circle",{r:(7*LS).toFixed(2),class:"trpkt-ring"}));
-    pk.appendChild(svgEl("circle",{r:(3.6*LS).toFixed(2),class:"trpkt"}));
-    pk.appendChild(svgEl("animateMotion",{dur:dur, repeatCount:"indefinite", path:pktD, begin:"0s"}));
-    gTrace.appendChild(pk);
+  // the comet: three dashes of one long path, heads aligned, tails fading.
+  // Phase comes from the page clock, so a redraw does not restart it.
+  var last=steps[N-1], D=last&&byName[last.node];
+  if(full && D){
+    full+=" L"+P(D);
+    var probe=svgEl("path",{d:full}); gTrace.appendChild(probe);
+    var L=probe.getTotalLength(); probe.remove();
+    var speed=260*LS, pause=0.9, travel=(L+140)/speed, dur=travel+pause;
+    var span=(L+140)*dur/travel;                       // distance covered over a whole cycle incl. the pause
+    [["t1",190],["t2",120],["t3",68],["t4",32],["t5",11]].forEach(function(c){
+      var len=c[1]*LS, p=svgEl("path",{d:full,class:"trcomet "+c[0]});
+      p.style.setProperty("--len", len.toFixed(1));
+      p.style.setProperty("--o0", len.toFixed(1));
+      p.style.setProperty("--o1", (len-span).toFixed(1));
+      p.style.setProperty("--dur", dur.toFixed(2)+"s");
+      p.style.animationDelay=(-((performance.now()/1000)%dur)).toFixed(2)+"s";
+      gTrace.appendChild(p);
+    });
   }
-  // operation chips above each router on the path
+  // one small chip above each router: step number, a dot for the kind of operation, the operation
   steps.forEach(function(st, i){
     var n=byName[st.node]; if(!n) return;
-    var f=N>1?i/(N-1):0, col=opOf(st.h.action)==="err"?"var(--crit)":trColor(f), txt=opShort(st.h.action), w=txt.length*6.1+30;
-    var g=svgEl("g",{class:"trop","data-step":i,transform:"translate("+n.x.toFixed(1)+","+(n.y-R_ICON-14*LS).toFixed(1)+") scale("+LS.toFixed(3)+")"});
-    g.appendChild(svgEl("rect",{x:-w/2,y:-10,width:w,height:20,rx:10,style:"stroke:"+col}));
-    g.appendChild(svgEl("circle",{cx:-w/2+10,cy:0,r:7,style:"fill:"+col}));
-    var nt=svgEl("text",{x:-w/2+10,y:3.3,"text-anchor":"middle",class:"n"}); nt.textContent=String(i+1); g.appendChild(nt);
-    var t=svgEl("text",{x:-w/2+22,y:3.5}); t.textContent=txt; g.appendChild(t);
-    if(i===0 || i===N-1){
-      var fl=i===0?"SOURCE":(r.result==="reached"?"DESTINATION":"STOPPED"), fw=fl.length*6+12;
-      var fg=svgEl("g",{class:"trflag",transform:"translate("+(-w/2)+",-24)"});
-      fg.appendChild(svgEl("rect",{x:0,y:-6,width:fw,height:12,rx:3,style:"fill:"+(r.result!=="reached"&&i>0?"var(--warn)":col)}));
-      var ft=svgEl("text",{x:6,y:3}); ft.textContent=fl; fg.appendChild(ft); g.appendChild(fg);
-    }
+    var op=opOf(st.h.action), txt=opShort(st.h.action).toUpperCase(), w=txt.length*6.1+38;
+    var g=svgEl("g",{class:"trop","data-step":i,transform:"translate("+n.x.toFixed(1)+","+(n.y-R_ICON-13*LS).toFixed(1)+") scale("+LS.toFixed(3)+")"});
+    g.appendChild(svgEl("rect",{x:-w/2,y:-9,width:w,height:18,rx:9,class:"bg"}));
+    g.appendChild(svgEl("circle",{cx:-w/2+9,cy:0,r:6.5,class:"num"}));
+    var nt=svgEl("text",{x:-w/2+9,y:3.1,"text-anchor":"middle",class:"n"}); nt.textContent=String(i+1); g.appendChild(nt);
+    g.appendChild(svgEl("circle",{cx:-w/2+22,cy:0,r:2.6,class:"dot",style:"fill:"+OP_COLOR[op]}));
+    var t=svgEl("text",{x:-w/2+29,y:3.3,class:"t"}); t.textContent=txt; g.appendChild(t);
     gTrace.appendChild(g);
   });
 }
