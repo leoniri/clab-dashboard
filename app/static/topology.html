@@ -1302,6 +1302,10 @@ function wireOf(h, dst){
   out.push({t:inner, k:"pl"});
   return out;
 }
+function travelAng(c,t){
+  var dx=2*(1-t)*(c.p1.x-c.p0.x)+2*t*(c.p2.x-c.p1.x), dy=2*(1-t)*(c.p1.y-c.p0.y)+2*t*(c.p2.y-c.p1.y);
+  return Math.atan2(dy,dx);
+}
 function orientSeg(l, from){
   var sg=l._seg; if(!sg) return null;
   return l._A===from ? [sg.p0,sg.p1,sg.p2] : [sg.p2,sg.p1,sg.p0];
@@ -1345,7 +1349,8 @@ function drawTrace(byName){
     g.appendChild(svgEl("path",{d:d,class:"trglow"}));
     g.appendChild(svgEl("path",{d:d,class:"trcore"}));
     // one small chevron a third of the way along, pointing the way the packet goes
-    var sg={p0:o[0],p1:o[1],p2:o[2]}, cp=qpt(sg,0.3), ca=tangentAng(sg,0.3)*180/Math.PI;
+    // the true direction of travel - tangentAng() flips angles to keep text upright
+    var sg={p0:o[0],p1:o[1],p2:o[2]}, cp=qpt(sg,0.3), ca=travelAng(sg,0.3)*180/Math.PI;
     g.appendChild(svgEl("path",{d:"M-3.5,-4.5 L1.5,0 L-3.5,4.5", class:"trchev",
       transform:"translate("+P(cp)+") rotate("+ca.toFixed(1)+") scale("+LS.toFixed(3)+")"}));
     gTraceU.appendChild(g);
