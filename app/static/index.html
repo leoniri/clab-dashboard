@@ -13,33 +13,77 @@
   padding:4px 10px;border:1px solid var(--line);border-radius:99px;background:var(--surface)}
 .live.stale{color:var(--crit);border-color:color-mix(in srgb,var(--crit) 40%,transparent)}
 
-/* ---------- host instruments ---------- */
-.host{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 26px}
-.meter{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
-  padding:13px 16px 14px;min-width:0;overflow:hidden}
-.meter::after{content:"";position:absolute;inset:0 0 auto 0;height:1px;
-  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--accent) 45%,transparent),transparent);opacity:.6}
-.meter .k{display:flex;align-items:center;gap:7px;font:600 10.5px var(--font-mono);letter-spacing:.12em;
-  text-transform:uppercase;color:var(--muted)}
-.meter .k svg{width:14px;height:14px;color:var(--accent)}
-.meter .k .side{margin-left:auto;letter-spacing:.02em;text-transform:none;font-weight:500;color:var(--ink-2)}
-.meter .v{font:600 24px/1.15 var(--font-mono);margin-top:8px;font-variant-numeric:tabular-nums;white-space:nowrap;
-  letter-spacing:-.02em}
-.meter .v small{font:400 12px var(--font-mono);color:var(--muted);margin-left:6px;letter-spacing:0}
-.meter .spark{position:absolute;right:12px;bottom:12px;width:44%;height:34px;opacity:.9}
-.meter .spark path.a{fill:color-mix(in srgb,var(--accent) 16%,transparent);stroke:none}
-.meter .spark path.l{fill:none;stroke:var(--accent);stroke-width:1.6;vector-effect:non-scaling-stroke}
-.meter .spark.warn path.l{stroke:var(--warn)} .meter .spark.warn path.a{fill:var(--warn-soft)}
-.meter .spark.crit path.l{stroke:var(--crit)} .meter .spark.crit path.a{fill:var(--crit-soft)}
-.bar{height:5px;border-radius:3px;background:var(--surface-3);margin-top:12px;overflow:hidden;max-width:52%}
-.bar.full{max-width:none}
-.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-ink));border-radius:3px;transition:width .6s ease}
-.bar i.warn{background:var(--warn)} .bar i.crit{background:var(--crit)}
-.segbar{display:flex;gap:3px;margin-top:12px;height:5px}
-.segbar i{flex:1;border-radius:2px;background:var(--surface-3)}
-.segbar i.on{background:var(--ok);box-shadow:0 0 6px color-mix(in srgb,var(--ok) 60%,transparent)}
-@media (max-width:980px){ .host{grid-template-columns:1fr 1fr} }
-@media (max-width:520px){ .host{grid-template-columns:1fr} }
+/* ---------- host instruments ----------
+   One panel, four cells split by hairlines. Each cell: label row, a ring
+   gauge beside the headline number, and a full-width footer strip (trend line,
+   capacity bar or running labs) so all four line up. */
+.host{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 28px;
+  border:1px solid var(--line);border-radius:16px;overflow:hidden;isolation:isolate;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--surface-2) 70%,var(--surface)) 0%,var(--surface) 100%);
+  box-shadow:var(--shadow)}
+.host::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;z-index:2;pointer-events:none;
+  background:linear-gradient(90deg,transparent 0%,color-mix(in srgb,var(--accent) 55%,transparent) 30%,
+    color-mix(in srgb,var(--accent-2) 45%,transparent) 70%,transparent 100%)}
+.host::after{content:"";position:absolute;inset:-40% 40% auto -10%;height:120%;z-index:-1;pointer-events:none;
+  background:radial-gradient(closest-side,color-mix(in srgb,var(--accent) 7%,transparent),transparent)}
+.inst{position:relative;min-width:0;padding:16px 20px 0;display:flex;flex-direction:column}
+.inst + .inst{border-left:1px solid var(--line)}
+.inst .k{display:flex;align-items:center;gap:8px;font:500 12px var(--font-sans);color:var(--ink-2);letter-spacing:.01em}
+.inst .k .ic{display:grid;place-items:center;width:22px;height:22px;border-radius:7px;
+  background:var(--accent-soft);color:var(--accent-ink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 22%,transparent)}
+.inst .k .ic svg{width:13px;height:13px}
+.inst .k .chip{margin-left:auto;font:500 10.5px var(--font-mono);padding:2px 8px;border-radius:99px;
+  color:var(--muted);background:var(--surface-3);white-space:nowrap}
+.inst .k .chip.ok{color:var(--ok);background:var(--ok-soft)}
+.inst .k .chip.warn{color:var(--warn);background:var(--warn-soft)}
+.inst .k .chip.crit{color:var(--crit);background:var(--crit-soft)}
+.inst .body{display:flex;align-items:center;gap:16px;margin-top:14px}
+.ring{flex:none;position:relative;width:58px;height:58px}
+.ring svg{width:58px;height:58px;transform:rotate(-90deg);overflow:visible}
+.ring .track{fill:none;stroke:var(--surface-3);stroke-width:5}
+.ring .arc{fill:none;stroke:var(--ring,var(--accent));stroke-width:5;stroke-linecap:round;
+  transition:stroke-dashoffset .9s cubic-bezier(.2,.7,.2,1),stroke .4s;
+  filter:drop-shadow(0 0 5px color-mix(in srgb,var(--ring,var(--accent)) 45%,transparent))}
+.ring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:600 13px var(--font-mono);
+  font-variant-numeric:tabular-nums;color:var(--ink);letter-spacing:-.02em}
+.ring b small{font-size:9px;color:var(--muted);margin-left:1px;font-weight:500}
+.inst.warn{--ring:var(--warn)} .inst.crit{--ring:var(--crit)} .inst.okc{--ring:var(--ok)}
+.inst .num{min-width:0}
+.inst .v{font:600 26px/1.05 var(--font-display);letter-spacing:-.025em;font-variant-numeric:tabular-nums;
+  white-space:nowrap;color:var(--ink)}
+.inst .v small{font:500 13px var(--font-sans);color:var(--muted);margin-left:5px;letter-spacing:0}
+.inst .d{font:400 11.5px var(--font-mono);color:var(--muted);margin-top:6px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.inst .d em{font-style:normal;color:var(--ink-2)}
+.inst .foot{margin:14px -20px 0;height:44px;position:relative}
+/* trend line, edge to edge, fading out at the top */
+.inst .trend{position:absolute;inset:0;width:100%;height:100%;display:block}
+.inst .trend .l{fill:none;stroke:var(--ring,var(--accent));stroke-width:1.5;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+.inst .trend .dot{fill:var(--ring,var(--accent))}
+.inst .foot .span{position:absolute;right:12px;top:2px;font:500 9.5px var(--font-mono);color:var(--muted);
+  letter-spacing:.06em;text-transform:uppercase;opacity:.8}
+/* disk capacity */
+.cap{position:absolute;left:20px;right:20px;top:8px}
+.cap .track{height:8px;border-radius:99px;background:var(--surface-3);overflow:hidden;
+  box-shadow:inset 0 1px 1px rgba(0,0,0,.18)}
+.cap .used{height:100%;border-radius:99px;transition:width .9s cubic-bezier(.2,.7,.2,1);
+  background:linear-gradient(90deg,color-mix(in srgb,var(--ring,var(--accent)) 70%,transparent),var(--ring,var(--accent)));
+  box-shadow:0 0 10px color-mix(in srgb,var(--ring,var(--accent)) 40%,transparent)}
+.cap .legend{display:flex;justify-content:space-between;margin-top:8px;font:500 10.5px var(--font-mono);color:var(--muted)}
+.cap .legend i{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:6px;vertical-align:0;background:var(--ring,var(--accent))}
+.cap .legend span + span i{background:var(--surface-3);box-shadow:inset 0 0 0 1px var(--line-strong)}
+/* running labs */
+.runl{position:absolute;left:20px;right:20px;top:6px;display:flex;gap:6px;flex-wrap:nowrap;overflow:hidden}
+.runl a{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:3px 9px;border-radius:99px;
+  font:500 11px var(--font-mono);color:var(--ink-2);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  background:var(--ok-soft);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ok) 25%,transparent)}
+.runl a:hover{color:var(--ink)}
+.runl a i{flex:none;width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok)}
+.runl .more{color:var(--muted);background:var(--surface-3);box-shadow:none}
+.runl .none{font:400 11px var(--font-mono);color:var(--muted);padding-top:3px}
+@media (max-width:1100px){ .host{grid-template-columns:1fr 1fr} .inst:nth-child(3){border-left:0}
+  .inst:nth-child(n+3){border-top:1px solid var(--line)} }
+@media (max-width:560px){ .host{grid-template-columns:1fr} .inst + .inst{border-left:0;border-top:1px solid var(--line)} }
 
 /* ---------- toolbar ---------- */
 .listhead{display:flex;align-items:center;gap:10px;margin:0 0 12px;flex-wrap:wrap}
@@ -191,7 +235,7 @@
 var POLL_IDLE = 3000, POLL_BUSY = 1000;
 var state = null, expanded = new Set(), filter = "all";
 var job = null, jobLines = 0, follow = true, timer = null, failures = 0;
-var memHist = [], cpuHist = [];
+var memHist = [], cpuHist = [], histT = [];
 
 // ---------- helpers ----------
 function $(id){ return document.getElementById(id); }
@@ -244,45 +288,137 @@ UI.commands([
 UI.keys([{keys:"Enter", label:"on a focused lab row: show / hide its nodes"}]);
 
 // ---------- host stats ----------
-function spark(hist, cls){
-  var w = 100, h = 30, n = hist.length;
-  var s = svgEl("svg", {"class":"spark " + (cls || ""), viewBox:"0 0 " + w + " " + h, preserveAspectRatio:"none"});
-  if (n < 2) return s;
-  var max = Math.max(10, Math.max.apply(null, hist) * 1.15);
-  var pts = hist.map(function(v, i){ return [(i / (n - 1)) * w, h - (v / max) * (h - 2) - 1]; });
-  var d = pts.map(function(p, i){ return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join("");
-  s.appendChild(svgEl("path", {"class":"a", d: d + "L" + w + " " + h + "L0 " + h + "Z"}));
-  s.appendChild(svgEl("path", {"class":"l", d: d}));
-  return s;
+// Built once, then updated in place so the gauges and bars animate.
+var RING_C = 2 * Math.PI * 25;
+var inst = null;
+function instCell(ic, label){
+  var c = el("div","inst"), k = el("div","k"), i = el("span","ic");
+  i.appendChild(UI.icon(ic)); k.appendChild(i); k.appendChild(el("span", null, label));
+  var chip = el("span","chip"); k.appendChild(chip); c.appendChild(k);
+  var body = el("div","body"), ring = el("div","ring");
+  var sv = svgEl("svg", {viewBox:"0 0 58 58"});
+  sv.appendChild(svgEl("circle", {"class":"track", cx:29, cy:29, r:25}));
+  var arc = svgEl("circle", {"class":"arc", cx:29, cy:29, r:25, "stroke-dasharray":RING_C, "stroke-dashoffset":RING_C});
+  sv.appendChild(arc); ring.appendChild(sv);
+  var rl = el("b"); ring.appendChild(rl); body.appendChild(ring);
+  var num = el("div","num"), v = el("div","v"), d = el("div","d");
+  num.appendChild(v); num.appendChild(d); body.appendChild(num); c.appendChild(body);
+  var foot = el("div","foot"); c.appendChild(foot);
+  $("stats").appendChild(c);
+  return {c:c, chip:chip, arc:arc, rl:rl, v:v, d:d, foot:foot};
 }
-function renderStats(h){
-  var box = $("stats");
-  box.textContent = "";
+function setRing(x, frac, label, unit){
+  x.arc.setAttribute("stroke-dashoffset", (RING_C * (1 - Math.max(0, Math.min(1, frac)))).toFixed(2));
+  x.rl.textContent = label; if (unit) x.rl.appendChild(el("small", null, unit));
+}
+function setVal(x, big, unit){ x.v.textContent = big; if (unit) x.v.appendChild(el("small", null, unit)); }
+function setDesc(x, parts){
+  x.d.textContent = "";
+  parts.forEach(function(p, i){
+    if (i) x.d.appendChild(document.createTextNode(" · "));
+    if (Array.isArray(p)){ x.d.appendChild(el("em", null, p[0])); x.d.appendChild(document.createTextNode(" " + p[1])); }
+    else x.d.appendChild(document.createTextNode(p));
+  });
+}
+function setSev(x, sev){ x.c.classList.toggle("warn", sev === "warn"); x.c.classList.toggle("crit", sev === "crit"); }
+function setChip(x, text, cls){ x.chip.textContent = text; x.chip.className = "chip " + (cls || ""); }
+function sevWord(pct){ return pct >= 90 ? "critical" : pct >= 75 ? "high" : "normal"; }
+// smooth trend line (Catmull-Rom as cubic Béziers) with a gradient fill fading upwards
+var gradSeq = 0;
+function trend(x, hist){
+  var w = 300, h = 44, n = hist.length;
+  if (!x.tr){
+    var id = "tg" + (++gradSeq);
+    var s = svgEl("svg", {"class":"trend", viewBox:"0 0 " + w + " " + h, preserveAspectRatio:"none"});
+    var defs = svgEl("defs"), g = svgEl("linearGradient", {id:id, x1:0, y1:0, x2:0, y2:1});
+    var s1 = svgEl("stop", {offset:"0"}); s1.setAttribute("style", "stop-color:var(--ring,var(--accent));stop-opacity:.28");
+    var s2 = svgEl("stop", {offset:"1"}); s2.setAttribute("style", "stop-color:var(--ring,var(--accent));stop-opacity:0");
+    g.appendChild(s1); g.appendChild(s2); defs.appendChild(g); s.appendChild(defs);
+    var a = svgEl("path", {fill:"url(#" + id + ")"}), l = svgEl("path", {"class":"l"});
+    s.appendChild(a); s.appendChild(l);
+    x.foot.appendChild(s);
+    var sp = el("span","span"); x.foot.appendChild(sp);
+    x.tr = {a:a, l:l, sp:sp};
+  }
+  x.tr.sp.textContent = n > 1 ? "last " + dur(Math.max(60, Math.round((Date.now() - histT[0]) / 1000))) : "";
+  if (n < 2){ x.tr.a.setAttribute("d", ""); x.tr.l.setAttribute("d", ""); return; }
+  // the line's own range (at least 10 points), so a steady value sits mid-strip
+  var hi = Math.max.apply(null, hist), lo = Math.min.apply(null, hist);
+  var mid = (hi + lo) / 2, half = Math.max(5, (hi - lo) / 2 * 1.3);
+  lo = Math.max(0, mid - half); hi = lo + 2 * half;
+  var pts = hist.map(function(v, i){ return [(i / (n - 1)) * w, h - 4 - ((v - lo) / (hi - lo)) * (h - 14)]; });
+  var d = "M" + pts[0][0].toFixed(1) + " " + pts[0][1].toFixed(1);
+  for (var i = 0; i < n - 1; i++){
+    var p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    d += "C" + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(1) + " " + (p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)
+       + " " + (p2[0] - (p3[0] - p1[0]) / 6).toFixed(1) + " " + (p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)
+       + " " + p2[0].toFixed(1) + " " + p2[1].toFixed(1);
+  }
+  x.tr.l.setAttribute("d", d);
+  x.tr.a.setAttribute("d", d + "L" + w + " " + h + "L0 " + h + "Z");
+}
+function renderStats(h, labs){
+  if (!inst){
+    $("stats").textContent = "";
+    inst = {mem: instCell("mem", "Memory"), cpu: instCell("cpu", "CPU"),
+            disk: instCell("disk", "Disk"), labs: instCell("box", "Labs")};
+    inst.labs.c.classList.add("okc");
+    var cap = el("div","cap"), tr = el("div","track"), used = el("div","used"), lg = el("div","legend");
+    tr.appendChild(used); cap.appendChild(tr); cap.appendChild(lg); inst.disk.foot.appendChild(cap);
+    inst.disk.used = used; inst.disk.lg = lg;
+    inst.labs.runl = el("div","runl"); inst.labs.foot.appendChild(inst.labs.runl);
+  }
   var memPct = h.mem_pct || 0, diskPct = h.disk_pct || 0, cpuPct = h.cpu_pct || 0;
   var freeMb = (h.mem_total_mb || 0) - (h.mem_used_mb || 0);
-  function meter(ic, k, side, v, unit, title){
-    var m = el("div","meter"); if (title) m.title = title;
-    var kk = el("div","k"); kk.appendChild(UI.icon(ic)); kk.appendChild(el("span",null,k)); kk.appendChild(el("span","side",side||""));
-    m.appendChild(kk);
-    var val = el("div","v", v); if (unit) val.appendChild(el("small", null, unit)); m.appendChild(val);
-    box.appendChild(m);
-    return m;
+
+  var m = inst.mem;
+  setSev(m, sevClass(memPct)); setRing(m, memPct / 100, Math.round(memPct), "%");
+  setChip(m, gb(freeMb) + " free", sevClass(memPct) || "ok");
+  setVal(m, ((h.mem_used_mb || 0) / 1024).toFixed(1), "GB used");
+  setDesc(m, [["of " + gb(h.mem_total_mb || 0), "total"]]);
+  m.c.title = gb(freeMb) + " free of " + gb(h.mem_total_mb || 0);
+  trend(m, memHist);
+
+  var c = inst.cpu;
+  setSev(c, sevClass(cpuPct)); setRing(c, cpuPct / 100, Math.round(cpuPct), "%");
+  setChip(c, sevWord(cpuPct), sevClass(cpuPct) || "ok");
+  setVal(c, String(h.cpu_count || "?"), "cores");
+  setDesc(c, h.load ? [["load", h.load.join("  ")]] : ["load unknown"]);
+  c.c.title = h.load ? "load average 1 / 5 / 15 min: " + h.load.join(" / ") : "";
+  trend(c, cpuHist);
+
+  var dk = inst.disk, total = h.disk_total_gb || 0, free = h.disk_free_gb || 0;
+  setSev(dk, sevClass(diskPct)); setRing(dk, diskPct / 100, Math.round(diskPct), "%");
+  setChip(dk, sevWord(diskPct), sevClass(diskPct) || "ok");
+  setVal(dk, String(free), "GB free");
+  setDesc(dk, [["of " + total + " GB", "on /"]]);
+  dk.used.style.width = Math.min(100, diskPct) + "%";
+  dk.lg.textContent = "";
+  var u = el("span"); u.appendChild(el("i")); u.appendChild(document.createTextNode(Math.max(0, total - free) + " GB used"));
+  var f = el("span"); f.appendChild(el("i")); f.appendChild(document.createTextNode(free + " GB free"));
+  dk.lg.appendChild(u); dk.lg.appendChild(f);
+
+  var lb = inst.labs, run = h.labs_running || 0, tot = h.labs_total || 0;
+  setRing(lb, tot ? run / tot : 0, run + "/" + tot);
+  setChip(lb, (h.containers_running || 0) + " containers", run ? "ok" : "");
+  setVal(lb, String(run), run === 1 ? "lab running" : "labs running");
+  setDesc(lb, [[String(Math.max(0, tot - run)), "stopped"], [String(tot), "total"]]);
+  var names = (labs || []).filter(function(l){ return l.running; });
+  var sig = names.map(function(l){ return l.id; }).join();
+  if (lb.runSig !== sig){
+    lb.runSig = sig; lb.runl.textContent = "";
+    if (!names.length) lb.runl.appendChild(el("span","none","nothing running"));
+    names.slice(0, 2).forEach(function(l){
+      var a = el("a"); a.href = "topology.html?lab=" + encodeURIComponent(l.id); a.title = "open " + (l.name || l.file);
+      a.appendChild(el("i")); a.appendChild(document.createTextNode(l.name || l.file)); lb.runl.appendChild(a);
+    });
+    if (names.length > 2){
+      var mo = el("a","more", "+" + (names.length - 2)); mo.href = "#"; mo.title = names.slice(2).map(function(l){ return l.name; }).join(", ");
+      mo.addEventListener("click", function(e){ e.preventDefault(); setFilter("running"); });
+      lb.runl.appendChild(mo);
+    }
   }
-  function bar(m, pct, full){
-    var b = el("div","bar" + (full ? " full" : "")), i = el("i", sevClass(pct)); i.style.width = Math.min(100, pct) + "%";
-    b.appendChild(i); m.appendChild(b);
-  }
-  var mm = meter("mem", "Memory", memPct + "%", gb(h.mem_used_mb), "/ " + gb(h.mem_total_mb), gb(freeMb) + " free");
-  bar(mm, memPct); mm.appendChild(spark(memHist, sevClass(memPct)));
-  var cm = meter("cpu", "CPU", h.cpu_count ? h.cpu_count + " cores" : "", cpuPct.toFixed(0) + "%", h.load ? "load " + h.load[0] : "",
-        h.load ? "load average " + h.load.join(" ") : "");
-  bar(cm, cpuPct); cm.appendChild(spark(cpuHist, sevClass(cpuPct)));
-  var dm = meter("disk", "Disk", diskPct + "% used", h.disk_free_gb + " GB", "free", h.disk_total_gb + " GB total");
-  bar(dm, diskPct, true);
-  var lm = meter("box", "Labs", (h.containers_running||0) + " containers", (h.labs_running||0) + " running", "/ " + (h.labs_total||0));
-  var sb = el("div","segbar");
-  for (var i = 0; i < Math.min(h.labs_total || 0, 24); i++) sb.appendChild(el("i", i < (h.labs_running||0) ? "on" : ""));
-  lm.appendChild(sb);
+
   $("hostline").textContent = (h.hostname || "host") + "  ·  containerlab " + (h.clab_version || "?")
     + "  ·  up " + dur(h.uptime_s) + "  ·  " + (h.cpu_count || "?") + " cores, " + gb(h.mem_total_mb) + " RAM";
 }
@@ -762,9 +898,9 @@ function tick(){
       liveTxt.textContent = s.busy ? "live · job running" : "live";
       state = s;
       var h = s.host || {};
-      memHist.push(h.mem_pct || 0); cpuHist.push(h.cpu_pct || 0);
-      if (memHist.length > 60){ memHist.shift(); cpuHist.shift(); }
-      renderStats(h);
+      memHist.push(h.mem_pct || 0); cpuHist.push(h.cpu_pct || 0); histT.push(Date.now());
+      if (memHist.length > 60){ memHist.shift(); cpuHist.shift(); histT.shift(); }
+      renderStats(h, s.labs);
       var sig = labSignature(s);
       if (sig !== lastSig){ renderLabs(s); lastSig = sig; }
       schedule(s.busy ? POLL_BUSY : POLL_IDLE);
