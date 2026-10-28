@@ -103,107 +103,60 @@ body{overflow:hidden}
 .node circle.st{stroke:var(--canvas);stroke-width:2.5}
 
 /* ---------- path trace ----------
-   Quiet by design: off-path elements step back, the path is one thin accent
-   line over a soft blur, and a single comet (bright head, fading tail)
-   glides along it, passing behind each router. */
-/* the trace has its own colour: no link on the map is ever blue (green /
-   amber / red are adjacency state, teal is the UI accent, blues and violets
-   are router kinds); live link colours step aside while a trace is shown */
-:root{--trace:#4C8DFF;--trace-ink:#C7DBFF;--on-trace:#04122E}
+   Hairline by design: off-path elements step back; the path is a 1.4 px line
+   over a faint glow, and a light pulse of the same thickness runs along it
+   like light through a fibre. Marks around it are small and thin.
+   The trace has its own colour: no link on the map is ever blue (green /
+   amber / red are adjacency state, teal is the UI accent); live link
+   colours step aside while a trace is shown. */
+:root{--trace:#5B9BFF;--trace-ink:#CFE0FF;--on-trace:#04122E}
 :root[data-theme="light"]{--trace:#1D4ED8;--trace-ink:#1E40AF;--on-trace:#fff}
 .tracing .lk .link{stroke:var(--line-strong) !important;filter:none !important;transition:none !important}
 .tracing .lk.onpath .link{stroke:transparent !important}
 .tracing .lk .flowp,.tracing .lk .rate{display:none}
-.tracing .lk:not(.onpath){opacity:.18}
-.tracing .node:not(.onpath){opacity:.28}
+.tracing .lk:not(.onpath){opacity:.2}
+.tracing .node:not(.onpath){opacity:.3}
 .tracing .bgp{opacity:.15}
-.trglow{fill:none;stroke:var(--trace);stroke-width:9;stroke-linecap:round;opacity:.22;filter:blur(5px);pointer-events:none}
-.trcore{fill:none;stroke:var(--trace);stroke-width:2.4;stroke-linecap:round;pointer-events:none;transition:stroke-width .2s}
-.trseg.hl .trcore{stroke-width:4}
-.trseg.hl .trglow{opacity:.45}
-.tralt{fill:none;stroke:var(--trace);stroke-width:1.6;stroke-dasharray:3 5;opacity:.45;pointer-events:none}
-.trchev{fill:none;stroke:var(--trace-ink);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
-.trcomet{fill:none;stroke-linecap:round;pointer-events:none;animation:trcomet var(--dur) linear infinite;
+.trglow{fill:none;stroke:var(--trace);stroke-width:4;stroke-linecap:round;opacity:.22;filter:blur(2.5px);pointer-events:none}
+.trline{fill:none;stroke:var(--trace);stroke-width:1.4;stroke-linecap:round;pointer-events:none;transition:stroke-width .15s}
+.trhit{fill:none;stroke:transparent;stroke-width:14}
+.trseg.hl .trline{stroke-width:2.2} .trseg.hl .trglow{opacity:.45}
+.tralt{fill:none;stroke:var(--trace);stroke-width:1;stroke-dasharray:2 4;opacity:.5;pointer-events:none}
+.trchev{fill:none;stroke:var(--trace-ink);stroke-width:1.1;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+/* the pulse: dashes of one path through the route, heads aligned, tails fading */
+.trpulse{fill:none;stroke-linecap:round;pointer-events:none;animation:trpulse var(--dur) linear infinite;
   stroke-dasharray:var(--len) 100000;stroke-dashoffset:var(--o0)}
-.trcomet.t1{stroke:var(--trace);stroke-width:2.6;opacity:.16}
-.trcomet.t2{stroke:var(--trace);stroke-width:2.8;opacity:.3}
-.trcomet.t3{stroke:var(--trace-ink);stroke-width:3;opacity:.55}
-.trcomet.t4{stroke:var(--trace-ink);stroke-width:3.2;opacity:.85;filter:drop-shadow(0 0 3px var(--trace))}
-.trcomet.t5{stroke:#fff;stroke-width:3.6;filter:drop-shadow(0 0 4px var(--trace)) drop-shadow(0 0 10px var(--trace))}
-:root[data-theme="light"] .trcomet.t5{stroke:var(--trace-ink);filter:drop-shadow(0 0 4px var(--trace))}
-:root[data-theme="light"] .trcomet.t4{stroke:var(--trace)}
-@keyframes trcomet{from{stroke-dashoffset:var(--o0)} to{stroke-dashoffset:var(--o1)}}
-.trring{fill:color-mix(in srgb,var(--trace) 7%,transparent);stroke:var(--trace);stroke-width:1.3;opacity:.75;pointer-events:none}
-.trring.src{stroke-width:2;opacity:1}
-.trring.dst2{fill:none;opacity:.45}
-.trripple{fill:none;stroke:var(--trace);stroke-width:1.5;pointer-events:none;transform-box:fill-box;transform-origin:center;
-  animation:trripple 2.6s cubic-bezier(.2,.6,.3,1) infinite}
-@keyframes trripple{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.9);opacity:0}}
-.node.trhl .halo{opacity:1;stroke:var(--trace);stroke-width:2}
-.trop{pointer-events:none}
-.trop rect.bg{fill:color-mix(in srgb,var(--surface) 92%,transparent);stroke:var(--line-strong);stroke-width:1}
-.trop circle.num{fill:var(--trace)}
-.trop text.n{font-family:var(--font-mono);font-size:9px;font-weight:700;fill:var(--on-trace)}
-.trop text.t{font-family:var(--font-mono);font-size:9.5px;font-weight:600;letter-spacing:.06em;fill:var(--ink)}
-.trop circle.dot{stroke:none}
-.trop.hl rect.bg{stroke:var(--trace)}
-.trhdr{pointer-events:auto}
-.trhdr rect.bg{fill:color-mix(in srgb,var(--surface) 92%,transparent);stroke:var(--line);stroke-width:1}
-.trhdr text{font-family:var(--font-mono);font-size:9px;font-weight:600}
-.trhdr text.lb{fill:var(--trace-ink)} .trhdr text.pl{fill:var(--muted)} .trhdr text.sep{fill:var(--line-strong)}
-.trhdr.hl rect.bg{stroke:var(--trace)}
-.tracing .lk.onpath.blk .link{stroke:transparent !important}
-.trblk{fill:none;stroke:var(--crit);stroke-width:2.2;stroke-dasharray:5 5;opacity:.9;pointer-events:none}
-.trblock circle{fill:var(--surface);stroke:var(--crit);stroke-width:1.6}
-.trblock path:not(.trblk){stroke:var(--crit);stroke-width:1.8;stroke-linecap:round;fill:none}
+@keyframes trpulse{from{stroke-dashoffset:var(--o0)} to{stroke-dashoffset:var(--o1)}}
+.trpulse.p1{stroke:var(--trace);stroke-width:1.4;opacity:.25}
+.trpulse.p2{stroke:var(--trace);stroke-width:1.4;opacity:.5}
+.trpulse.p3{stroke:var(--trace-ink);stroke-width:1.5;opacity:.85}
+.trpulse.p4{stroke:#fff;stroke-width:1.7;filter:drop-shadow(0 0 2px var(--trace)) drop-shadow(0 0 5px var(--trace))}
+:root[data-theme="light"] .trpulse.p3{stroke:var(--trace)}
+:root[data-theme="light"] .trpulse.p4{stroke:var(--trace-ink);filter:drop-shadow(0 0 2px var(--trace))}
+.trend{fill:none;stroke:var(--trace);stroke-width:1;opacity:.55;pointer-events:none}
+.node.trhl .halo{opacity:1;stroke:var(--trace);stroke-width:1.2}
+/* station: a small numbered disc at the router's corner */
+.trst{pointer-events:none}
+.trst circle{fill:var(--surface);stroke:var(--trace);stroke-width:1.1}
+.trst text{font-family:var(--font-mono);font-size:8px;font-weight:700;fill:var(--trace-ink)}
+.trst.end circle{fill:var(--trace);stroke:none} .trst.end text{fill:var(--on-trace)}
+.trst.bad circle{stroke:var(--crit)} .trst.bad.end circle{fill:var(--crit)} .trst.bad.end text{fill:#fff}
+/* caption above the router and the wire card on each link: small, thin */
+.trcap,.trcard{pointer-events:none}
+.trcap rect.bg,.trcard rect.bg{fill:color-mix(in srgb,var(--surface) 94%,transparent);stroke:var(--line-strong);stroke-width:.8}
+.trcap text,.trcard text{font-family:var(--font-mono);font-size:8.5px;font-weight:500}
+.trcap text{fill:var(--ink-2);letter-spacing:.05em}
+.trcard{pointer-events:auto}
+.trcard text.lb{fill:var(--trace-ink);font-weight:600} .trcard text.pl{fill:var(--muted)} .trcard text.sep{fill:var(--line-strong)}
+.trcap.hl rect.bg,.trcard.hl rect.bg{stroke:var(--trace)}
+/* a dead link the router still points at */
+.trblk{fill:none;stroke:var(--crit);stroke-width:1.3;stroke-dasharray:3 4;pointer-events:none}
+.trblock circle{fill:var(--surface);stroke:var(--crit);stroke-width:1.1}
+.trblock path:not(.trblk){stroke:var(--crit);stroke-width:1.3;stroke-linecap:round;fill:none}
 .hop .why{margin-top:8px;padding:6px 9px;border-radius:7px;font:11px/1.45 var(--font-sans);
   color:var(--crit);background:var(--crit-soft)}
 .hop .why.warn{color:var(--warn);background:var(--warn-soft)}
-/* transit map */
-.trcase{fill:none;stroke:var(--canvas);stroke-width:11;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
-.trroute{fill:none;stroke:var(--trace);stroke-width:5;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;
-  filter:drop-shadow(0 0 6px color-mix(in srgb,var(--trace) 45%,transparent))}
-:root[data-theme="light"] .trcase{stroke:#fff}
-:root[data-theme="light"] .trroute{filter:drop-shadow(0 1px 2px color-mix(in srgb,var(--trace) 35%,transparent))}
-.drawin{stroke-dasharray:var(--L) var(--L);stroke-dashoffset:var(--L);animation:trdraw 1.1s cubic-bezier(.65,0,.35,1) forwards}
-@keyframes trdraw{to{stroke-dashoffset:0}}
-.trchevw{fill:none;stroke:#fff;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
-.trchevw.late{opacity:0;animation:trfade .4s ease 1s forwards}
-@keyframes trfade{to{opacity:1}}
-.trhit{fill:none;stroke:transparent;stroke-width:16}
-.trseg.hl .trhit{stroke:color-mix(in srgb,var(--trace) 22%,transparent)}
-.trglint{fill:none;stroke:#fff;stroke-width:2.6;stroke-linecap:round;opacity:.85;pointer-events:none;
-  stroke-dasharray:var(--len) 100000;stroke-dashoffset:var(--o0);animation:trcomet var(--dur) linear infinite;
-  filter:drop-shadow(0 0 4px #fff)}
-.trcard{pointer-events:auto}
-.trcard rect.bg{fill:var(--surface);stroke:var(--line-strong);stroke-width:1;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
-:root[data-theme="light"] .trcard rect.bg{filter:drop-shadow(0 3px 8px rgba(11,19,32,.12))}
-.trcard rect.lbx{fill:color-mix(in srgb,var(--trace) 18%,transparent)}
-.trcard text{font-family:var(--font-mono);font-size:9.5px;font-weight:600}
-.trcard text.lb{fill:var(--trace-ink);font-weight:700} .trcard text.pl{fill:var(--muted)}
-.trcard.hl rect.bg{stroke:var(--trace)}
-.trst{pointer-events:none}
-.trst .ring{fill:var(--surface);stroke:var(--trace);stroke-width:2.4}
-.trst text{font-family:var(--font-mono);font-size:10px;font-weight:700;fill:var(--trace-ink)}
-.trst.end .ring{fill:var(--trace)} .trst.end text{fill:#fff}
-.trst.bad .ring{stroke:var(--crit)} .trst.bad.end .ring{fill:var(--crit)}
-.trcap{pointer-events:none}
-.trcap rect.bg{fill:var(--surface);stroke:var(--line-strong);stroke-width:1;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35))}
-:root[data-theme="light"] .trcap rect.bg{filter:drop-shadow(0 3px 8px rgba(11,19,32,.12))}
-.trcap text{font-family:var(--font-mono);font-size:9.5px;font-weight:600;letter-spacing:.06em;fill:var(--ink)}
-.trcap.hl rect.bg{stroke:var(--trace)}
-/* particle flow */
-.trfline{fill:none;stroke:var(--trace);stroke-width:1.6;opacity:.55;pointer-events:none}
-.trfglow{fill:none;stroke:var(--trace);stroke-width:10;opacity:.12;filter:blur(4px);pointer-events:none}
-.trseg.hl .trfline{opacity:1;stroke-width:2.6}
-.trpart{pointer-events:none}
-.trpart .core{fill:#fff}
-.trpart .halo{fill:var(--trace);opacity:.35;filter:blur(2.5px)}
-:root[data-theme="light"] .trpart .core{fill:var(--trace)}
-.trfhalo{fill:color-mix(in srgb,var(--trace) 8%,transparent);stroke:color-mix(in srgb,var(--trace) 35%,transparent);stroke-width:1;pointer-events:none}
-.trfhalo.end{stroke:var(--trace);stroke-width:1.4}
-@media (prefers-reduced-motion:reduce){ .trglint,.trpart{display:none} .drawin{animation:none;stroke-dasharray:none} .trchevw.late{animation:none;opacity:1} }
-@media (prefers-reduced-motion:reduce){ .trcomet{display:none} .trripple{animation:none;opacity:0} }
+@media (prefers-reduced-motion:reduce){ .trpulse{display:none} }
 
 /* ---------- edit mode ---------- */
 .node.new .halo{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6;stroke-dasharray:5 3;opacity:1}
@@ -1356,250 +1309,104 @@ function orientSeg(l, from){
 }
 var OP_COLOR={push:"var(--ok)", swap:"var(--warn)", pop:"var(--accent-2)", done:"var(--trace)",
   fwd:"var(--muted)", encap:"var(--xe)", err:"var(--crit)"};
-function drawTraceComet(byName){
-  var r=trace.res, steps=traceSteps(r), N=steps.length, ok=r.result==="reached";
-  var full="", started=false;
-  function P(p){ return p.x.toFixed(1)+","+p.y.toFixed(1); }
-  // rings behind the routers on the path (under the links layer)
-  steps.forEach(function(st, i){
-    var n=byName[st.node]; if(!n) return;
-    var rr=R_ICON+7;
-    gTraceU.appendChild(svgEl("ellipse",{cx:n.x,cy:n.y,rx:rr,ry:rr-6,class:"trring"+(i===0?" src":""),"data-step":i}));
-    if(i===N-1 && N>1 && ok){
-      gTraceU.appendChild(svgEl("ellipse",{cx:n.x,cy:n.y,rx:rr+6,ry:rr,class:"trring dst2"}));
-      gTraceU.appendChild(svgEl("ellipse",{cx:n.x,cy:n.y,rx:rr,ry:rr-6,class:"trripple"}));
-    }
-  });
-  steps.forEach(function(st, i){
-    var h=st.h;
-    (h.ecmp_links||[]).forEach(function(id){
-      var l=linkById(id), o=l&&orientSeg(l,st.node); if(!o) return;
-      gTraceU.appendChild(svgEl("path",{d:"M"+P(o[0])+" Q"+P(o[1])+" "+P(o[2]), class:"tralt"}));
-    });
-    var l=h.link&&linkById(h.link), o=l&&orientSeg(l, st.node);
-    if(!o) return;
-    var d="M"+P(o[0])+" Q"+P(o[1])+" "+P(o[2]);
-    if(h.blocked){
-      // the router still points here, but the link is dead: the packet stops
-      var bg=svgEl("g",{class:"trblock","data-step":i});
-      bg.appendChild(svgEl("path",{d:d,class:"trblk"}));
-      var bm=qpt({p0:o[0],p1:o[1],p2:o[2]},0.5), xg=svgEl("g",{transform:"translate("+P(bm)+") scale("+LS.toFixed(3)+")"});
-      xg.appendChild(svgEl("circle",{r:9})); xg.appendChild(svgEl("path",{d:"M-3.5,-3.5 L3.5,3.5 M3.5,-3.5 L-3.5,3.5"}));
-      var bt=svgEl("title",{}); bt.textContent=h.blocked; xg.appendChild(bt);
-      bg.appendChild(xg); gTraceU.appendChild(bg);
-      return;
-    }
-    var g=svgEl("g",{class:"trseg","data-step":i});
-    g.appendChild(svgEl("path",{d:d,class:"trglow"}));
-    g.appendChild(svgEl("path",{d:d,class:"trcore"}));
-    // one small chevron a third of the way along, pointing the way the packet goes
-    // the true direction of travel - tangentAng() flips angles to keep text upright
-    var sg={p0:o[0],p1:o[1],p2:o[2]}, cp=qpt(sg,0.3), ca=travelAng(sg,0.3)*180/Math.PI;
-    g.appendChild(svgEl("path",{d:"M-3.5,-4.5 L1.5,0 L-3.5,4.5", class:"trchev",
-      transform:"translate("+P(cp)+") rotate("+ca.toFixed(1)+") scale("+LS.toFixed(3)+")"}));
-    gTraceU.appendChild(g);
-    // the comet's route runs through each router's centre
-    var A=byName[st.node];
-    full += (started ? " L"+P(A)+" L" : "M"+P(A)+" L") + P(o[0]) + " Q"+P(o[1])+" "+P(o[2]);
-    started=true;
-    // what is on the wire, beside the middle of the link: labels (top first) · payload
-    var m=qpt(sg,0.5), ang=tangentAng(sg,0.5), off=15*LS;
-    var w=wireOf(h, r.dst), parts=[];
-    w.forEach(function(x, j){ if(j) parts.push({t:"·",k:"sep"}); parts.push({t:x.t,k:x.k}); });
-    var tw=parts.reduce(function(a,x){ return a+x.t.length*5.6+(x.k==="sep"?4:0); },0)+14;
-    var hg=svgEl("g",{class:"trhdr","data-step":i,transform:"translate("+(m.x-Math.sin(ang)*off).toFixed(1)+","
-      +(m.y+Math.cos(ang)*off).toFixed(1)+") scale("+LS.toFixed(3)+")"});
-    hg.appendChild(svgEl("rect",{x:-tw/2,y:-8,width:tw,height:16,rx:8,class:"bg"}));
-    var x=-tw/2+7;
-    parts.forEach(function(p){
-      var pw=p.t.length*5.6+(p.k==="sep"?4:0);
-      var t=svgEl("text",{x:(x+pw/2).toFixed(1),y:3.2,"text-anchor":"middle",class:p.k}); t.textContent=p.t; hg.appendChild(t);
-      x+=pw;
-    });
-    var tt=svgEl("title",{}); tt.textContent="on the wire "+st.node+" → "+(l.a===st.node?l.b:l.a)+":  "
-      +w.map(function(x){ return x.t; }).join(" | ")+"   (top label first)"; hg.appendChild(tt);
-    gTrace.appendChild(hg);
-  });
-  // the comet: three dashes of one long path, heads aligned, tails fading.
-  // Phase comes from the page clock, so a redraw does not restart it.
-  var last=steps[N-1], D=last&&byName[last.node];
-  if(full && D){
-    full+=" L"+P(D);
-    var probe=svgEl("path",{d:full}); gTrace.appendChild(probe);
-    var L=probe.getTotalLength(); probe.remove();
-    var speed=260*LS, pause=0.9, travel=(L+140)/speed, dur=travel+pause;
-    var span=(L+140)*dur/travel;                       // distance covered over a whole cycle incl. the pause
-    [["t1",190],["t2",120],["t3",68],["t4",32],["t5",11]].forEach(function(c){
-      var len=c[1]*LS, p=svgEl("path",{d:full,class:"trcomet "+c[0]});
-      p.style.setProperty("--len", len.toFixed(1));
-      p.style.setProperty("--o0", len.toFixed(1));
-      p.style.setProperty("--o1", (len-span).toFixed(1));
-      p.style.setProperty("--dur", dur.toFixed(2)+"s");
-      p.style.animationDelay=(-((performance.now()/1000)%dur)).toFixed(2)+"s";
-      gTrace.appendChild(p);
-    });
-  }
-  // one small chip above each router: step number, a dot for the kind of operation, the operation
-  steps.forEach(function(st, i){
-    var n=byName[st.node]; if(!n) return;
-    var op=st.h.blocked?"err":opOf(st.h.action), txt=(st.h.blocked?"drop · link down":opShort(st.h.action)).toUpperCase(), w=txt.length*6.1+38;
-    var g=svgEl("g",{class:"trop","data-step":i,transform:"translate("+n.x.toFixed(1)+","+(n.y-R_ICON-13*LS).toFixed(1)+") scale("+LS.toFixed(3)+")"});
-    g.appendChild(svgEl("rect",{x:-w/2,y:-9,width:w,height:18,rx:9,class:"bg"}));
-    g.appendChild(svgEl("circle",{cx:-w/2+9,cy:0,r:6.5,class:"num"}));
-    var nt=svgEl("text",{x:-w/2+9,y:3.1,"text-anchor":"middle",class:"n"}); nt.textContent=String(i+1); g.appendChild(nt);
-    g.appendChild(svgEl("circle",{cx:-w/2+22,cy:0,r:2.6,class:"dot",style:"fill:"+OP_COLOR[op]}));
-    var t=svgEl("text",{x:-w/2+29,y:3.3,class:"t"}); t.textContent=txt; g.appendChild(t);
-    gTrace.appendChild(g);
-  });
-}
-// ---- trace styles: transit / flow / comet (View menu, ?trace=<style>) ----
-var TRACE_STYLES=[["transit","Transit map"],["flow","Particle flow"],["comet","Comet"]];
-var traceStyle=(function(){
-  var q=/[?&]trace=(transit|flow|comet)/.exec(location.search);
-  var v=q?q[1]:null;
-  try{ if(v) localStorage.setItem("clabd-trace-style",v); else v=localStorage.getItem("clabd-trace-style"); }catch(e){}
-  return v||"transit";
-})();
-function setTraceStyle(v){ traceStyle=v; try{ localStorage.setItem("clabd-trace-style",v); }catch(e){} traceDrawn=null; render(); }
-var traceDrawn=null;          // the result whose draw-in animation already played
-function drawTrace(byName){
-  $("stage").setAttribute("data-trs", traceStyle);
-  if(traceStyle==="comet") return drawTraceComet(byName);
-  if(traceStyle==="flow") return drawTraceFlow(byName);
-  return drawTraceTransit(byName);
-}
 function P_(p){ return p.x.toFixed(1)+","+p.y.toFixed(1); }
-// geometry shared by the styles: one oriented curve per hop, and one path
-// through the whole route (into each router's centre and out again)
+// one oriented curve per hop, and one path through the whole route (into
+// each router's centre and out again) for the pulse
 function traceGeom(byName){
-  var r=trace.res, steps=traceSteps(r), segs=[], full="", started=false;
+  var r=trace.res, steps=traceSteps(r), segs=[], full="", started=false, stopped=false;
   steps.forEach(function(st, i){
     var h=st.h, l=h.link&&linkById(h.link), o=l&&orientSeg(l, st.node), A=byName[st.node];
     if(!o || !A) return;
     var sg={p0:o[0],p1:o[1],p2:o[2]};
     segs.push({i:i, st:st, h:h, l:l, sg:sg, d:"M"+P_(o[0])+" Q"+P_(o[1])+" "+P_(o[2]), blocked:!!h.blocked});
-    if(h.blocked) return;
+    if(h.blocked || stopped){ stopped=true; return; }
     full += (started ? " L"+P_(A)+" L" : "M"+P_(A)+" L") + P_(o[0]) + " Q"+P_(o[1])+" "+P_(o[2]);
     started=true;
   });
-  // the route ends in the centre of the last router it reaches
   var lastOk=null;
   for(var k=0;k<segs.length;k++){ if(segs[k].blocked) break; lastOk=segs[k]; }
   if(lastOk){ var nx=steps[lastOk.i+1], E=nx&&byName[nx.node]; if(E) full+=" L"+P_(E); }
   return {r:r, steps:steps, N:steps.length, segs:segs, full:full, ok:r.result==="reached"};
 }
-function drawBlocked(sg, d, i, why){
-  var bg=svgEl("g",{class:"trblock","data-step":i});
-  bg.appendChild(svgEl("path",{d:d,class:"trblk"}));
-  var xg=svgEl("g",{transform:"translate("+P_(qpt(sg,0.5))+") scale("+LS.toFixed(3)+")"});
-  xg.appendChild(svgEl("circle",{r:9})); xg.appendChild(svgEl("path",{d:"M-3.5,-3.5 L3.5,3.5 M3.5,-3.5 L-3.5,3.5"}));
-  var bt=svgEl("title",{}); bt.textContent=why; xg.appendChild(bt);
-  bg.appendChild(xg); gTraceU.appendChild(bg);
-}
 function pathLen(d){ var p=svgEl("path",{d:d}); gTrace.appendChild(p); var L=p.getTotalLength(); p.remove(); return L; }
-// a card beside the middle of a link: what is on the wire (labels top first, payload)
-function wireCard(G, seg, cls){
-  var m=qpt(seg.sg,0.5), ang=tangentAng(seg.sg,0.5), off=19*LS, w=wireOf(seg.h, trace.res.dst);
-  var widths=w.map(function(x){ return x.t.length*6.2+(x.k==="lb"?12:8); }), tw=widths.reduce(function(a,b){ return a+b; },0)+8;
-  var g=svgEl("g",{class:cls,"data-step":seg.i,transform:"translate("+(m.x-Math.sin(ang)*off).toFixed(1)+","
-    +(m.y+Math.cos(ang)*off).toFixed(1)+") scale("+LS.toFixed(3)+")"});
-  g.appendChild(svgEl("rect",{x:-tw/2,y:-10,width:tw,height:20,rx:6,class:"bg"}));
-  var x=-tw/2+4;
-  w.forEach(function(p, j){
-    if(p.k==="lb") g.appendChild(svgEl("rect",{x:x,y:-6.5,width:widths[j]-4,height:13,rx:3.5,class:"lbx"}));
-    var t=svgEl("text",{x:(x+(widths[j]-(p.k==="lb"?4:0))/2).toFixed(1),y:3.4,"text-anchor":"middle",class:p.k}); t.textContent=p.t; g.appendChild(t);
-    x+=widths[j];
+function drawTrace(byName){
+  var geo=traceGeom(byName), still=window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // the line, per hop (hover target, faint glow, hairline, one small chevron)
+  geo.segs.forEach(function(sg){
+    (sg.h.ecmp_links||[]).forEach(function(id){
+      var l=linkById(id), o=l&&orientSeg(l, sg.st.node); if(!o) return;
+      gTraceU.appendChild(svgEl("path",{d:"M"+P_(o[0])+" Q"+P_(o[1])+" "+P_(o[2]),class:"tralt"}));
+    });
+    if(sg.blocked){
+      var bg=svgEl("g",{class:"trblock","data-step":sg.i});
+      bg.appendChild(svgEl("path",{d:sg.d,class:"trblk"}));
+      var xg=svgEl("g",{transform:"translate("+P_(qpt(sg.sg,0.5))+") scale("+LS.toFixed(3)+")"});
+      xg.appendChild(svgEl("circle",{r:6.5})); xg.appendChild(svgEl("path",{d:"M-2.5,-2.5 L2.5,2.5 M2.5,-2.5 L-2.5,2.5"}));
+      var bt=svgEl("title",{}); bt.textContent=sg.h.blocked; xg.appendChild(bt);
+      bg.appendChild(xg); gTraceU.appendChild(bg);
+      return;
+    }
+    var g=svgEl("g",{class:"trseg","data-step":sg.i});
+    g.appendChild(svgEl("path",{d:sg.d,class:"trhit"}));
+    g.appendChild(svgEl("path",{d:sg.d,class:"trglow"}));
+    g.appendChild(svgEl("path",{d:sg.d,class:"trline"}));
+    var cp=qpt(sg.sg,0.3), ca=travelAng(sg.sg,0.3)*180/Math.PI;
+    g.appendChild(svgEl("path",{d:"M-2.2,-3 L1.4,0 L-2.2,3",class:"trchev",
+      transform:"translate("+P_(cp)+") rotate("+ca.toFixed(1)+") scale("+LS.toFixed(3)+")"}));
+    gTraceU.appendChild(g);
   });
-  var tt=svgEl("title",{}); tt.textContent="on the wire "+seg.st.node+" → "+(seg.l.a===seg.st.node?seg.l.b:seg.l.a)+":  "
-    +w.map(function(x){ return x.t; }).join(" | ")+"   (top label first)"; g.appendChild(tt);
-  G.appendChild(g);
-}
-// station badge (number) at a router's top-left, and its operation beside the name
-function stations(G, geo, byName){
+  // the pulse - on the page clock, so a redraw does not restart it
+  if(geo.full && !still){
+    var L=pathLen(geo.full), speed=300*LS, travel=(L+180*LS)/speed, dur=travel+0.7, span=(L+180*LS)*dur/travel;
+    [["p1",170],["p2",95],["p3",42],["p4",10]].forEach(function(c){
+      var len=c[1]*LS, p=svgEl("path",{d:geo.full,class:"trpulse "+c[0]});
+      p.style.setProperty("--len",len.toFixed(1)); p.style.setProperty("--o0",len.toFixed(1));
+      p.style.setProperty("--o1",(len-span).toFixed(1)); p.style.setProperty("--dur",dur.toFixed(2)+"s");
+      p.style.animationDelay=(-((performance.now()/1000)%dur)).toFixed(2)+"s";
+      gTrace.appendChild(p);
+    });
+  }
+  // a hairline ring round the two ends
+  [0, geo.N-1].forEach(function(i, j){
+    if(j && geo.N<2) return;
+    var st=geo.steps[i], n=st&&byName[st.node]; if(!n) return;
+    gTraceU.appendChild(svgEl("ellipse",{cx:n.x,cy:n.y,rx:R_ICON+6,ry:R_ICON-2,class:"trend"}));
+  });
+  // wire cards beside each link
+  geo.segs.forEach(function(sg){
+    if(sg.blocked) return;
+    var m=qpt(sg.sg,0.5), ang=tangentAng(sg.sg,0.5), off=13*LS, w=wireOf(sg.h, geo.r.dst), parts=[];
+    w.forEach(function(x, j){ if(j) parts.push({t:"·",k:"sep"}); parts.push(x); });
+    var tw=parts.reduce(function(a,x){ return a+x.t.length*5.2+(x.k==="sep"?3:0); },0)+12;
+    var g=svgEl("g",{class:"trcard","data-step":sg.i,transform:"translate("+(m.x-Math.sin(ang)*off).toFixed(1)+","
+      +(m.y+Math.cos(ang)*off).toFixed(1)+") scale("+LS.toFixed(3)+")"});
+    g.appendChild(svgEl("rect",{x:-tw/2,y:-7,width:tw,height:14,rx:3.5,class:"bg"}));
+    var x=-tw/2+6;
+    parts.forEach(function(p){
+      var pw=p.t.length*5.2+(p.k==="sep"?3:0);
+      var t=svgEl("text",{x:(x+pw/2).toFixed(1),y:3,"text-anchor":"middle",class:p.k}); t.textContent=p.t; g.appendChild(t);
+      x+=pw;
+    });
+    var tt=svgEl("title",{}); tt.textContent="on the wire "+sg.st.node+" → "+(sg.l.a===sg.st.node?sg.l.b:sg.l.a)+":  "
+      +w.map(function(x){ return x.t; }).join(" | ")+"   (top label first)"; g.appendChild(tt);
+    gTrace.appendChild(g);
+  });
+  // per router: a small numbered disc at its corner, the operation above it
   geo.steps.forEach(function(st, i){
     var n=byName[st.node]; if(!n) return;
     var end=(i===0||i===geo.N-1), op=st.h.blocked?"err":opOf(st.h.action);
     var g=svgEl("g",{class:"trst"+(end?" end":"")+(op==="err"?" bad":""),"data-step":i,
-      transform:"translate("+(n.x-R_ICON+3).toFixed(1)+","+(n.y-R_ICON+5).toFixed(1)+") scale("+LS.toFixed(3)+")"});
-    g.appendChild(svgEl("circle",{r:10.5,class:"ring"}));
-    var t=svgEl("text",{x:0,y:3.8,"text-anchor":"middle"}); t.textContent=String(i+1); g.appendChild(t);
-    G.appendChild(g);
-    var txt=(st.h.blocked?"drop · link down":opShort(st.h.action)).toUpperCase(), w=txt.length*6.3+22;
-    var c=svgEl("g",{class:"trcap","data-step":i,transform:"translate("+n.x.toFixed(1)+","+(n.y-R_ICON-15*LS).toFixed(1)+") scale("+LS.toFixed(3)+")"});
-    c.appendChild(svgEl("rect",{x:-w/2,y:-10,width:w,height:20,rx:10,class:"bg"}));
-    c.appendChild(svgEl("circle",{cx:-w/2+11,cy:0,r:3,style:"fill:"+OP_COLOR[op]}));
-    var ct=svgEl("text",{x:-w/2+19,y:3.5}); ct.textContent=txt; c.appendChild(ct);
-    G.appendChild(c);
+      transform:"translate("+(n.x-R_ICON+4).toFixed(1)+","+(n.y-R_ICON+6).toFixed(1)+") scale("+LS.toFixed(3)+")"});
+    g.appendChild(svgEl("circle",{r:7.5}));
+    var t=svgEl("text",{x:0,y:2.9,"text-anchor":"middle"}); t.textContent=String(i+1); g.appendChild(t);
+    gTrace.appendChild(g);
+    var txt=(st.h.blocked?"drop · link down":opShort(st.h.action)).toUpperCase(), w=txt.length*5.4+18;
+    var c=svgEl("g",{class:"trcap","data-step":i,transform:"translate("+n.x.toFixed(1)+","+(n.y-R_ICON-11*LS).toFixed(1)+") scale("+LS.toFixed(3)+")"});
+    c.appendChild(svgEl("rect",{x:-w/2,y:-7.5,width:w,height:15,rx:7.5,class:"bg"}));
+    c.appendChild(svgEl("circle",{cx:-w/2+8,cy:0,r:2.2,style:"fill:"+OP_COLOR[op]}));
+    var ct=svgEl("text",{x:-w/2+14,y:3}); ct.textContent=txt; c.appendChild(ct);
+    gTrace.appendChild(c);
   });
-}
-
-// Transit map: a cased route that draws itself in, white chevrons inside it,
-// station badges, a rare glint running along it.
-function drawTraceTransit(byName){
-  var geo=traceGeom(byName);
-  geo.segs.forEach(function(sg){ if(sg.blocked) drawBlocked(sg.sg, sg.d, sg.i, sg.h.blocked);
-    (sg.h.ecmp_links||[]).forEach(function(id){ var l=linkById(id), o=l&&orientSeg(l, sg.st.node); if(!o) return;
-      gTraceU.appendChild(svgEl("path",{d:"M"+P_(o[0])+" Q"+P_(o[1])+" "+P_(o[2]),class:"tralt"})); }); });
-  if(geo.full){
-    var L=pathLen(geo.full), fresh=traceDrawn!==trace.res; traceDrawn=trace.res;
-    var cas=svgEl("path",{d:geo.full,class:"trcase"}), rt=svgEl("path",{d:geo.full,class:"trroute"});
-    if(fresh && !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)){
-      [cas,rt].forEach(function(p){ p.style.setProperty("--L",L.toFixed(1)); p.classList.add("drawin"); });
-    }
-    gTraceU.appendChild(cas); gTraceU.appendChild(rt);
-    // per hop: a hover target and a chevron in the middle of the line
-    geo.segs.forEach(function(sg){
-      if(sg.blocked) return;
-      var g=svgEl("g",{class:"trseg","data-step":sg.i});
-      g.appendChild(svgEl("path",{d:sg.d,class:"trhit"}));
-      [0.3].forEach(function(t){
-        var cp=qpt(sg.sg,t), ca=travelAng(sg.sg,t)*180/Math.PI;
-        g.appendChild(svgEl("path",{d:"M-2.6,-3.6 L1.6,0 L-2.6,3.6",class:"trchevw"+(fresh?" late":""),
-          transform:"translate("+P_(cp)+") rotate("+ca.toFixed(1)+") scale("+LS.toFixed(3)+")"}));
-      });
-      gTraceU.appendChild(g);
-    });
-    // glint: one short highlight every few seconds, on the page clock
-    var speed=520*LS, dur=L/speed+3.2, span=(L+60)*dur/(L/speed);
-    var gl=svgEl("path",{d:geo.full,class:"trglint"});
-    gl.style.setProperty("--len",(40*LS).toFixed(1)); gl.style.setProperty("--o0",(40*LS).toFixed(1));
-    gl.style.setProperty("--o1",(40*LS-span).toFixed(1)); gl.style.setProperty("--dur",dur.toFixed(2)+"s");
-    gl.style.animationDelay=(-((performance.now()/1000)%dur)).toFixed(2)+"s";
-    gTraceU.appendChild(gl);
-  }
-  geo.segs.forEach(function(sg){ if(!sg.blocked) wireCard(gTrace, sg, "trcard"); });
-  stations(gTrace, geo, byName);
-}
-
-// Particle flow: a quiet line with evenly spaced glowing particles streaming
-// from source to destination.
-function drawTraceFlow(byName){
-  var geo=traceGeom(byName);
-  geo.segs.forEach(function(sg){
-    if(sg.blocked){ drawBlocked(sg.sg, sg.d, sg.i, sg.h.blocked); return; }
-    var g=svgEl("g",{class:"trseg","data-step":sg.i});
-    g.appendChild(svgEl("path",{d:sg.d,class:"trfglow"}));
-    g.appendChild(svgEl("path",{d:sg.d,class:"trfline"}));
-    gTraceU.appendChild(g);
-  });
-  if(geo.full && !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)){
-    var L=pathLen(geo.full), gap=70*LS, K=Math.max(3, Math.min(40, Math.round(L/gap))), dur=L/(150*LS);
-    for(var k=0;k<K;k++){
-      var pg=svgEl("g",{class:"trpart"});
-      pg.appendChild(svgEl("circle",{r:(5.5*LS).toFixed(2),class:"halo"}));
-      pg.appendChild(svgEl("circle",{r:(2.3*LS).toFixed(2),class:"core"}));
-      // begin is document time, so the stream keeps its phase across redraws
-      pg.appendChild(svgEl("animateMotion",{dur:dur.toFixed(2)+"s",repeatCount:"indefinite",path:geo.full,
-        begin:(-(k*dur/K)).toFixed(2)+"s",keyPoints:"0;1",keyTimes:"0;1",calcMode:"linear"}));
-      gTrace.appendChild(pg);
-    }
-  }
-  geo.steps.forEach(function(st, i){
-    var n=byName[st.node]; if(!n) return;
-    gTraceU.appendChild(svgEl("ellipse",{cx:n.x,cy:n.y,rx:R_ICON+12,ry:R_ICON+4,class:"trfhalo"+(i===0||i===geo.N-1?" end":"")}));
-  });
-  geo.segs.forEach(function(sg){ if(!sg.blocked) wireCard(gTrace, sg, "trcard"); });
-  stations(gTrace, geo, byName);
 }
 
 // fade what is not on the path (called at the end of render, once nodes exist)
@@ -2310,11 +2117,9 @@ $("t_view").addEventListener("click",function(){
     {label:"Adjacency colours", checked:live.on, onClick:function(v){ setLive(v); }},
     {label:"Traffic on links", checked:showRate, onClick:setRate},
     {label:"BGP sessions", checked:showBgp, onClick:setBgp},
-    {head:"Path trace style"}
-  ].concat(TRACE_STYLES.map(function(t){ return {label:t[1], checked:traceStyle===t[0], onClick:function(){ setTraceStyle(t[0]); }}; })).concat([
     {sep:1},
     {label:"Legend", checked:showLegend, onClick:setLegend}
-  ]), {align:"left", focus:false});
+  ], {align:"left", focus:false});
 });
 function setIfs(v){ showIfs=v; store("clabd-topo-ifs",v); render(); }
 function setRate(v){ showRate=v; store("clabd-rate",v); if(v && !live.on) setLive(true); render(); }
