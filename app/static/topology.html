@@ -182,6 +182,8 @@ details.nlog .jlog{max-height:220px;margin-top:6px}
 .trhit{fill:none;stroke:transparent;stroke-width:14}
 .trseg.hl .trline{stroke-width:2.2} .trseg.hl .trglow{opacity:.45}
 .tralt{fill:none;stroke:var(--trace);stroke-width:1;stroke-dasharray:2 4;opacity:.5;pointer-events:none}
+.trdead{fill:none;stroke:var(--crit);stroke-width:1.5;stroke-dasharray:4 3;pointer-events:none;
+  filter:drop-shadow(0 0 4px color-mix(in srgb,var(--crit) 55%,transparent))}
 .trchev{fill:none;stroke:var(--trace-ink);stroke-width:1.1;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
 /* the pulse: dashes of one path through the route, heads aligned, tails fading */
 .trpulse{fill:none;stroke-linecap:round;pointer-events:none;animation:trpulse var(--dur) linear infinite;
@@ -1665,6 +1667,9 @@ function drawTrace(byName){
       xg.appendChild(svgEl("circle",{r:6.5})); xg.appendChild(svgEl("path",{d:"M-2.5,-2.5 L2.5,2.5 M2.5,-2.5 L-2.5,2.5"}));
       var bt=svgEl("title",{}); bt.textContent=sg.h.blocked; xg.appendChild(bt);
       bg.appendChild(xg); gTraceU.appendChild(bg);
+      // the router that swallows the traffic
+      var dn=sg.h.dead_node && byName[sg.h.dead_node];
+      if(dn) gTraceU.appendChild(svgEl("ellipse",{cx:dn.x,cy:dn.y,rx:R_ICON+7,ry:R_ICON+7,class:"trdead"}));
       return;
     }
     var g=svgEl("g",{class:"trseg","data-step":sg.i});
@@ -1687,6 +1692,11 @@ function drawTrace(byName){
       p.style.animationDelay=(-((performance.now()/1000)%dur)).toFixed(2)+"s";
       gTrace.appendChild(p);
     });
+  }
+  // where the packet dies without a dead link (no route): a red ring on that router
+  if(!geo.ok && !geo.segs.some(function(x){ return x.blocked; }) && geo.N){
+    var dz=byName[geo.steps[geo.N-1].node];
+    if(dz) gTraceU.appendChild(svgEl("ellipse",{cx:dz.x,cy:dz.y,rx:R_ICON+7,ry:R_ICON+7,class:"trdead"}));
   }
   // a hairline ring round the two ends
   [0, geo.N-1].forEach(function(i, j){
@@ -1722,7 +1732,8 @@ function drawTrace(byName){
     g.appendChild(svgEl("circle",{r:7.5}));
     var t=svgEl("text",{x:0,y:2.9,"text-anchor":"middle"}); t.textContent=String(i+1); g.appendChild(t);
     gTrace.appendChild(g);
-    var txt=(st.h.blocked?"drop · link down":opShort(st.h.action)).toUpperCase(), w=txt.length*5.4+18;
+    var txt=(st.h.blocked?(st.h.dead_node?"drop · node down":"drop · link down")
+             :/^no route/.test(st.h.action||"")?"drop · no route":opShort(st.h.action)).toUpperCase(), w=txt.length*5.4+18;
     var c=svgEl("g",{class:"trcap","data-step":i,transform:"translate("+n.x.toFixed(1)+","+(n.y-R_ICON-11*LS).toFixed(1)+") scale("+LS.toFixed(3)+")"});
     c.appendChild(svgEl("rect",{x:-w/2,y:-7.5,width:w,height:15,rx:7.5,class:"bg"}));
     c.appendChild(svgEl("circle",{cx:-w/2+8,cy:0,r:2.2,style:"fill:"+OP_COLOR[op]}));
@@ -1768,7 +1779,7 @@ function setTrace(on){
   else { sel=null; selLink=null; }
   render();
 }
-var RESULT_TEXT={reached:"reached the destination", blackhole:"dropped: the next link is down", "no-route":"stopped: no route", "left-lab":"left the lab",
+var RESULT_TEXT={reached:"reached the destination", blackhole:"blackholed: dropped on the path", "no-route":"dropped: no route", "left-lab":"left the lab",
   down:"stopped at a node that is down", loop:"too many hops - a loop?", unsupported:"stopped: a node the trace cannot read"};
 function renderTracePanel(box){
   var ph=el("div","ph"); ph.appendChild(el("span","ttl","Path trace"));
@@ -1832,9 +1843,19 @@ function renderTracePanel(box){
   [[String(Math.max(0,N-1)),"hops"],[String(N),"routers"],[String(labelOps),"label ops"],[r.seconds+" s","trace time"]].forEach(function(x){
     var d=el("div",null,x[0]); d.appendChild(el("span",null,x[1])); sts.appendChild(d); });
   sum.appendChild(sts);
-  var rs=el("div","res"); rs.appendChild(el("span","pill "+(ok?"ok":r.result==="blackhole"?"crit":"warn"), RESULT_TEXT[r.result]||r.result));
+  var rs=el("div","res"); rs.appendChild(el("span","pill "+(ok?"ok":/^(blackhole|no-route|down)$/.test(r.result)?"crit":"warn"), RESULT_TEXT[r.result]||r.result));
   rs.appendChild(document.createTextNode(r.commands+" show commands")); sum.appendChild(rs);
   box.appendChild(sum);
+  if(!ok){
+    var deadAt=(r.hops||[]).filter(function(h){ return h.dead_node; }).map(function(h){ return h.dead_node; })[0];
+    var downNodes=nodes.filter(function(x){ return x.container && x.container.state!=="running"; }).map(function(x){ return x.name; });
+    var last=steps.length ? steps[steps.length-1].node : r.src;
+    if(deadAt) box.appendChild(el("div","te-note warn trdown",
+      deadAt+" is not running, but "+last+" still forwards to it: until the IGP and BGP notice, the traffic is blackholed there."));
+    else if(downNodes.length && r.result==="no-route") box.appendChild(el("div","te-note warn trdown",
+      downNodes.join(", ")+(downNodes.length>1?" are":" is")+" not running. The routes through "+(downNodes.length>1?"them":"it")
+      +" have been withdrawn, so the packet is dropped at "+last+", where its route ends."));
+  }
   traceCompareBox(box, r);
   // what the packet looks like on the wire, one row per stretch with the same header
   var phases=tracePhases(steps, r);

@@ -932,10 +932,14 @@ class Tracer:
         self._protection(hop, node, res)
         if self._check(hop, link):
             return "blackhole"
-        st["node"], st["in_port"] = far, far_port
         if far not in self.cont:
-            hop["_far"] = (far, far_port)
-            return "down"
+            # the router forwards to a neighbour that is not running (stopped,
+            # crashed, still frozen): its FIB still points there - a VM's NIC
+            # even stays up until the IGP times out - so the packet is dropped
+            hop["blocked"] = "the next hop, %s, is not running" % far
+            hop["dead_node"] = far
+            return "blackhole"
+        st["node"], st["in_port"] = far, far_port
         # plain IP arriving on a router is looked up in its incoming port's VRF
         st["vrf"] = None if st["enc"] else self.vrf_of(far, self._platform_if(far, far_port))
         return None
