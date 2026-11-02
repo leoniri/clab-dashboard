@@ -102,8 +102,47 @@ body{overflow:hidden}
 .node text.ip{font-family:var(--font-mono);font-size:9.5px;fill:var(--muted);pointer-events:none}
 .node circle.st{stroke:var(--canvas);stroke-width:2.5}
 /* addressing and SIDs in the name card: a hairline, then one row per fact */
-.srh{margin:14px 0 6px;font:600 10px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-.kv dd.mono{font-family:var(--font-mono);white-space:pre-line}
+/* node panel: header, actions, tiles, and one list style for every tab */
+.nhead{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:2px 12px;align-items:center;margin-bottom:12px}
+.nhead .nic{grid-row:1/3;width:40px;height:40px;color:var(--oth)}
+.nhead .nic.k-xe{color:var(--xe)} .nhead .nic.k-xr{color:var(--xr)} .nhead .nic.k-nx{color:var(--nx)}
+.nhead .nic.k-lin{color:var(--lin)} .nhead .nic.k-frr{color:var(--frr)} .nhead .nic.k-srl{color:var(--srl)}
+.nhead .ttl{font:600 18px var(--font-display);letter-spacing:-.015em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nhead .pill{justify-self:end}
+.nhead .sub{grid-column:2/4;font:11px var(--font-mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nact{display:flex;gap:6px;margin:0 0 14px}
+.nact .ub{flex:1 1 0;justify-content:center;min-width:0;padding:0 8px}
+.nact .ub.more{flex:0 0 auto}
+.ntiles{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 14px}
+.ntiles div{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:9px 11px;min-width:0}
+.ntiles b{display:block;font:600 17px var(--font-mono);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ntiles b.ok{color:var(--ok)} .ntiles b.warn{color:var(--warn)} .ntiles b.crit{color:var(--crit)}
+.ntiles span{font:500 9.5px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.nsh{display:flex;align-items:center;gap:8px;margin:16px 0 7px;font:600 10px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.nsh:first-child{margin-top:2px}
+.nsh .c{font:600 10px var(--font-mono);letter-spacing:0;color:var(--ink-2);background:var(--surface-3);border-radius:99px;padding:0 7px}
+.nl{border:1px solid var(--line);border-radius:10px;background:var(--surface-2);overflow:hidden}
+.nl .r{display:grid;grid-template-columns:8px minmax(0,1fr) auto;gap:2px 10px;align-items:center;padding:8px 11px}
+.nl .r + .r{border-top:1px solid var(--line)}
+.nl .r.click{cursor:pointer} .nl .r.click:hover{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.nl .d{width:7px;height:7px;border-radius:50%;background:var(--idle)}
+.nl .d.ok{background:var(--ok)} .nl .d.warn{background:var(--warn)} .nl .d.crit{background:var(--crit)}
+.nl .d.lo{background:var(--sr-lo)} .nl .d.mpls{background:var(--sr-mpls)} .nl .d.srv6{background:var(--srv6)}
+.nl .t1{font:600 12.5px var(--font-sans);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nl .t1 .m{font:500 11.5px var(--font-mono)}
+.nl .t1 .q{font:400 11px var(--font-mono);color:var(--muted);margin-left:6px}
+.nl .t2{grid-column:2/4;font:10.5px var(--font-mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nl .side{font:600 10px var(--font-mono);padding:1px 7px;border-radius:99px;background:var(--surface-3);color:var(--ink-2);white-space:nowrap}
+.nl .side.ok{color:var(--ok);background:var(--ok-soft)} .nl .side.warn{color:var(--warn);background:var(--warn-soft)}
+.nl .side.crit{color:var(--crit);background:var(--crit-soft)}
+.nl .side.mpls{color:var(--sr-mpls);background:color-mix(in srgb,var(--sr-mpls) 14%,transparent)}
+.nl .side.srv6{color:var(--srv6);background:color-mix(in srgb,var(--srv6) 14%,transparent)}
+.nempty{font:11.5px var(--font-sans);color:var(--muted);padding:2px 0}
+.nkv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 14px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;
+  background:var(--surface-2);font:11.5px var(--font-mono)}
+.nkv dt{color:var(--muted)} .nkv dd{margin:0;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nkv dd .q{color:var(--muted)}
+.nfoot{font:11px var(--font-sans);color:var(--muted);margin-top:12px}
 .node line.srdiv{stroke:var(--line);stroke-width:1}
 .node text.srm{font-family:var(--font-mono);font-size:10px;font-weight:500;fill:var(--ink);pointer-events:none}
 .node text.srs{font-family:var(--font-mono);font-size:8.5px;fill:var(--muted);pointer-events:none}
@@ -2633,35 +2672,53 @@ function renderNodeGuide(box, n){
 }
 
 // ---------- node: protocols ----------
+// list helpers shared by the node panel's tabs
+function nSection(box, title, count){
+  var h=el("div","nsh",title); if(count!=null) h.appendChild(el("span","c",String(count))); box.appendChild(h);
+}
+function nList(box){ var l=el("div","nl"); box.appendChild(l); return l; }
+// row: dot class, primary (text or node), secondary text, side chip [text, class]
+function nRow(list, dot, t1, t2, side, onClick){
+  var r=el("div","r"+(onClick?" click":""));
+  r.appendChild(el("span","d "+(dot||"")));
+  var a=el("span","t1"); if(typeof t1==="string") a.textContent=t1; else a.appendChild(t1); r.appendChild(a);
+  if(side) r.appendChild(el("span","side "+(side[1]||""), side[0])); else r.appendChild(el("span"));
+  if(t2){ var b=el("span","t2",t2); b.title=t2; r.appendChild(b); }
+  if(onClick) r.addEventListener("click", onClick);
+  list.appendChild(r); return r;
+}
+function nPrimary(main, qual, mono){
+  var s=el("span"); s.appendChild(el("span", mono?"m":null, main)); if(qual) s.appendChild(el("span","q",qual)); return s;
+}
+
 function renderNodeProto(box, n){
   var p=live.data && live.data.nodes && live.data.nodes[n.name];
   if(!live.on){ box.appendChild(el("p","hint","Live state is off."));
     box.appendChild(UI.button("Turn on live state","sm",function(){ setLive(true); },"bolt")); return; }
   if(!p){ box.appendChild(el("p","hint", lab && lab.running ? "collecting…" : "The lab is not running.")); return; }
-  if(p.error) box.appendChild(el("p","hint",p.error));
-  box.appendChild(el("div","subh","IGP · "+(p.platform||"")));
-  if(p.igp && p.igp.length){
-    var pl=el("div","plist2");
-    p.igp.forEach(function(a){
-      var r=el("div","row");
-      r.appendChild(el("span","w",a.proto.toUpperCase()+" "+a.peer+" · "+a.iface));
-      r.appendChild(el("span","s "+(/up|full/i.test(a.state)?"ok":"warn"),a.state));
-      pl.appendChild(r);
+  if(p.error) box.appendChild(el("p","te-note err",p.error));
+  var igp=p.igp||[], bgp=p.bgp||[];
+  var protos={}; igp.forEach(function(a){ protos[a.proto]=1; });
+  nSection(box, (Object.keys(protos).map(function(x){ return x==="isis"?"IS-IS":x.toUpperCase(); }).join(" / ")||"IGP")+" adjacencies", igp.length);
+  if(igp.length){
+    var il=nList(box);
+    igp.forEach(function(a){
+      var up=/up|full/i.test(a.state);
+      nRow(il, up?"ok":"warn", nPrimary(a.peer), (a.proto==="isis"?"IS-IS":a.proto.toUpperCase())+" · "+a.iface, [a.state, up?"ok":"warn"]);
     });
-    box.appendChild(pl);
-  } else box.appendChild(el("p","hint","no adjacencies"));
-  box.appendChild(el("div","subh","BGP"));
-  if(p.bgp && p.bgp.length){
-    var bl=el("div","plist2");
-    p.bgp.forEach(function(b){
-      var r=el("div","row"), up=/established/i.test(b.state||"");
-      r.appendChild(el("span","w",(b.peer_node?b.peer_node+" ("+b.peer_ip+")":b.peer_ip)+" · AS"+b.asn
-        +(b.vrf?" · vrf "+b.vrf:"")+(up&&b.pfx!==null&&b.pfx!==undefined?" · "+b.pfx+" pfx":"")));
-      r.appendChild(el("span","s "+(up?"ok":"crit"),up?"up":(b.state||"?")));
-      bl.appendChild(r);
+  } else box.appendChild(el("div","nempty","No adjacencies."));
+  nSection(box, "BGP sessions", bgp.length);
+  if(bgp.length){
+    var bl=nList(box);
+    bgp.forEach(function(b){
+      var up=/established/i.test(b.state||"");
+      var det=[b.af, b.vrf?"vrf "+b.vrf:null, up && b.pfx!=null ? b.pfx+" pfx" : null,
+               b.uptime && b.uptime!=="never" ? "up "+b.uptime : null, b.peer_ip]
+        .filter(Boolean).join(" · ");
+      nRow(bl, up?"ok":"crit", nPrimary(b.peer_node||b.peer_ip, b.asn?"AS"+b.asn:null), det, [up?"Established":(b.state||"?"), up?"ok":"crit"]);
     });
-    box.appendChild(bl);
-  } else box.appendChild(el("p","hint","no sessions"));
+  } else box.appendChild(el("div","nempty","No sessions."));
+  box.appendChild(el("div","nfoot",(p.platform||"")+" · read "+(p.age!=null?Math.round(p.age)+" s ago":"")));
 }
 
 // ---------- polling ----------
@@ -2767,54 +2824,63 @@ function renderNodeSr(box, n, mine){
     if(!live.on){ var b=UI.button("Switch on live state","",function(){ setLive(true); renderInspector(true); },"pulse"); box.appendChild(b); }
     return;
   }
-  function section(title, rows, empty){
-    var sec=el("div","sec"); sec.appendChild(el("h4","srh",title));
-    if(!rows.length){ sec.appendChild(el("p","hint",empty)); box.appendChild(sec); return; }
-    var dl=el("dl","kv");
-    rows.forEach(function(r){ dl.appendChild(el("dt",null,r[0])); var dd=el("dd","mono",r[1]); if(r[2]) dd.title=r[2]; dl.appendChild(dd); });
-    sec.appendChild(dl); box.appendChild(sec);
-  }
-  section("Loopbacks", (f.loopbacks||[]).map(function(l){ return [l.name, l.v4.concat(l.v6).join("\n")]; }), "no loopback addresses");
-  var ps=(f.prefix_sids||[]).map(function(p){ return [p.prefix, p.label+(p.index!=null?"  index "+p.index:"")+(p.algo?"  algo "+p.algo:"")]; });
-  if(f.srgb) ps.unshift(["SRGB", f.srgb[0]+" – "+f.srgb[1]]);
-  section("SR-MPLS prefix-SIDs", ps, "none configured");
-  section("SRv6 locators", (f.locators||[]).map(function(l){
-    return [l.name, l.prefix+(l.algo?"  algo "+l.algo:"")+(l.usid?"\nuN "+l.usid:"")+(l.up===false?"\ndown":"")]; }), "none configured");
+  var los=f.loopbacks||[];
+  nSection(box, "Loopbacks", los.length);
+  if(los.length){ var ll=nList(box);
+    los.forEach(function(l){ l.v4.concat(l.v6).forEach(function(a, i){ nRow(ll, "lo", nPrimary(a, null, true), null, i ? null : [shortIf(l.name), ""]); }); });
+  } else box.appendChild(el("div","nempty","No loopback addresses."));
+  var ps=f.prefix_sids||[];
+  nSection(box, "SR-MPLS prefix-SIDs", ps.length);
+  if(ps.length){ var pl=nList(box);
+    ps.forEach(function(x){ nRow(pl, "mpls", nPrimary(String(x.label), x.index!=null?"index "+x.index:"absolute", true),
+      x.prefix+(f.srgb?" · SRGB "+f.srgb[0]+"–"+f.srgb[1]:""), x.algo?["algo "+x.algo,"mpls"]:null); });
+  } else box.appendChild(el("div","nempty","None configured."));
+  var locs=f.locators||[];
+  nSection(box, "SRv6 locators", locs.length);
+  if(locs.length){ var ol=nList(box);
+    locs.forEach(function(l){ nRow(ol, l.up===false?"crit":"srv6", nPrimary(l.prefix, l.name, true),
+      (l.usid?"uN "+l.usid:"")+(l.up===false?" · down":""), l.algo?["algo "+l.algo,"srv6"]:null); });
+  } else box.appendChild(el("div","nempty","None configured."));
   var adj=[];
   mine.forEach(function(l){
     var side=l.a===n.name?"a":"b", far=side==="a"?l.b:l.a, lv=liveOf(l);
-    var list=(lv && lv.d && lv.d.adj && lv.d.adj[side]) || [];
-    list.forEach(function(a){
-      adj.push([ifInfo(n, l[side+"_if"]).short+" → "+far,
-                a.type==="srv6" ? (a.behavior||"uA")+" "+a.sid+(a.algo?"  algo "+a.algo:"")
-                                : a.label+(a.protected?"  protected":"")+(a.proto?"  "+a.proto:"")]);
-    });
+    ((lv && lv.d && lv.d.adj && lv.d.adj[side]) || []).forEach(function(a){ adj.push({a:a, far:far, ifn:ifInfo(n, l[side+"_if"]).short}); });
   });
-  section("Adjacency-SIDs", adj, "none on this router's links");
-  box.appendChild(el("p","hint","Read from the router about once a minute while this tab or a View layer is on."));
+  nSection(box, "Adjacency-SIDs", adj.length);
+  if(adj.length){ var al=nList(box);
+    adj.forEach(function(x){ var a=x.a, v6=a.type==="srv6";
+      nRow(al, v6?"srv6":"mpls", nPrimary(v6 ? a.sid : String(a.label), v6 ? (a.behavior||"uA") : (a.protected?"protected":null), true),
+        x.ifn+" → "+x.far+(a.proto?" · "+a.proto:"")+(a.algo?" · algo "+a.algo:""), [v6?"SRv6":"MPLS", v6?"srv6":"mpls"]); });
+  } else box.appendChild(el("div","nempty","None on this router's links."));
+  box.appendChild(el("div","nfoot","Read from the router about once a minute while this tab or a View layer is on."));
 }
 
 function renderNodePanel(box, n){
   var st=statusOf(n), type=NodeIcons.classify(n);
   var running = n.container && n.container.state==="running";
-  var ph=el("div","ph"); ph.appendChild(el("span","ttl",n.name)); ph.appendChild(el("span","pill "+st.cls, st.label));
-  box.appendChild(ph);
-  box.appendChild(el("div","psub",(n.external ? "outside the lab" : kindLabel(n))
-    +(nodeIp(n)?" · "+nodeIp(n):"")));
+  // header: the node's own icon (with its status ring), name, platform, state
+  var hd=el("div","nhead");
+  var nic=svgEl("svg",{viewBox:"0 0 48 48",class:"nic "+kcls(n.kind,n.image),"aria-hidden":"true"});
+  nic.appendChild(NodeIcons.svg(type,{status: type==="router" ? ({ok:"up", warn:"warn", crit:"down", idle:"off"})[st.cls] : ""}));
+  hd.appendChild(nic);
+  var tt=el("span","ttl",n.name); tt.title=n.name; hd.appendChild(tt);
+  hd.appendChild(el("span","pill "+st.cls, st.label));
+  hd.appendChild(el("span","sub",(n.external ? "outside the lab" : kindLabel(n))+(nodeIp(n)?" · "+nodeIp(n):"")));
+  box.appendChild(hd);
   if(!n.external && !n._new){
-    var ar=el("div","actrow");
-    var cli=UI.button("Open CLI","primary",function(){
+    var ar=el("div","nact");
+    var cli=UI.button("CLI","primary sm",function(){
       openTerm(n); },"terminal");
-    cli.disabled=!running; cli.title=running?"a session to "+n.name+" in the browser":"the node has to be running";
+    cli.disabled=!running; cli.title=running?"open a CLI session to "+n.name:"the node has to be running";
     ar.appendChild(cli);
     if(canConfigure(n) && window.DeviceConfig){
-      var cfg=UI.button("Configure","",function(){ DeviceConfig.open(lab, n.name); },"gear");
+      var cfg=UI.button("Configure","sm",function(){ DeviceConfig.open(lab, n.name); },"gear");
       cfg.disabled=!running; cfg.title=running?"running config, push configuration, save to startup":"the node has to be running";
       ar.appendChild(cfg);
     }
     if(running && canConfigure(n)){
-      var wf=UI.button("What if it fails?","",function(){ impactStart("nodes", n.name); },"warn");
-      wf.title="which router pairs, BGP sessions and VPNs lose their path if "+n.name+" goes down";
+      var wf=UI.button("What if","sm",function(){ impactStart("nodes", n.name); },"warn");
+      wf.title="what if "+n.name+" fails: which router pairs, BGP sessions and VPNs lose their path";
       ar.appendChild(wf);
     }
     ar.appendChild(UI.moreButton(function(){ return [
@@ -2822,7 +2888,7 @@ function renderNodePanel(box, n){
        href: running ? UI.term.url(n.container.name) : undefined, target:"_blank"},
       canConfigure(n) ? {label:"Show running config", icon:"file", disabled:!running,
        onClick:function(){ DeviceConfig.open(lab, n.name, {tab:"running"}); }} : null
-    ]; }));
+    ]; }, "more actions", "sm more"));
     box.appendChild(ar);
   }
   editNodeButtons(box, n);
@@ -2831,7 +2897,7 @@ function renderNodePanel(box, n){
   var gchecks=((guide.data&&guide.data.checks)||[]).filter(function(c){ return c.node===n.name; });
   if(!n.external && (guideRole(n.name) || gchecks.length)) tl.push({id:"guide",label:"Guide",n:gchecks.length||null});
   if(!n.external && canConfigure(n)) tl.push({id:"proto",label:"Protocols"});
-  if(!n.external && running && canConfigure(n)) tl.push({id:"sr",label:"Addressing & SIDs"});
+  if(!n.external && running && canConfigure(n)) tl.push({id:"sr",label:"Addressing"});
   tl.push({id:"links",label:"Links",n:mine.length});
   if(!tl.some(function(t){ return t.id===insTab.node; })) insTab.node="overview";
   UI.tabs(box, tl, insTab.node, function(id){ insTab.node=id; renderInspector(true); });
@@ -2840,34 +2906,56 @@ function renderNodePanel(box, n){
   if(insTab.node==="guide"){ renderNodeGuide(box, n); return; }
   if(insTab.node==="links"){
     var byName={}; nodes.forEach(function(x){ byName[x.name]=x; });
-    var list=el("div","iflist"); list.style.marginTop="0";
+    nSection(box, "Links", mine.length);
+    if(!mine.length){ box.appendChild(el("div","nempty","No links.")); return; }
+    var list=nList(box);
     mine.forEach(function(l){
       var far = l.a===n.name ? l.b : l.a;
       var mineIf = ifInfo(n, l.a===n.name ? l.a_if : l.b_if);
       var farIf  = ifInfo(byName[far], l.a===n.name ? l.b_if : l.a_if);
-      var lv=liveOf(l);
-      var row=el("div","ifrow", mineIf.short + "  →  " + far + " " + farIf.short);
-      if(lv && lv.st) row.style.borderLeft="3px solid var(--"+({up:"ok",partial:"warn",lost:"crit",down:"crit"}[lv.st]||"line")+")";
-      row.title="show this link";
-      row.addEventListener("click",function(){ selLink=l; sel=null; render(); });
-      list.appendChild(row);
+      var lv=liveOf(l), d=lv&&lv.d, stt=lv&&lv.st;
+      var dot={up:"ok",partial:"warn",lost:"crit",down:"crit"}[stt]||"";
+      var p_=el("span"); p_.appendChild(el("span","m",mineIf.short)); p_.appendChild(el("span","q","→"));
+      var fn=el("span",null," "+far); fn.style.marginLeft="6px"; p_.appendChild(fn);
+      var det=["remote "+farIf.short];
+      if(d && ((d.ab_bps||0)+(d.ba_bps||0))>0){ var aA=l.a===n.name; det.push("out "+fmtBps(aA?d.ab_bps:d.ba_bps)+"b/s · in "+fmtBps(aA?d.ba_bps:d.ab_bps)+"b/s"); }
+      if(d && d.failed) det.push("failed from the dashboard");
+      else if(d && d.impaired) det.push("impaired (netem)");
+      var side = stt ? [{up:"adjacency up",partial:"not full",lost:"adjacency lost",down:"down"}[stt]||stt, dot] : null;
+      var r=nRow(list, dot, p_, det.join(" · "), side, function(){ selLink=l; sel=null; render(); });
+      r.title="show this link";
     });
-    if(!mine.length) list.appendChild(el("p","hint","no links"));
-    box.appendChild(list);
     return;
   }
-  var dl=el("dl","kv");
-  function kv(k,v){ dl.appendChild(el("dt",null,k)); dl.appendChild(el("dd",null,v||"—")); }
+  // at a glance: resources and protocol health
+  var pr=live.on && live.data && live.data.nodes && live.data.nodes[n.name];
+  if(running){
+    var tiles=el("div","ntiles");
+    function tile(v, k, cls){ var d=el("div"), b=el("b",cls||null,v); b.title=v; d.appendChild(b); d.appendChild(el("span",null,k)); tiles.appendChild(d); }
+    tile(n.container.cpu || "—", "CPU");
+    tile(n.container.mem ? String(n.container.mem).split("/")[0].trim() : "—", "memory");
+    if(pr){
+      var ia=pr.igp||[], iu=ia.filter(function(a){ return /up|full/i.test(a.state); }).length;
+      var ba=pr.bgp||[], bu=ba.filter(function(b){ return /established/i.test(b.state||""); }).length;
+      tile(iu+"/"+ia.length, "IGP adjacencies", ia.length ? (iu===ia.length?"ok":"warn") : "");
+      tile(bu+"/"+ba.length, "BGP sessions", ba.length ? (bu===ba.length?"ok":"crit") : "");
+    }
+    box.appendChild(tiles);
+  }
+  nSection(box, "Details");
+  var dl=el("dl","nkv");
+  function kv(k,v,q){ dl.appendChild(el("dt",null,k)); var dd=el("dd",null,v||"—"); if(q){ dd.appendChild(el("span","q"," "+q)); }
+    dd.title=(v||"")+(q?" "+q:""); dl.appendChild(dd); }
   var gr=guideRole(n.name);
   if(gr && gr.role) kv("lab role", gr.role);
-  kv("role", NodeIcons.label(type));
-  kv("kind", n.kind);
-  kv("image", n.image);
-  if(n.container){ kv("container", n.container.name); kv("mgmt", nodeIp(n)); }
+  kv("platform", n.external ? "external endpoint" : kindLabel(n), NodeIcons.label(type));
+  var im=String(n.image||""), ci=im.lastIndexOf(":");
+  if(im) kv("image", ci>0 ? im.slice(0,ci).split("/").pop() : im, ci>0 ? im.slice(ci+1) : null);
+  if(n.container) kv("mgmt", nodeIp(n));
   else if(!n.external) kv("mgmt", nodeIp(n) || "assigned at deploy");
-  if(n.container && n.container.cpu) kv("cpu", n.container.cpu);
-  if(n.container && n.container.mem) kv("memory", n.container.mem);
-  else if(n.est_ram_mb) kv("memory", gb(n.est_ram_mb)+" (est)");
+  if(n.container) kv("container", n.container.name);
+  if(!running && n.est_ram_mb) kv("memory", gb(n.est_ram_mb), "estimated");
+  kv("kind", n.kind);
   box.appendChild(dl);
 }
 
