@@ -635,6 +635,18 @@ var TERM_KEY = "clabd.term", TERM_H = "clabd.term.h";
 var TD = null, termSeq = 0, dragId = null;
 var TERM_FONT = 13, FONT_MIN = 8, FONT_MAX = 32;     // 13 = install.sh's ttyd fontSize
 var TERM_HIST = "clabd.term.hist";
+// One colour per router, mid-tone so it sits on the dark console: shown as the
+// tab's edge and a faint tint, repeated on the pane header.
+var TERM_COLORS = ["#2A9D8F", "#3B7DD8", "#8B5CC4", "#C2547A", "#C8692E", "#A88A2A",
+                   "#5E9A3A", "#2F8FAE", "#6366C9", "#B0503F", "#3E9A6A", "#7A7F99"];
+function termColor(spec){
+  var twin = TD.sessions.filter(function(x){ return x.c === spec.c; })[0];
+  if (twin) return twin.color;                        // the same router keeps its colour
+  if (TERM_COLORS.indexOf(spec.color) >= 0) return spec.color;
+  var used = TD.sessions.map(function(x){ return x.color; });
+  return TERM_COLORS.filter(function(c){ return used.indexOf(c) < 0; })[0]
+      || TERM_COLORS[TD.sessions.length % TERM_COLORS.length];
+}
 
 function termUrl(container){ return "/term/?arg=" + encodeURIComponent(container); }
 function tib(ic, title, fn){
@@ -803,7 +815,9 @@ function add(spec, show){
            font: spec.font >= FONT_MIN && spec.font <= FONT_MAX ? spec.font : null, bc: spec.bc !== false};
   var same = TD.sessions.filter(function(x){ return x.c === s.c; }).length;
   s.label = same ? s.name + " (" + (same + 1) + ")" : s.name;
+  s.color = termColor(spec);
   s.pane = el("div", "tpane"); s.pane.hidden = true;
+  s.pane.style.setProperty("--tc", s.color);
   var head = el("div", "tphead"), r = el("span", "right");
   head.draggable = true; head.title = "drag onto another pane to move it";
   head.appendChild(el("span", "who", s.label));
@@ -964,6 +978,7 @@ function render(){
   TD.tabs.replaceChildren();
   TD.sessions.forEach(function(s){
     var i = TD.slots.indexOf(s.id), t = el("button", "ttab"), x = el("span", "x");
+    t.style.setProperty("--tc", s.color);
     t.type = "button"; t.setAttribute("role", "tab"); t.draggable = true;
     t.classList.toggle("shown", i >= 0); t.classList.toggle("idle", !s.live);
     t.title = [s.c, s.lab, s.meta].filter(Boolean).join(" · ") + (s.live ? "" : "\nconnects when shown");
@@ -1075,7 +1090,7 @@ function save(){
   try {
     if (!TD.sessions.length){ sessionStorage.removeItem(TERM_KEY); return; }
     sessionStorage.setItem(TERM_KEY, JSON.stringify({
-      sessions: TD.sessions.map(function(s){ return {c:s.c, name:s.name, lab:s.lab, meta:s.meta, font:s.font, bc:s.bc}; }),
+      sessions: TD.sessions.map(function(s){ return {c:s.c, name:s.name, lab:s.lab, meta:s.meta, font:s.font, bc:s.bc, color:s.color}; }),
       slots: TD.slots.map(function(id){ return TD.sessions.indexOf(byId(id)); }),
       layout: TD.layout, manual: TD.manual, focus: TD.focus, mode: TD.mode, split: TD.split, bc: TD.bc}));
   } catch (e) {}
