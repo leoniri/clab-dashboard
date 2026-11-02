@@ -96,6 +96,7 @@ var P = {
   lay4:'<rect x="4" y="5" width="16" height="14" rx="1.5"/><path d="M12 5v14M4 12h16"/>',
   winmin:'<path d="M6 17h12"/>',
   winmax:'<rect x="5" y="5" width="14" height="14" rx="1.5"/><path d="M5 9h14"/>',
+  broadcast:'<circle cx="12" cy="12" r="2"/><path d="M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8"/>',
   winrestore:'<rect x="5" y="9" width="10" height="10" rx="1.5"/><path d="M9 9V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-3"/>'
 };
 var NS = "http://www.w3.org/2000/svg";
@@ -633,6 +634,7 @@ var GROW = {"1":"2v", "2v":"4", "2h":"4"};
 var TERM_KEY = "clabd.term", TERM_H = "clabd.term.h";
 var TD = null, termSeq = 0, dragId = null;
 var TERM_FONT = 13, FONT_MIN = 8, FONT_MAX = 32;     // 13 = install.sh's ttyd fontSize
+var TERM_HIST = "clabd.term.hist";
 
 function termUrl(container){ return "/term/?arg=" + encodeURIComponent(container); }
 function tib(ic, title, fn){
@@ -651,11 +653,13 @@ function dock(){
   var tabsEl = el("div", "ttabs"), lay = el("div", "tlay"), right = el("div", "tlay");
   tabsEl.setAttribute("role", "tablist");
   TD = {el:d, tabs:tabsEl, count:cnt, lay:lay, stage:el("div", "tstage"),
-        sessions:[], slots:[null], layout:"1", manual:false, focus:0, mode:"open", split:{x:.5, y:.5}};
+        sessions:[], slots:[null], layout:"1", manual:false, focus:0, mode:"open", split:{x:.5, y:.5}, bc:false};
   ["1", "2v", "2h", "4"].forEach(function(k){
     var b = tib("lay" + k, "layout: " + LAYOUT_NAMES[k], function(){ setLayout(k, true); });
     b.dataset.layout = k; lay.appendChild(b);
   });
+  TD.bcBtn = tib("broadcast", "send a command to several terminals", function(){ setBroadcast(!TD.bc); });
+  right.appendChild(TD.bcBtn); right.appendChild(el("span", "tsep"));
   TD.minBtn = tib("winmin", "minimise", function(){ setMode(TD.mode === "min" ? "open" : "min"); });
   TD.maxBtn = tib("winmax", "maximise", function(){ setMode(TD.mode === "max" ? "open" : "max"); });
   right.appendChild(TD.minBtn); right.appendChild(TD.maxBtn);
@@ -664,7 +668,7 @@ function dock(){
   bar.addEventListener("dblclick", function(e){
     if (e.target === bar || e.target === tabsEl) setMode(TD.mode === "max" ? "open" : "max");
   });
-  d.appendChild(bar); d.appendChild(TD.stage);
+  d.appendChild(bar); d.appendChild(cmdBar()); d.appendChild(TD.stage);
   document.body.appendChild(d);
   var h = 0; try { h = +localStorage.getItem(TERM_H) || 0; } catch (e) {}
   if (h) d.style.height = Math.min(h, innerHeight - 60) + "px";
@@ -796,7 +800,7 @@ function focusPane(i){
 function add(spec, show){
   dock();
   var s = {id: ++termSeq, c: spec.c, name: spec.name || spec.c, lab: spec.lab || "", meta: spec.meta || "", live: false,
-           font: spec.font >= FONT_MIN && spec.font <= FONT_MAX ? spec.font : null};
+           font: spec.font >= FONT_MIN && spec.font <= FONT_MAX ? spec.font : null, bc: spec.bc !== false};
   var same = TD.sessions.filter(function(x){ return x.c === s.c; }).length;
   s.label = same ? s.name + " (" + (same + 1) + ")" : s.name;
   s.pane = el("div", "tpane"); s.pane.hidden = true;
@@ -964,6 +968,13 @@ function render(){
     t.classList.toggle("shown", i >= 0); t.classList.toggle("idle", !s.live);
     t.title = [s.c, s.lab, s.meta].filter(Boolean).join(" · ") + (s.live ? "" : "\nconnects when shown");
     if (i >= 0 && L.n > 1) t.appendChild(el("span", "n", String(i + 1)));
+    if (TD.bc){
+      var bx = el("span", "bcx" + (s.bc ? " on" : ""));
+      bx.title = s.bc ? "gets broadcast commands - click to leave out" : "left out of broadcasts - click to include";
+      bx.appendChild(icon("check"));
+      bx.addEventListener("click", function(e){ e.stopPropagation(); s.bc = !s.bc; render(); });
+      t.appendChild(bx);
+    }
     t.appendChild(el("span", "l", s.label));
     x.title = "close"; x.appendChild(icon("x"));
     x.addEventListener("click", function(e){ e.stopPropagation(); closeSession(s); });
@@ -974,6 +985,8 @@ function render(){
     s.tab = t; TD.tabs.appendChild(t);
   });
   TD.count.textContent = "CLI " + TD.sessions.length;
+  TD.sessions.forEach(function(s){ s.pane.classList.toggle("bc", TD.bc && s.bc); });
+  bcTargets();
   TD.lay.querySelectorAll(".tib").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.layout === TD.layout)); });
   mark(); offset(); save();
 }
@@ -985,14 +998,86 @@ function mark(){
     if (s.tab){ s.tab.classList.toggle("focus", f); s.tab.setAttribute("aria-selected", String(f)); }
   });
 }
+// Broadcast: one command line in the dock types the same text into every
+// ticked session, as if typed there - xterm's own input path, so the router
+// sees keystrokes (no bracketed paste that would stop bash running it).
+function cmdBar(){
+  var b = el("div", "tcmd"), inp = el("textarea"), send = el("button", "tsend", "Send"), cc = el("button", "tctl", "Ctrl-C");
+  b.hidden = true;
+  inp.rows = 1; inp.spellcheck = false; inp.autocomplete = "off";
+  inp.placeholder = "command for the ticked terminals - Enter sends, Shift+Enter new line, \u2191 \u2193 history, Esc closes";
+  send.type = cc.type = "button";
+  cc.title = "send Ctrl-C to the ticked terminals (stop a ping, a debug, ...)";
+  var p = el("span", "p", "\u00bb"), tgt = el("span", "tgt"), hist = [], at = 0, draft = "";
+  try { hist = JSON.parse(localStorage.getItem(TERM_HIST) || "[]") || []; } catch (e) {}
+  function go(){
+    var v = inp.value;
+    if (!broadcast(v.replace(/\r\n?/g, "\n").split("\n").map(function(l){ return l + "\r"; }))) return;
+    if (v.trim() && hist[hist.length - 1] !== v){
+      hist.push(v); hist = hist.slice(-50);
+      try { localStorage.setItem(TERM_HIST, JSON.stringify(hist)); } catch (e) {}
+    }
+    at = hist.length; inp.value = ""; grow(); inp.focus();
+  }
+  function browsing(){ return inp.value.indexOf("\n") < 0 || inp.value === hist[at]; }
+  function grow(){ inp.style.height = "auto"; inp.style.height = Math.min(inp.scrollHeight, 130) + "px"; }
+  inp.addEventListener("input", grow);
+  inp.addEventListener("keydown", function(e){
+    if (e.key === "Enter" && !e.shiftKey){ e.preventDefault(); go(); }
+    else if (e.key === "Escape"){ e.preventDefault(); setBroadcast(false); }
+    // history while the text is one line or an unedited entry, so the arrows still move in a typed block
+    else if (e.key === "ArrowUp" && at > 0 && browsing()){
+      e.preventDefault(); if (at === hist.length) draft = inp.value; inp.value = hist[--at]; grow();
+    }
+    else if (e.key === "ArrowDown" && at < hist.length && browsing()){
+      e.preventDefault(); at++; inp.value = at === hist.length ? draft : hist[at]; grow();
+    }
+  });
+  send.addEventListener("click", go);
+  cc.addEventListener("click", function(){ broadcast(["\x03"]); inp.focus(); });
+  [p, inp, tgt, cc, send].forEach(function(x){ b.appendChild(x); });
+  TD.cmd = {bar:b, input:inp, tgt:tgt, send:send, cc:cc};
+  return b;
+}
+function setBroadcast(on, quiet){
+  TD.bc = on;
+  TD.cmd.bar.hidden = !on;
+  TD.el.classList.toggle("bcast", on);
+  TD.bcBtn.setAttribute("aria-pressed", String(on));
+  if (on && TD.mode === "min") setMode("open");
+  render();
+  if (on && !quiet) TD.cmd.input.focus();
+}
+function bcTargets(){
+  if (!TD.cmd) return;
+  var n = TD.sessions.filter(function(s){ return s.bc; }).length;
+  TD.cmd.tgt.textContent = "to " + n + " of " + TD.sessions.length;
+  TD.cmd.send.disabled = TD.cmd.cc.disabled = !n;
+}
+function broadcast(chunks){
+  var sent = 0, missed = [];
+  TD.sessions.forEach(function(s){
+    if (!s.bc) return;
+    var t = s.live && termOf(s);
+    if (!t){ missed.push(s.label); return; }
+    chunks.forEach(function(d){
+      try { t._core.coreService.triggerDataEvent(d, true); }
+      catch (e) { t.paste(d.replace(/\r$/, "\n")); }
+    });
+    sent++;
+  });
+  if (missed.length) toast("Sent to " + sent + ". Not connected yet: " + missed.join(", ") + " - show its tab first.", "warn", 7000);
+  else if (!sent) toast("No terminal is ticked.", "warn");
+  return sent > 0;
+}
 function save(){
   if (!TD) return;
   try {
     if (!TD.sessions.length){ sessionStorage.removeItem(TERM_KEY); return; }
     sessionStorage.setItem(TERM_KEY, JSON.stringify({
-      sessions: TD.sessions.map(function(s){ return {c:s.c, name:s.name, lab:s.lab, meta:s.meta, font:s.font}; }),
+      sessions: TD.sessions.map(function(s){ return {c:s.c, name:s.name, lab:s.lab, meta:s.meta, font:s.font, bc:s.bc}; }),
       slots: TD.slots.map(function(id){ return TD.sessions.indexOf(byId(id)); }),
-      layout: TD.layout, manual: TD.manual, focus: TD.focus, mode: TD.mode, split: TD.split}));
+      layout: TD.layout, manual: TD.manual, focus: TD.focus, mode: TD.mode, split: TD.split, bc: TD.bc}));
   } catch (e) {}
 }
 // Back on another page: same tabs and layout, the visible panes log in again,
@@ -1003,6 +1088,7 @@ function restore(){
   if (!st || !Array.isArray(st.sessions) || !st.sessions.length) return;
   var made = st.sessions.map(function(x){ return add(x, false); });
   TD.manual = !!st.manual;
+  if (st.bc) setBroadcast(true, true);
   ["x", "y"].forEach(function(a){ var v = st.split && +st.split[a]; if (v > .05 && v < .95) TD.split[a] = v; });
   resize(LAYOUTS[st.layout] ? st.layout : "1");
   TD.slots = TD.slots.map(function(_, i){ var k = (st.slots || [])[i]; return made[k] ? made[k].id : null; });
