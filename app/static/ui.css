@@ -386,6 +386,10 @@ html.tdock-drag .tdock iframe{pointer-events:none}
 .tphead .right{margin-left:auto;display:flex;gap:1px;flex:none}
 .tphead .tib{width:24px;height:22px}
 .tphead .tib svg{width:13px;height:13px}
+.tphead .tfs{min-width:24px;height:22px;padding:0 3px;border:0;border-radius:5px;background:none;color:var(--console-dim);
+  font:11px var(--font-mono);cursor:pointer;text-align:center}
+.tphead .tfs:hover{background:rgba(255,255,255,.1);color:#fff}
+.tphead .tsep{width:1px;height:14px;margin:0 4px;background:#243140;align-self:center}
 .tempty{display:grid;place-items:center;padding:12px;text-align:center;background:var(--console-bg);color:var(--console-dim);font:12px var(--font-mono)}
 .tdrop{position:absolute;inset:0;z-index:3;display:grid;gap:1px}
 .tdrop div{display:grid;place-items:center;margin:6px;border:2px dashed rgba(255,255,255,.2);border-radius:8px;

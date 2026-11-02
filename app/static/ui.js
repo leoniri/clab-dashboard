@@ -632,6 +632,7 @@ var LAYOUT_NAMES = {"1":"one pane", "2v":"side by side", "2h":"stacked", "4":"fo
 var GROW = {"1":"2v", "2v":"4", "2h":"4"};
 var TERM_KEY = "clabd.term", TERM_H = "clabd.term.h";
 var TD = null, termSeq = 0, dragId = null;
+var TERM_FONT = 13, FONT_MIN = 8, FONT_MAX = 32;     // 13 = install.sh's ttyd fontSize
 
 function termUrl(container){ return "/term/?arg=" + encodeURIComponent(container); }
 function tib(ic, title, fn){
@@ -737,7 +738,50 @@ function hookFrame(s){
     var w = s.frame.contentWindow;
     w.addEventListener("focus", function(){ focusSession(s); });
     w.document.addEventListener("mousedown", function(){ focusSession(s); });
+    // Ctrl +/-/0 and Ctrl+wheel size the text of this terminal only
+    w.document.addEventListener("keydown", function(e){
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      var d = e.key === "=" || e.key === "+" ? 1 : e.key === "-" ? -1 : e.key === "0" ? 0 : null;
+      if (d === null) return;
+      e.preventDefault(); e.stopPropagation(); setFont(s, d);
+    }, true);
+    w.addEventListener("wheel", function(e){
+      if (!e.ctrlKey) return;
+      e.preventDefault(); setFont(s, e.deltaY < 0 ? 1 : -1);
+    }, {passive: false, capture: true});
   } catch (e) {}
+  watchFont(s, w);
+}
+// xterm lives on ttyd's page as window.term. ttyd applies its own fontSize
+// when the socket connects (and on every reconnect) and refits, so the pane's
+// size is put back whenever the terminal resizes - plus a few checks while
+// it is still connecting.
+function termOf(s){ try { return s.frame.contentWindow.term || null; } catch (e) { return null; } }
+function watchFont(s, w){
+  var tries = 0, hooked = null;
+  (function tick(){
+    if (!w || s.frame.contentWindow !== w) return;       // reloaded or closed
+    var t = termOf(s);
+    if (t && t !== hooked && t.onResize){
+      hooked = t;
+      t.onResize(function(){ setTimeout(function(){ applyFont(s); }, 0); });
+    }
+    applyFont(s);
+    if (++tries < 24) setTimeout(tick, 250);
+  })();
+}
+function applyFont(s){
+  var t = termOf(s);
+  if (t && s.font && t.options.fontSize !== s.font){
+    t.options.fontSize = s.font;
+    try { t.fit(); } catch (e) {}
+  }
+  s.fsEl.textContent = String(t ? t.options.fontSize : s.font || TERM_FONT);
+}
+function setFont(s, d){
+  var t = termOf(s), cur = s.font || (t && t.options.fontSize) || TERM_FONT;
+  s.font = d === 0 ? TERM_FONT : Math.max(FONT_MIN, Math.min(FONT_MAX, cur + d));
+  applyFont(s); save();
 }
 function focusSession(s){
   var i = TD.slots.indexOf(s.id);
@@ -751,7 +795,8 @@ function focusPane(i){
 }
 function add(spec, show){
   dock();
-  var s = {id: ++termSeq, c: spec.c, name: spec.name || spec.c, lab: spec.lab || "", meta: spec.meta || "", live: false};
+  var s = {id: ++termSeq, c: spec.c, name: spec.name || spec.c, lab: spec.lab || "", meta: spec.meta || "", live: false,
+           font: spec.font >= FONT_MIN && spec.font <= FONT_MAX ? spec.font : null};
   var same = TD.sessions.filter(function(x){ return x.c === s.c; }).length;
   s.label = same ? s.name + " (" + (same + 1) + ")" : s.name;
   s.pane = el("div", "tpane"); s.pane.hidden = true;
@@ -759,6 +804,13 @@ function add(spec, show){
   head.draggable = true; head.title = "drag onto another pane to move it";
   head.appendChild(el("span", "who", s.label));
   head.appendChild(el("span", "meta", [s.lab, s.meta].filter(Boolean).join(" · ")));
+  s.fsEl = el("button", "tfs", String(s.font || TERM_FONT));
+  s.fsEl.type = "button"; s.fsEl.title = "text size - click to reset (Ctrl 0)";
+  s.fsEl.addEventListener("click", function(e){ e.stopPropagation(); setFont(s, 0); });
+  r.appendChild(tib("minus", "smaller text (Ctrl -)", function(){ setFont(s, -1); }));
+  r.appendChild(s.fsEl);
+  r.appendChild(tib("plus", "larger text (Ctrl +)", function(){ setFont(s, 1); }));
+  r.appendChild(el("span", "tsep"));
   r.appendChild(tib("redo", "reconnect", function(){ connect(s, true); focusPane(TD.slots.indexOf(s.id)); }));
   r.appendChild(tib("external", "move to a browser tab", function(){ popout(s); }));
   r.appendChild(tib("x", "close this session", function(){ closeSession(s); }));
@@ -900,7 +952,7 @@ function save(){
   try {
     if (!TD.sessions.length){ sessionStorage.removeItem(TERM_KEY); return; }
     sessionStorage.setItem(TERM_KEY, JSON.stringify({
-      sessions: TD.sessions.map(function(s){ return {c:s.c, name:s.name, lab:s.lab, meta:s.meta}; }),
+      sessions: TD.sessions.map(function(s){ return {c:s.c, name:s.name, lab:s.lab, meta:s.meta, font:s.font}; }),
       slots: TD.slots.map(function(id){ return TD.sessions.indexOf(byId(id)); }),
       layout: TD.layout, manual: TD.manual, focus: TD.focus, mode: TD.mode}));
   } catch (e) {}
