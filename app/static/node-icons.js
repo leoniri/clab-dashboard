@@ -14,8 +14,13 @@
  *   NodeIcons.markup(type)          -> SVG markup string for a <g>, drawn in
  *                                      a 48x48 box at the origin
  *   NodeIcons.svg(type, opts)       -> SVGGElement
- *       opts: {size: 48, x: 0, y: 0, title: ""} - (x,y) is the top-left of
- *       the box, size scales it.
+ *       opts: {size: 48, x: 0, y: 0, title: "", status: ""} - (x,y) is the
+ *       top-left of the box, size scales it. status (up | warn | down | off)
+ *       lights the router's neon ring and adds class ni-st-<status>; the
+ *       colours live in ui.css. Other types ignore it.
+ *
+ * Routers are a flat disc with the router mark, a fine outer ring and,
+ * when a status is given, a neon ring in the gap between the two.
  *
  * Colours: bodies use currentColor, so set `color:` on the element (or a
  * parent) to pick the family colour. Glyphs on the body (arrows, slots,
@@ -86,16 +91,9 @@
 
   var DRAW = {
     router: function () {
-      // a puck seen from above-front, four arrows on the top face
-      var arrows =
-        arrow(0, 0, 13, -13, 6) + arrow(0, 0, -13, 13, 6) +      // out
-        arrow(-15, -15, -4, -4, 6) + arrow(15, 15, 4, 4, 6);     // in
       return '' +
-        '<path d="M3 18V30A21 8.5 0 0 0 45 30V18Z" fill="currentColor"/>' +
-        '<path d="M3 18V30A21 8.5 0 0 0 45 30V18Z" ' + SHADE + '/>' +
-        '<ellipse cx="24" cy="18" rx="21" ry="8.5" fill="currentColor"/>' +
-        '<ellipse cx="24" cy="18" rx="21" ry="8.5" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="1"/>' +
-        '<g transform="translate(24 18) scale(1 .42)">' + arrows + '</g>';
+        '<circle cx="24" cy="24" r="21.55" fill="none" stroke="currentColor" stroke-width="1.2" stroke-opacity=".85"/>' +
+        '<circle cx="24" cy="24" r="18" fill="currentColor"/>' + routerMark(24, 24, .84, 2.2);
     },
     switch: function () {
       return '' +
@@ -138,6 +136,42 @@
     }
   };
 
+  // the router mark: arrows out to NE / SW, in from NW / SE, open heads
+  function routerMark(cx, cy, s, sw) {
+    var d = "";
+    function P(x, y) { return r(cx + x * s) + " " + r(cy + y * s); }
+    function arw(x1, y1, x2, y2) {
+      var dx = x2 - x1, dy = y2 - y1, len = Math.sqrt(dx * dx + dy * dy), ux = dx / len, uy = dy / len;
+      var h = 3.7, w = 3.1, bx = x2 - ux * h, by = y2 - uy * h;
+      d += "M" + P(x1, y1) + "L" + P(x2, y2) +
+           "M" + P(bx - uy * w, by + ux * w) + "L" + P(x2, y2) + "L" + P(bx + uy * w, by - ux * w);
+    }
+    arw(4.6, -4.6, 11, -11); arw(-4.6, 4.6, -11, 11); arw(-11.4, -11.4, -5, -5); arw(11.4, 11.4, 5, 5);
+    return '<path d="' + d + '" fill="none" stroke="#fff" stroke-width="' + sw +
+      '" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+
+  // The status light between disc and outer ring: a soft glow, the lit ring
+  // and a pale core, all currentColor so ui.css colours them by state.
+  var LED_R = 19.75;
+  function routerLed() {
+    function ring(w, extra) {
+      return '<circle cx="24" cy="24" r="' + LED_R + '" fill="none" stroke="currentColor" stroke-width="' + w + '"' + (extra || "") + '/>';
+    }
+    return '<g class="ni-led">' + ring(1.5, ' class="glow" filter="url(#ni-neon)"') +
+      ring(.95, ' class="body"') + ring(.38, ' class="core"') + '</g>';
+  }
+  var STATUS = /^(up|warn|down|off)$/;
+  function ensureNeon() {
+    if (typeof document === "undefined" || document.getElementById("ni-neon")) return;
+    var host = document.createElementNS(NS, "svg");
+    host.setAttribute("width", "0"); host.setAttribute("height", "0");
+    host.setAttribute("aria-hidden", "true"); host.style.position = "absolute";
+    host.innerHTML = '<defs><filter id="ni-neon" x="-40%" y="-40%" width="180%" height="180%">' +
+      '<feGaussianBlur stdDeviation="1.15"/></filter></defs>';
+    (document.body || document.documentElement).appendChild(host);
+  }
+
   function serverBody() {
     return '' +
       '<path d="M12 7L17 3H39L34 7Z" fill="currentColor"/>' +
@@ -147,22 +181,24 @@
       '<rect x="12" y="7" width="22" height="38" rx="1.5" fill="currentColor"/>';
   }
 
-  function markup(type) {
-    var fn = DRAW[type] || DRAW.router;
-    return '<g class="nodeicon ni-' + (DRAW[type] ? type : "router") + '">' + fn() + '</g>';
+  function markup(type, opts) {
+    var t = DRAW[type] ? type : "router", st = opts && STATUS.test(opts.status || "") && t === "router" ? opts.status : "";
+    if (st) ensureNeon();
+    return '<g class="nodeicon ni-' + t + (st ? " ni-st-" + st : "") + '">' + DRAW[t]() + (st ? routerLed() : "") + '</g>';
   }
 
   function svg(type, opts) {
     opts = opts || {};
     var size = opts.size || 48;
-    var g = document.createElementNS(NS, "g");
-    g.setAttribute("class", "nodeicon ni-" + (DRAW[type] ? type : "router"));
+    var g = document.createElementNS(NS, "g"), t = DRAW[type] ? type : "router";
+    var st = STATUS.test(opts.status || "") && t === "router" ? opts.status : "";
+    g.setAttribute("class", "nodeicon ni-" + t + (st ? " ni-st-" + st : ""));
     g.setAttribute("transform", "translate(" + (opts.x || 0) + " " + (opts.y || 0) +
       ") scale(" + (size / 48) + ")");
-    var fn = DRAW[type] || DRAW.router;
+    if (st) ensureNeon();
     // parse inside an <svg> wrapper so the children get the SVG namespace
     var tmp = document.createElementNS(NS, "svg");
-    tmp.innerHTML = fn();
+    tmp.innerHTML = DRAW[t]() + (st ? routerLed() : "");
     while (tmp.firstChild) g.appendChild(tmp.firstChild);
     if (opts.title) {
       var t = document.createElementNS(NS, "title");

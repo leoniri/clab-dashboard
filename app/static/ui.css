@@ -42,12 +42,15 @@
 
   /* node families (topology, builder, lab list chips) */
   --xe:#5AA9FF;  --xe-soft:rgba(90,169,255,.14);
-  --xr:#B794F6;  --xr-soft:rgba(183,148,246,.15);
+  --xr:#4F7BFF;  --xr-soft:rgba(79,123,255,.15);
   --nx:#F472B6;  --nx-soft:rgba(244,114,182,.14);
   --lin:#2DD4BF; --lin-soft:rgba(45,212,191,.13);
   --frr:#FB923C; --frr-soft:rgba(251,146,60,.14);
   --srl:#4ADE80; --srl-soft:rgba(74,222,128,.13);
   --oth:#FBBF24; --oth-soft:rgba(251,191,36,.13);
+  /* router status ring (node-icons.js): neon on the map */
+  --led-up:#39FF8E; --led-up-core:#E2FFEE; --led-warn:#FFB020; --led-warn-core:#FFF1D0;
+  --led-down:#FF2E55; --led-down-core:#FFD9E0; --led-off:#2A3442; --led-glow:.95;
   /* protocols in the capture viewer */
   --p-tcp:#5AA9FF; --p-icmp:#4ADE80; --p-arp:#FBBF24; --p-mpls:#B794F6; --p-rt:#FB923C;
 }
@@ -70,12 +73,14 @@
   --shadow-sm:0 1px 2px rgba(11,19,32,.08);
   --glow:0 0 0 1px rgba(12,156,140,.35), 0 0 14px rgba(12,156,140,.12);
   --xe:#1F6FE0;  --xe-soft:rgba(31,111,224,.10);
-  --xr:#7A3DD6;  --xr-soft:rgba(122,61,214,.10);
+  --xr:#2A4FD0;  --xr-soft:rgba(42,79,208,.10);
   --nx:#C2257A;  --nx-soft:rgba(194,37,122,.10);
   --lin:#0B8A80; --lin-soft:rgba(11,138,128,.10);
   --frr:#C2530E; --frr-soft:rgba(194,83,14,.10);
   --srl:#15803D; --srl-soft:rgba(21,128,61,.10);
   --oth:#9A6700; --oth-soft:rgba(154,103,0,.10);
+  --led-up:#00D468; --led-up-core:#B6FFD6; --led-warn:#F59E0B; --led-warn-core:#FFE7B0;
+  --led-down:#F0123F; --led-down-core:#FFC2CE; --led-off:#CBD3DD; --led-glow:.7;
   --p-tcp:#1F6FE0; --p-icmp:#15803D; --p-arp:#9A6700; --p-mpls:#7A3DD6; --p-rt:#C2530E;
 }
 
@@ -337,6 +342,18 @@ input[type=range]{accent-color:var(--accent)}
 .dlg .body{padding:6px 20px 14px;overflow:auto;color:var(--ink-2);font-size:13.5px}
 .dlg .body p{margin:0 0 12px}
 .dlg > footer{display:flex;gap:8px;justify-content:flex-end;padding:12px 20px 16px;border-top:1px solid var(--line);background:var(--surface)}
+
+/* --------------------------------------------- router status ring */
+.ni-led{color:var(--led-off)}
+.ni-led .glow,.ni-led .core{opacity:0}
+.ni-st-up .ni-led{color:var(--led-up)} .ni-st-warn .ni-led{color:var(--led-warn)} .ni-st-down .ni-led{color:var(--led-down)}
+.ni-st-up .ni-led .glow,.ni-st-warn .ni-led .glow,.ni-st-down .ni-led .glow{opacity:var(--led-glow)}
+.ni-st-up .ni-led .core{opacity:.9;color:var(--led-up-core)}
+.ni-st-warn .ni-led .core{opacity:.9;color:var(--led-warn-core)}
+.ni-st-down .ni-led .core{opacity:.9;color:var(--led-down-core)}
+.ni-st-warn .ni-led{animation:ni-boot 1.6s ease-in-out infinite}
+@keyframes ni-boot{50%{opacity:.35}}
+@media (prefers-reduced-motion: reduce){ .ni-st-warn .ni-led{animation:none} }
 
 /* ------------------------------------------------- terminal dock */
 .tdock{position:fixed;left:var(--rail-w);right:0;bottom:0;z-index:70;height:46vh;min-height:140px;display:flex;flex-direction:column;

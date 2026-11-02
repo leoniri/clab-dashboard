@@ -975,7 +975,7 @@ function render(){
   obstacles=[];
   nodes.forEach(function(n){
     var b=n._box;
-    obstacles.push(box(n.x-R_ICON-3, n.y-R_ICON*0.8-3, n.x+R_ICON+3, n.y+R_ICON*0.8+3));
+    obstacles.push(box(n.x-R_ICON-3, n.y-R_ICON*0.95-3, n.x+R_ICON+3, n.y+R_ICON*0.95+3));
     obstacles.push(box(n.x-b.w/2-4, n.y+b.top-2, n.x+b.w/2+4, n.y+b.bottom+3));
   });
 
@@ -1123,10 +1123,13 @@ function render(){
                      +(n._new?" new":"")+(n._del?" del":"")+(rn&&rn.frozen?" frozen":"")
                      +(imp.open&&imp.nodes.indexOf(n.name)>=0?" imdown":""),
                      transform:"translate("+n.x.toFixed(1)+","+n.y.toFixed(1)+")"});
-    g.appendChild(svgEl("ellipse",{class:"halo",cx:0,cy:0,rx:R_ICON+6,ry:R_ICON-1}));
+    // routers carry their state in the icon's neon ring; other types keep the corner dot
+    var isRouter=type==="router";
+    g.appendChild(svgEl("ellipse",{class:"halo",cx:0,cy:0,rx:R_ICON+(isRouter?3:6),ry:isRouter?R_ICON+3:R_ICON-1}));
     var icg=svgEl("g",{class:"ic"});
     icg.appendChild(NodeIcons.svg(type,{x:-ICON/2, y:-ICON/2, size:ICON,
-      title: n.name+" · "+NodeIcons.label(type)+" · "+n.kind}));
+      status: isRouter ? ({ok:"up", warn:"warn", crit:"down", idle:"off"})[st.cls] : "",
+      title: n.name+" · "+NodeIcons.label(type)+" · "+n.kind+" · "+st.label}));
     g.appendChild(icg);
     var lbl=svgEl("g",{transform:"translate(0,"+b.top+") scale("+LS.toFixed(3)+")"});
     lbl.appendChild(svgEl("rect",{class:"nmbg",x:-b.bw/2,y:0,width:b.bw,height:b.bh,rx:4}));
@@ -1136,7 +1139,7 @@ function render(){
       ipt.textContent=ip; lbl.appendChild(ipt);
     }
     g.appendChild(lbl);
-    if(!n.external) g.appendChild(svgEl("circle",{class:"st",cx:23,cy:-15,r:6,fill:st.color}));
+    if(!n.external && !isRouter) g.appendChild(svgEl("circle",{class:"st",cx:23,cy:-15,r:6,fill:st.color}));
     g.addEventListener("pointerdown",function(e){ startDragNode(e,n); });
     if(editing && !n.external && !n._del){
       var h=svgEl("circle",{class:"lhandle",cx:R_ICON+5,cy:0,r:7});
