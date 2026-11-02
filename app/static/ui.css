@@ -340,7 +340,8 @@ input[type=range]{accent-color:var(--accent)}
 
 /* ------------------------------------------------- terminal dock */
 .tdock{position:fixed;left:var(--rail-w);right:0;bottom:0;z-index:70;height:46vh;min-height:140px;display:flex;flex-direction:column;
-  background:var(--console-bg);border-top:1px solid #243140;box-shadow:0 -12px 40px rgba(0,0,0,.45);animation:rise .16s ease-out}
+  background:var(--console-bg);border:1px solid #243140;border-bottom:0;border-radius:12px 12px 0 0;
+  box-shadow:0 -12px 40px rgba(0,0,0,.45);animation:rise .16s ease-out}
 .tdock[hidden]{display:none!important}
 .tdock.min{height:auto!important;min-height:0}
 .tdock.min .tstage{display:none}
@@ -356,7 +357,7 @@ html.tdock-drag-y, html.tdock-drag-y *{cursor:ns-resize!important}
 html.tdock-drag-x, html.tdock-drag-x *{cursor:ew-resize!important}
 html.tdock-drag .tdock iframe{pointer-events:none}
 .tbar{position:relative;display:flex;align-items:center;gap:8px;height:36px;padding:0 6px 0 12px;flex:none;
-  background:#0B1017;border-bottom:1px solid #1B2632;color:var(--console-ink);font:12px var(--font-mono)}
+  background:#0B1017;border-bottom:1px solid #1B2632;border-radius:11px 11px 0 0;color:var(--console-ink);font:12px var(--font-mono)}
 .tgrip{position:absolute;left:0;right:0;top:-4px;height:8px;cursor:ns-resize;z-index:2;touch-action:none}
 .tbar .ttl{display:flex;align-items:center;gap:7px;color:#fff;font-weight:700;flex:none}
 .tbar .ttl svg{width:15px;height:15px;color:var(--accent)}
