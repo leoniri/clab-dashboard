@@ -1089,6 +1089,9 @@ class Handler(BaseHTTPRequestHandler):
                          "trash_dir": TRASH_DIR})
             self._json(plan)
             return
+        if u.path == "/api/term/info":
+            self._json(term_sessions())
+            return
         if u.path.startswith("/api/") and self._manage_get(u):
             return
         if u.path == "/api/health":
@@ -1740,6 +1743,39 @@ def host_interfaces():
             continue
         res.append({"name": name, "addr": f[3]})
     return res
+
+
+def term_sessions():
+    """How many web terminals ttyd allows (--max-clients) and how many are open.
+
+    ttyd runs term.py once per browser connection, so its direct children are
+    the open sessions. Read from /proc; {max: 0} when ttyd is not running.
+    """
+    procs = {}
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit():
+            continue
+        try:
+            with open("/proc/%s/cmdline" % pid, "rb") as fh:
+                argv = fh.read().split(b"\0")
+            with open("/proc/%s/stat" % pid) as fh:
+                ppid = fh.read().rsplit(")", 1)[1].split()[1]
+        except (OSError, IndexError):
+            continue
+        procs[pid] = (argv, ppid)
+    for pid, (argv, _) in procs.items():
+        if os.path.basename(argv[0]) != b"ttyd" or b"/term" not in argv:
+            continue
+        cap = 0
+        for flag in (b"--max-clients", b"-m"):
+            if flag in argv[:-1]:
+                try:
+                    cap = int(argv[argv.index(flag) + 1])
+                except ValueError:
+                    pass
+        active = sum(1 for _, pp in procs.values() if pp == pid)
+        return {"max": cap, "active": active}
+    return {"max": 0, "active": 0}
 
 
 def tail(path, n):

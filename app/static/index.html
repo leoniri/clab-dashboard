@@ -245,21 +245,6 @@
   <div class="clog" id="clog"></div>
 </div>
 
-<div class="termwrap" id="termwrap" hidden>
-  <div class="termbox">
-    <div class="termhead">
-      <span class="who" id="term_who">—</span>
-      <span class="meta" id="term_meta"></span>
-      <span class="right">
-        <a id="term_tab" href="#" target="_blank" rel="noopener">new tab</a>
-        <button id="term_reload">reconnect</button>
-        <button id="term_close">close</button>
-      </span>
-    </div>
-    <iframe id="term_frame" title="Router CLI" allow="clipboard-write"></iframe>
-  </div>
-</div>
-
 <div class="scrim" id="scrim" hidden>
   <div class="dlg" id="modal" role="dialog" aria-modal="true" aria-labelledby="mtitle">
     <header><div class="dlg-ic danger" id="micon"></div><h3 id="mtitle">Confirm</h3></header>
@@ -788,7 +773,7 @@ function renderLabs(s){
         var cliTd = el("td"); cliTd.style.textAlign = "right";
         if (c.name && c.state === "running"){
           var cli = UI.button("CLI", "sm", function(){
-            openTerm(c.name, n.name + " · " + l.name, (c.ipv4 || "") + " · " + n.kind);
+            UI.term.open(c.name, {name: n.name, lab: l.name, meta: [c.ipv4, n.kind].filter(Boolean).join(" · ")});
           }, "terminal");
           cli.title = "open " + c.name + " in the browser";
           cliTd.appendChild(cli);
@@ -800,34 +785,6 @@ function renderLabs(s){
     }
   });
 }
-
-// ---------- web terminal ----------
-// ttyd sits behind /term/ and takes the container name in ?arg=. The server
-// validates that name against the running containers before it execs ssh, and
-// resolves the credentials from the topology, so nothing sensitive is in here.
-function termUrl(container){
-  return "term/?arg=" + encodeURIComponent(container);
-}
-function openTerm(container, who, meta){
-  $("term_who").textContent = who;
-  $("term_meta").textContent = meta || "";
-  $("term_tab").href = termUrl(container);
-  $("term_frame").src = termUrl(container);
-  $("termwrap").hidden = false;
-  $("termwrap").dataset.container = container;
-}
-function closeTerm(){
-  $("termwrap").hidden = true;
-  $("term_frame").src = "about:blank";   // drop the session
-}
-$("term_close").addEventListener("click", closeTerm);
-$("term_reload").addEventListener("click", function(){
-  var c = $("termwrap").dataset.container;
-  if (c) $("term_frame").src = termUrl(c);
-});
-$("termwrap").addEventListener("click", function(e){
-  if (e.target === $("termwrap")) closeTerm();
-});
 
 // ---------- confirm modal ----------
 var pending = null;
@@ -891,7 +848,7 @@ $("scrim").addEventListener("click", function(e){ if (e.target === $("scrim")) c
 $("mok").addEventListener("click", function(){ var f = pending; closeModal(); if (f) f(); });
 document.addEventListener("keydown", function(e){
   if (e.key !== "Escape") return;
-  if (!$("termwrap").hidden) closeTerm(); else closeModal();
+  closeModal();
 });
 
 // ---------- save current config ----------

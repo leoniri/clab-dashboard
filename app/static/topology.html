@@ -582,21 +582,6 @@ i.res.reached{color:var(--ok);background:var(--ok-soft)} i.res.blackhole,i.res.n
   </div>
 </div>
 
-<div class="termwrap" id="termwrap" hidden>
-  <div class="termbox">
-    <div class="termhead">
-      <span class="who" id="term_who">—</span>
-      <span class="meta" id="term_meta"></span>
-      <span class="right">
-        <a id="term_tab" href="#" target="_blank" rel="noopener">new tab</a>
-        <button id="term_reload">reconnect</button>
-        <button id="term_close">close</button>
-      </span>
-    </div>
-    <iframe id="term_frame" title="Router CLI" allow="clipboard-write"></iframe>
-  </div>
-</div>
-
 <script src="ui.js"></script>
 <script src="node-icons.js"></script>
 <script src="device-config.js"></script>
@@ -2590,7 +2575,7 @@ function renderNodePanel(box, n){
   if(!n.external && !n._new){
     var ar=el("div","actrow");
     var cli=UI.button("Open CLI","primary",function(){
-      openTerm(n.container.name, n.name+" · "+lab.name, nodeIp(n)+" · "+n.kind); },"terminal");
+      openTerm(n); },"terminal");
     cli.disabled=!running; cli.title=running?"a session to "+n.name+" in the browser":"the node has to be running";
     ar.appendChild(cli);
     if(canConfigure(n) && window.DeviceConfig){
@@ -2605,7 +2590,7 @@ function renderNodePanel(box, n){
     }
     ar.appendChild(UI.moreButton(function(){ return [
       {label:"CLI in a new tab", icon:"external", disabled:!running,
-       href: running ? "term/?arg="+encodeURIComponent(n.container.name) : undefined, target:"_blank"},
+       href: running ? UI.term.url(n.container.name) : undefined, target:"_blank"},
       canConfigure(n) ? {label:"Show running config", icon:"file", disabled:!running,
        onClick:function(){ DeviceConfig.open(lab, n.name, {tab:"running"}); }} : null
     ]; }));
@@ -2867,7 +2852,7 @@ setPanel(panelOpen);
 // ---------- keyboard + command palette ----------
 document.addEventListener("keydown",function(e){
   if(e.ctrlKey||e.metaKey||e.altKey||/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
-  if(document.querySelector(".scrim,.cmdk,.dc-scrim") || !$("termwrap").hidden || !lab) return;
+  if(document.querySelector(".scrim,.cmdk,.dc-scrim") || !lab) return;
   var k=e.key;
   if(k==="f"){ fit(); }
   else if(k==="i"){ setPanel(!panelOpen); }
@@ -2916,26 +2901,17 @@ function nodeCommands(){
             run:function(){ sel=n; selLink=null; revealPanel(); render(); }};
   }).concat(nodes.filter(function(n){ return !n.external; }).map(function(n){
     return {group:"Nodes", label:"CLI "+n.name, sub:"open a terminal", icon:"terminal", run:function(){
-      if(n.container && n.container.state==="running") openTerm(n.container.name, n.name+" · "+lab.name, nodeIp(n)+" · "+n.kind);
+      if(n.container && n.container.state==="running") openTerm(n);
       else UI.toast(n.name+" is not running", "warn"); }};
   })));
 }
 
 // ---------- terminal ----------
-function termUrl(c){ return "term/?arg="+encodeURIComponent(c); }
-function openTerm(c,who,meta){
-  $("term_who").textContent=who; $("term_meta").textContent=meta||"";
-  $("term_tab").href=termUrl(c); $("term_frame").src=termUrl(c);
-  $("termwrap").hidden=false; $("termwrap").dataset.container=c;
+function openTerm(n){
+  UI.term.open(n.container.name, {name:n.name, lab:lab.name, meta:[nodeIp(n), n.kind].filter(Boolean).join(" · ")});
 }
-function closeTerm(){ $("termwrap").hidden=true; $("term_frame").src="about:blank"; }
-$("term_close").addEventListener("click",closeTerm);
-$("term_reload").addEventListener("click",function(){
-  var c=$("termwrap").dataset.container; if(c) $("term_frame").src=termUrl(c);
-});
-$("termwrap").addEventListener("click",function(e){ if(e.target===$("termwrap")) closeTerm(); });
 document.addEventListener("keydown",function(e){
-  if(e.key==="Escape"){ if(!$("termwrap").hidden) closeTerm(); else if(imp.open && !document.querySelector(".scrim")) setImpact(false); else { sel=null; selLink=null; render(); } }
+  if(e.key==="Escape"){ if(imp.open && !document.querySelector(".scrim")) setImpact(false); else { sel=null; selLink=null; render(); } }
 });
 
 // ---------- edit mode ----------

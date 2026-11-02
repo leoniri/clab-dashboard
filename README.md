@@ -4,7 +4,8 @@ A web UI for [containerlab](https://containerlab.dev): run, draw, break and insp
 network labs from the browser.
 
 - **Labs** - every topology on the host, running or not, with start / redeploy / stop,
-  memory pre-flight, in-browser CLI to every node, and an audit log of every action.
+  memory pre-flight, in-browser CLI to every node (a terminal dock with tabs and up to
+  four panes side by side), and an audit log of every action.
 - **Topology map** - live IGP adjacencies, BGP sessions and link traffic; fail a link or
   add delay/loss/jitter; capture packets in the browser (Wireshark-style decode, pcap
   download); **path trace** through each router's own dataplane - labels, SRv6 uSID shifts (uN, uA), SR policies (BSID, uB6) and VPN decap - to IPv4 or IPv6 destinations or a SID; every
@@ -76,6 +77,7 @@ curl -fsSL https://raw.githubusercontent.com/leoniri/clab-dashboard/main/get.sh 
 | `--clab-version X.Y.Z` | install this containerlab release instead of the latest |
 | `--no-clab` | leave Docker and containerlab exactly as they are |
 | `--no-auth` / `--auth` | switch the login off / on (off only makes sense with `--listen 127.0.0.1`) |
+| `--terminals N` | web CLI sessions open at once, all users together (default 32, remembered on upgrade) |
 | `--uninstall` | remove the services and web config; labs, images and data stay |
 | `--version vX.Y.Z` | (get.sh only) install that release instead of the latest; `main` for the development branch |
 

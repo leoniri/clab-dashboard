@@ -10,6 +10,7 @@
 #     sudo ./install.sh --clab-version 0.79.0   # pin containerlab instead of latest
 #     sudo ./install.sh --no-clab           # leave Docker + containerlab alone
 #     sudo ./install.sh --no-auth           # switch the login off (only with --listen 127.0.0.1!)
+#     sudo ./install.sh --terminals 48      # web CLI sessions open at once, all users (default 32)
 #     sudo ./install.sh --auth              # switch it back on
 #     sudo ./install.sh --uninstall         # remove services + web config, keep lab data
 #
@@ -27,6 +28,7 @@ CLAB_TESTED=0.79.0          # newest containerlab this release was tested agains
 CLAB_VERSION=               # empty = latest
 DO_CLAB=1
 AUTH_MODE=keep              # keep | on | off
+TERMINALS=                  # empty = keep the last value (default 32)
 UNINSTALL=0
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -41,6 +43,7 @@ while [ $# -gt 0 ]; do
         --no-clab) DO_CLAB=0; shift ;;
         --auth) AUTH_MODE=on; shift ;;
         --no-auth) AUTH_MODE=off; shift ;;
+        --terminals) TERMINALS="${2:-}"; shift 2 ;;
         --uninstall) UNINSTALL=1; shift ;;
         -h|--help) usage; exit 0 ;;
         *) echo "unknown option $1 (see --help)" >&2; exit 2 ;;
@@ -83,6 +86,7 @@ fi
 [ -f "$SRC/app/server.py" ] && [ -d "$SRC/app/static" ] \
     || die "run this from the unpacked clab-dashboard source (the directory holding app/)"
 case "$PORT" in ''|*[!0-9]*) die "--port needs a number" ;; esac
+case "$TERMINALS" in *[!0-9]*) die "--terminals needs a number" ;; esac
 [ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] || die "--port must be 1-65535"
 [ "$PORT" != 8090 ] && [ "$PORT" != 8091 ] || die "ports 8090 and 8091 are used internally - pick another"
 if [ -n "$LISTEN" ]; then
@@ -232,6 +236,16 @@ Environment=CLABD_DATA_DIR=$DATA
 WantedBy=multi-user.target
 EOF
 
+# how many web terminals ttyd serves at once (all users and pages together);
+# a value given once is remembered for later upgrades
+if [ -n "$TERMINALS" ]; then
+    [ "$TERMINALS" -ge 1 ] || die "--terminals needs at least 1"
+    echo "$TERMINALS" > "$DATA/terminals"
+elif [ -s "$DATA/terminals" ]; then
+    TERMINALS=$(tr -dc 0-9 < "$DATA/terminals")
+fi
+TERMINALS=${TERMINALS:-32}
+
 cat > /etc/systemd/system/clab-term.service <<EOF
 [Unit]
 Description=clab-dashboard web terminal (ttyd)
@@ -244,7 +258,7 @@ Type=simple
 # the containers containerlab reports as running before it execs anything.
 # nginx only lets a request through to here after the dashboard's login check.
 ExecStart=$TTYD --port 8091 --interface 127.0.0.1 --base-path /term --writable \\
-          --max-clients 12 --url-arg --client-option fontSize=13 $PREFIX/term.py
+          --max-clients $TERMINALS --url-arg --client-option fontSize=13 $PREFIX/term.py
 Restart=always
 RestartSec=3
 User=root

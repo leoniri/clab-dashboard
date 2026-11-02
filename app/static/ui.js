@@ -27,6 +27,10 @@
  *   UI.kindClass(kind, image)        -> "k-xe" | "k-xr" | "k-nx" | "k-frr" | "k-srl" | "k-lin" | "k-oth"
  *   UI.kindLabel(kind, image)        -> "IOS-XE", "IOS-XR", ...
  *   UI.state()                       the last /api/state the shell fetched (or null)
+ *   UI.term.open(container, {name, lab, meta})
+ *                                    open a CLI session in the terminal dock (tabs,
+ *                                    up to four panes); UI.term.url(container) is
+ *                                    the ttyd URL for a plain browser tab
  *
  * window.alert is replaced by a toast, so a failed request never blocks the page.
  */
@@ -85,7 +89,14 @@ var P = {
   user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   logout:'<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 17l-5-5 5-5M5 12h11"/>',
   key:'<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M16 7l3 3M14 9l2 2"/>',
-  guide:'<path d="M5 4.5h9.5a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h9.5"/><path d="M9 8h5M9 11h3"/>'
+  guide:'<path d="M5 4.5h9.5a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h9.5"/><path d="M9 8h5M9 11h3"/>',
+  lay1:'<rect x="4" y="5" width="16" height="14" rx="1.5"/>',
+  lay2v:'<rect x="4" y="5" width="16" height="14" rx="1.5"/><path d="M12 5v14"/>',
+  lay2h:'<rect x="4" y="5" width="16" height="14" rx="1.5"/><path d="M4 12h16"/>',
+  lay4:'<rect x="4" y="5" width="16" height="14" rx="1.5"/><path d="M12 5v14M4 12h16"/>',
+  winmin:'<path d="M6 17h12"/>',
+  winmax:'<rect x="5" y="5" width="14" height="14" rx="1.5"/><path d="M5 9h14"/>',
+  winrestore:'<rect x="5" y="9" width="10" height="10" rx="1.5"/><path d="M9 9V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-3"/>'
 };
 var NS = "http://www.w3.org/2000/svg";
 function icon(name){
@@ -609,6 +620,326 @@ function palette(){
     .catch(function(){});
 }
 
+// ---------- terminal dock ----------
+// Every CLI session is a ttyd iframe in a dock at the bottom of the page: one
+// tab per session, up to four panes on screen. An iframe reloads - and so drops
+// its SSH session - whenever it is moved in the DOM, so a session's pane is
+// created once inside the stage grid and afterwards only its grid placement
+// changes. The open sessions are remembered for the browser tab, so the dock
+// comes back (and reconnects) on the next dashboard page.
+var LAYOUTS = {"1":{n:1, c:1}, "2v":{n:2, c:2}, "2h":{n:2, c:1}, "4":{n:4, c:2}};
+var LAYOUT_NAMES = {"1":"one pane", "2v":"side by side", "2h":"stacked", "4":"four panes"};
+var GROW = {"1":"2v", "2v":"4", "2h":"4"};
+var TERM_KEY = "clabd.term", TERM_H = "clabd.term.h";
+var TD = null, termSeq = 0, dragId = null;
+
+function termUrl(container){ return "/term/?arg=" + encodeURIComponent(container); }
+function tib(ic, title, fn){
+  var b = el("button", "tib"); b.type = "button"; b.title = title; b.setAttribute("aria-label", title);
+  b.appendChild(icon(ic));
+  b.addEventListener("click", function(e){ e.stopPropagation(); fn(e); });
+  return b;
+}
+function dock(){
+  if (TD) return TD;
+  var d = el("section", "tdock"), bar = el("div", "tbar"), grip = el("div", "tgrip");
+  d.hidden = true; d.setAttribute("aria-label", "terminals");
+  grip.title = "drag to resize";
+  var ttl = el("span", "ttl"), cnt = el("span", null, "CLI");
+  ttl.appendChild(icon("terminal")); ttl.appendChild(cnt);
+  var tabsEl = el("div", "ttabs"), lay = el("div", "tlay"), right = el("div", "tlay");
+  tabsEl.setAttribute("role", "tablist");
+  TD = {el:d, tabs:tabsEl, count:cnt, lay:lay, stage:el("div", "tstage"),
+        sessions:[], slots:[null], layout:"1", manual:false, focus:0, mode:"open"};
+  ["1", "2v", "2h", "4"].forEach(function(k){
+    var b = tib("lay" + k, "layout: " + LAYOUT_NAMES[k], function(){ setLayout(k, true); });
+    b.dataset.layout = k; lay.appendChild(b);
+  });
+  TD.minBtn = tib("winmin", "minimise", function(){ setMode(TD.mode === "min" ? "open" : "min"); });
+  TD.maxBtn = tib("winmax", "maximise", function(){ setMode(TD.mode === "max" ? "open" : "max"); });
+  right.appendChild(TD.minBtn); right.appendChild(TD.maxBtn);
+  right.appendChild(tib("x", "close all sessions", closeAll));
+  [grip, ttl, tabsEl, lay, right].forEach(function(x){ bar.appendChild(x); });
+  bar.addEventListener("dblclick", function(e){
+    if (e.target === bar || e.target === tabsEl) setMode(TD.mode === "max" ? "open" : "max");
+  });
+  d.appendChild(bar); d.appendChild(TD.stage);
+  document.body.appendChild(d);
+  var h = 0; try { h = +localStorage.getItem(TERM_H) || 0; } catch (e) {}
+  if (h) d.style.height = Math.min(h, innerHeight - 60) + "px";
+  grip.addEventListener("pointerdown", startResize);
+  if (window.ResizeObserver) new ResizeObserver(offset).observe(d);
+  window.addEventListener("resize", offset);
+  return TD;
+}
+// The page keeps its content above the dock: body padding, job console and
+// toasts all follow --tdock-off.
+function offset(){
+  var on = !!TD && !TD.el.hidden, root = document.documentElement;
+  root.classList.toggle("tdock-on", on);
+  root.style.setProperty("--tdock-off", on && TD.mode !== "max" ? TD.el.offsetHeight + "px" : "0px");
+}
+function startResize(e){
+  if (TD.mode !== "open") setMode("open");
+  e.preventDefault();
+  var grip = e.currentTarget, root = document.documentElement;
+  var below = innerHeight - TD.el.getBoundingClientRect().bottom;
+  try { grip.setPointerCapture(e.pointerId); } catch (x) {}
+  root.classList.add("tdock-drag");                    // iframes would swallow the moves
+  function move(ev){
+    TD.el.style.height = Math.max(140, Math.min(innerHeight - 60, innerHeight - below - ev.clientY)) + "px";
+  }
+  function up(){
+    root.classList.remove("tdock-drag");
+    grip.removeEventListener("pointermove", move); grip.removeEventListener("pointerup", up);
+    try { localStorage.setItem(TERM_H, parseInt(TD.el.style.height, 10)); } catch (x) {}
+  }
+  grip.addEventListener("pointermove", move); grip.addEventListener("pointerup", up);
+}
+function setMode(m){
+  TD.mode = m;
+  TD.el.classList.toggle("min", m === "min"); TD.el.classList.toggle("max", m === "max");
+  TD.minBtn.title = m === "min" ? "restore" : "minimise";
+  TD.maxBtn.replaceChildren(icon(m === "max" ? "winrestore" : "winmax"));
+  TD.maxBtn.title = m === "max" ? "restore" : "maximise";
+  offset(); save();
+  if (m !== "min") focusPane(TD.focus);
+}
+function byId(id){ return TD.sessions.filter(function(s){ return s.id === id; })[0] || null; }
+function background(){ return TD.sessions.filter(function(s){ return TD.slots.indexOf(s.id) < 0; }); }
+// Change the number of panes, keeping what is on screen (the focused pane wins
+// when there are fewer panes than before).
+function resize(k){
+  var n = LAYOUTS[k].n, f = TD.slots[TD.focus], keep = TD.slots.slice();
+  if (n < keep.length){
+    keep = keep.filter(function(x){ return x !== null; });
+    var at = keep.indexOf(f);
+    if (at >= n){ keep.splice(at, 1); keep.splice(n - 1, 0, f); }
+  }
+  TD.layout = k; TD.slots = [];
+  for (var i = 0; i < n; i++) TD.slots.push(i < keep.length ? keep[i] : null);
+  TD.focus = Math.max(0, TD.slots.indexOf(f));
+}
+function setLayout(k, manual){
+  if (manual) TD.manual = true;
+  resize(k);
+  TD.slots.forEach(function(x, i){ if (x === null){ var b = background()[0]; if (b) TD.slots[i] = b.id; } });
+  render(); focusPane(TD.focus);
+}
+function connect(s, force){
+  if (s.live && !force) return;
+  s.live = true; s.frame.src = termUrl(s.c);
+}
+// ttyd is served from the same origin, so the dock can see clicks inside a
+// terminal (to move the focus ring) and put the keyboard into xterm.
+function hookFrame(s){
+  try {
+    var w = s.frame.contentWindow;
+    w.addEventListener("focus", function(){ focusSession(s); });
+    w.document.addEventListener("mousedown", function(){ focusSession(s); });
+  } catch (e) {}
+}
+function focusSession(s){
+  var i = TD.slots.indexOf(s.id);
+  if (i >= 0 && i !== TD.focus){ TD.focus = i; mark(); save(); }
+}
+function focusPane(i){
+  var s = byId(TD.slots[i]);
+  if (!s || TD.mode === "min") return;
+  try { var t = s.frame.contentDocument.querySelector("textarea"); (t || s.frame.contentWindow).focus(); }
+  catch (e) { s.frame.focus(); }
+}
+function add(spec, show){
+  dock();
+  var s = {id: ++termSeq, c: spec.c, name: spec.name || spec.c, lab: spec.lab || "", meta: spec.meta || "", live: false};
+  var same = TD.sessions.filter(function(x){ return x.c === s.c; }).length;
+  s.label = same ? s.name + " (" + (same + 1) + ")" : s.name;
+  s.pane = el("div", "tpane"); s.pane.hidden = true;
+  var head = el("div", "tphead"), r = el("span", "right");
+  head.draggable = true; head.title = "drag onto another pane to move it";
+  head.appendChild(el("span", "who", s.label));
+  head.appendChild(el("span", "meta", [s.lab, s.meta].filter(Boolean).join(" · ")));
+  r.appendChild(tib("redo", "reconnect", function(){ connect(s, true); focusPane(TD.slots.indexOf(s.id)); }));
+  r.appendChild(tib("external", "move to a browser tab", function(){ popout(s); }));
+  r.appendChild(tib("x", "close this session", function(){ closeSession(s); }));
+  head.appendChild(r);
+  dragSource(head, s);
+  s.frame = el("iframe"); s.frame.title = "CLI " + s.label; s.frame.setAttribute("allow", "clipboard-write");
+  s.frame.addEventListener("load", function(){ hookFrame(s); });
+  s.pane.appendChild(head); s.pane.appendChild(s.frame);
+  s.pane.addEventListener("mousedown", function(){ focusSession(s); });
+  TD.stage.appendChild(s.pane);
+  TD.sessions.push(s);
+  TD.el.hidden = false;
+  if (show){
+    var i = TD.slots.indexOf(null);
+    if (i < 0 && !TD.manual && innerWidth >= 900 && GROW[TD.layout]){ resize(GROW[TD.layout]); i = TD.slots.indexOf(null); }
+    if (i < 0) i = TD.focus;                     // the pane's old session stays open as a tab
+    TD.slots[i] = s.id; TD.focus = i;
+    if (TD.mode === "min") setMode("open");
+  }
+  render();
+  if (show) focusPane(TD.focus);
+  return s;
+}
+function showSession(s){
+  var i = TD.slots.indexOf(s.id);
+  if (i < 0){ i = TD.focus; TD.slots[i] = s.id; }
+  TD.focus = i;
+  if (TD.mode === "min") setMode("open");
+  render(); focusPane(i);
+}
+function closeSession(s){
+  s.frame.src = "about:blank"; s.pane.remove();
+  TD.sessions.splice(TD.sessions.indexOf(s), 1);
+  var i = TD.slots.indexOf(s.id);
+  if (i >= 0){ var b = background()[0]; TD.slots[i] = b ? b.id : null; }
+  if (!TD.sessions.length){
+    TD.el.hidden = true; TD.slots = [null]; TD.layout = "1"; TD.manual = false; TD.focus = 0;
+    render(); return;
+  }
+  if (!TD.manual){
+    var n = TD.sessions.length, fit = n >= 3 ? "4" : n === 2 ? (TD.layout === "2h" ? "2h" : "2v") : "1";
+    if (LAYOUTS[fit].n < LAYOUTS[TD.layout].n) resize(fit);
+  }
+  render();
+}
+function closeAll(){
+  var n = TD.sessions.length;
+  (n > 1 ? confirmDlg("Close all terminals?", "This ends " + n + " CLI sessions.", {ok:"Close all", danger:true})
+         : Promise.resolve(true))
+    .then(function(ok){ if (ok) TD.sessions.slice().forEach(closeSession); });
+}
+function popout(s){
+  window.open(termUrl(s.c), "_blank", "noopener");
+  closeSession(s);
+}
+function dragSource(node, s){
+  node.addEventListener("dragstart", function(e){
+    if (TD.mode === "min"){ e.preventDefault(); return; }
+    dragId = s.id; e.dataTransfer.effectAllowed = "move";
+    try { e.dataTransfer.setData("text/plain", s.label); } catch (x) {}
+    setTimeout(dropZones, 0);        // changing the DOM inside dragstart cancels the drag in Chrome
+  });
+  node.addEventListener("dragend", function(){
+    dragId = null;
+    var z = TD.stage.querySelector(".tdrop"); if (z) z.remove();
+  });
+}
+// While a tab or pane header is dragged, a layer of drop targets covers the
+// panes - the iframes underneath would otherwise eat the drag events.
+function dropZones(){
+  if (dragId === null) return;
+  var z = el("div", "tdrop");
+  z.style.gridTemplateColumns = TD.stage.style.gridTemplateColumns;
+  z.style.gridTemplateRows = TD.stage.style.gridTemplateRows;
+  TD.slots.forEach(function(_, i){
+    var c = el("div", null, TD.slots.length > 1 ? "pane " + (i + 1) : "show here");
+    c.addEventListener("dragover", function(e){ e.preventDefault(); e.dataTransfer.dropEffect = "move"; c.classList.add("over"); });
+    c.addEventListener("dragleave", function(){ c.classList.remove("over"); });
+    c.addEventListener("drop", function(e){ e.preventDefault(); drop(i); });
+    z.appendChild(c);
+  });
+  TD.stage.appendChild(z);
+}
+function drop(i){
+  var id = dragId, from = TD.slots.indexOf(id);
+  if (id === null) return;
+  if (from >= 0) TD.slots[from] = TD.slots[i];   // swap with whatever was there
+  TD.slots[i] = id; TD.focus = i;
+  render(); focusPane(i);
+}
+function render(){
+  if (!TD) return;
+  var L = LAYOUTS[TD.layout], shown = 0;
+  TD.stage.style.gridTemplateColumns = "repeat(" + L.c + ", minmax(0, 1fr))";
+  TD.stage.style.gridTemplateRows = "repeat(" + Math.ceil(L.n / L.c) + ", minmax(0, 1fr))";
+  TD.stage.querySelectorAll(".tempty").forEach(function(x){ x.remove(); });
+  function at(node, i){ node.style.gridRow = String(Math.floor(i / L.c) + 1); node.style.gridColumn = String(i % L.c + 1); }
+  TD.sessions.forEach(function(s){
+    var i = TD.slots.indexOf(s.id);
+    s.pane.hidden = i < 0;
+    if (i >= 0){ at(s.pane, i); connect(s); shown++; }
+  });
+  TD.slots.forEach(function(id, i){
+    if (id !== null) return;
+    var e = el("div", "tempty", TD.sessions.length > shown ? "click a tab above, or drag one here"
+                                                            : "open another CLI from a lab or the map");
+    at(e, i); TD.stage.appendChild(e);
+  });
+  TD.tabs.replaceChildren();
+  TD.sessions.forEach(function(s){
+    var i = TD.slots.indexOf(s.id), t = el("button", "ttab"), x = el("span", "x");
+    t.type = "button"; t.setAttribute("role", "tab"); t.draggable = true;
+    t.classList.toggle("shown", i >= 0); t.classList.toggle("idle", !s.live);
+    t.title = [s.c, s.lab, s.meta].filter(Boolean).join(" · ") + (s.live ? "" : "\nconnects when shown");
+    if (i >= 0 && L.n > 1) t.appendChild(el("span", "n", String(i + 1)));
+    t.appendChild(el("span", "l", s.label));
+    x.title = "close"; x.appendChild(icon("x"));
+    x.addEventListener("click", function(e){ e.stopPropagation(); closeSession(s); });
+    t.appendChild(x);
+    t.addEventListener("click", function(){ showSession(s); });
+    t.addEventListener("auxclick", function(e){ if (e.button === 1){ e.preventDefault(); closeSession(s); } });
+    dragSource(t, s);
+    s.tab = t; TD.tabs.appendChild(t);
+  });
+  TD.count.textContent = "CLI " + TD.sessions.length;
+  TD.lay.querySelectorAll(".tib").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.layout === TD.layout)); });
+  mark(); offset(); save();
+}
+function mark(){
+  var multi = TD.slots.length > 1;
+  TD.sessions.forEach(function(s){
+    var f = TD.slots.indexOf(s.id) === TD.focus;
+    s.pane.classList.toggle("focus", f && multi);
+    if (s.tab){ s.tab.classList.toggle("focus", f); s.tab.setAttribute("aria-selected", String(f)); }
+  });
+}
+function save(){
+  if (!TD) return;
+  try {
+    if (!TD.sessions.length){ sessionStorage.removeItem(TERM_KEY); return; }
+    sessionStorage.setItem(TERM_KEY, JSON.stringify({
+      sessions: TD.sessions.map(function(s){ return {c:s.c, name:s.name, lab:s.lab, meta:s.meta}; }),
+      slots: TD.slots.map(function(id){ return TD.sessions.indexOf(byId(id)); }),
+      layout: TD.layout, manual: TD.manual, focus: TD.focus, mode: TD.mode}));
+  } catch (e) {}
+}
+// Back on another page: same tabs and layout, the visible panes log in again,
+// the rest connect when they are shown.
+function restore(){
+  var st = null;
+  try { st = JSON.parse(sessionStorage.getItem(TERM_KEY) || "null"); } catch (e) {}
+  if (!st || !Array.isArray(st.sessions) || !st.sessions.length) return;
+  var made = st.sessions.map(function(x){ return add(x, false); });
+  TD.manual = !!st.manual;
+  resize(LAYOUTS[st.layout] ? st.layout : "1");
+  TD.slots = TD.slots.map(function(_, i){ var k = (st.slots || [])[i]; return made[k] ? made[k].id : null; });
+  TD.focus = Math.min(Math.max(0, st.focus | 0), TD.slots.length - 1);
+  render();
+  setMode(st.mode === "min" || st.mode === "max" ? st.mode : "open");
+}
+// Open a CLI. The host's ttyd serves a fixed number of sessions (all users and
+// pages together), so ask first rather than show a pane that never connects.
+function termOpen(container, o){
+  o = o || {};
+  return fetch("/api/term/info", {cache:"no-store"})
+    .then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; })
+    .then(function(info){
+      if (info && info.max && info.active >= info.max){
+        toast("All " + info.max + " web terminals on this host are in use. Close one first.", "crit", 8000);
+        return null;
+      }
+      return add({c:container, name:o.name, lab:o.lab, meta:o.meta}, true);
+    });
+}
+function termToggle(){
+  if (TD && TD.sessions.length) setMode(TD.mode === "min" ? "open" : "min");
+}
+function bootTerm(){ if (rail) restore(); }
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bootTerm);
+else setTimeout(bootTerm, 0);
+
 // ---------- keyboard ----------
 var pageKeys = [];
 function keys(list){ pageKeys = pageKeys.concat(list || []); }
@@ -616,7 +947,7 @@ function showKeys(){
   var dl = el("dl", "keys");
   [["Ctrl K", "command palette - jump anywhere"], ["/", "focus the page's search box"], ["g l", "go to labs"],
    ["g c", "go to the catalogue"], ["g b", "go to the builder"], ["g m", "go to manage"], ["t", "toggle light / dark"],
-   ["?", "this list"], ["Esc", "close a dialog, menu or terminal"]].concat(pageKeys.map(function(k){ return [k.keys, k.label]; }))
+   ["`", "show / hide the terminal dock"], ["?", "this list"], ["Esc", "close a dialog or menu"]].concat(pageKeys.map(function(k){ return [k.keys, k.label]; }))
   .forEach(function(k){
     var dt = el("dt"); String(k[0]).split(" ").forEach(function(x){ dt.appendChild(el("kbd", null, x)); });
     dl.appendChild(dt); dl.appendChild(el("dd", null, k[1]));
@@ -636,7 +967,7 @@ document.addEventListener("keydown", function(e){
     e.preventDefault(); if (cmdkOpen) cmdkOpen.close(); else palette(); return;
   }
   if (e.ctrlKey || e.metaKey || e.altKey || typing(e) || cmdkOpen || !rail) return;
-  if (document.querySelector(".scrim:not([hidden]),.termwrap:not([hidden]),.te-scrim")) return;
+  if (document.querySelector(".scrim:not([hidden]),.te-scrim")) return;
   var now = Date.now();
   if (gPending && now - gPending < 900){
     gPending = 0;
@@ -647,6 +978,7 @@ document.addEventListener("keydown", function(e){
   if (e.key === "g"){ gPending = now; return; }
   if (e.key === "?"){ e.preventDefault(); showKeys(); return; }
   if (e.key === "t"){ toggleTheme(); return; }
+  if (e.key === "`"){ termToggle(); return; }
   if (e.key === "/"){
     var s = document.querySelector("[data-search]") || document.querySelector("input[type=search]");
     e.preventDefault();
@@ -658,5 +990,6 @@ window.UI = {icon: icon, appbar: appbar, menu: menu, closeMenu: closeMenu, moreB
              button: button, seg: seg, tabs: tabs, toggleTheme: toggleTheme, isDark: isDark,
              toast: toast, confirm: confirmDlg, prompt: promptDlg, dialog: dialog,
              commands: commands, keys: keys, palette: palette,
-             kindClass: kindClass, kindLabel: kindLabel, state: function(){ return shellState; }};
+             kindClass: kindClass, kindLabel: kindLabel, state: function(){ return shellState; },
+             term: {open: termOpen, url: termUrl, toggle: termToggle}};
 })();
