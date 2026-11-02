@@ -635,8 +635,8 @@ var TERM_KEY = "clabd.term", TERM_H = "clabd.term.h";
 var TD = null, termSeq = 0, dragId = null;
 var TERM_FONT = 13, FONT_MIN = 8, FONT_MAX = 32;     // 13 = install.sh's ttyd fontSize
 var TERM_HIST = "clabd.term.hist";
-// One colour per router, mid-tone so it sits on the dark console: shown as the
-// tab's edge and a faint tint, repeated on the pane header.
+// One colour per router, mid-tone so it sits on the dark console: a lit dot on
+// its tab and pane, an underline on the focused tab, a hairline over the pane.
 var TERM_COLORS = ["#2A9D8F", "#3B7DD8", "#8B5CC4", "#C2547A", "#C8692E", "#A88A2A",
                    "#5E9A3A", "#2F8FAE", "#6366C9", "#B0503F", "#3E9A6A", "#7A7F99"];
 function termColor(spec){
@@ -820,6 +820,7 @@ function add(spec, show){
   s.pane.style.setProperty("--tc", s.color);
   var head = el("div", "tphead"), r = el("span", "right");
   head.draggable = true; head.title = "drag onto another pane to move it";
+  head.appendChild(el("span", "dot"));
   head.appendChild(el("span", "who", s.label));
   head.appendChild(el("span", "meta", [s.lab, s.meta].filter(Boolean).join(" · ")));
   s.fsEl = el("button", "tfs", String(s.font || TERM_FONT));
@@ -990,6 +991,7 @@ function render(){
       bx.addEventListener("click", function(e){ e.stopPropagation(); s.bc = !s.bc; render(); });
       t.appendChild(bx);
     }
+    t.appendChild(el("span", "dot"));
     t.appendChild(el("span", "l", s.label));
     x.title = "close"; x.appendChild(icon("x"));
     x.addEventListener("click", function(e){ e.stopPropagation(); closeSession(s); });
