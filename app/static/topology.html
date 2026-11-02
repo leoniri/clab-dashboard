@@ -143,6 +143,14 @@ body{overflow:hidden}
 .nkv dt{color:var(--muted)} .nkv dd{margin:0;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nkv dd .q{color:var(--muted)}
 .nfoot{font:11px var(--font-sans);color:var(--muted);margin-top:12px}
+.nop{display:flex;align-items:center;gap:9px;margin:0 0 14px;padding:9px 12px;border-radius:10px;font:12.5px var(--font-sans);
+  border:1px solid color-mix(in srgb,var(--warn) 40%,var(--line));background:var(--warn-soft);color:var(--ink)}
+.nop .t{margin-left:auto;font:600 11.5px var(--font-mono);color:var(--warn);font-variant-numeric:tabular-nums}
+.nop.bad{border-color:color-mix(in srgb,var(--crit) 45%,var(--line));background:var(--crit-soft)}
+.nop.bad b{color:var(--crit)}
+details.nlog{margin:-6px 0 14px}
+details.nlog summary{cursor:pointer;font:500 11px var(--font-mono);color:var(--muted)}
+details.nlog .jlog{max-height:220px;margin-top:6px}
 .te-modal label.ucheck{text-transform:none;letter-spacing:0;font:12.5px/1.4 var(--font-sans);color:var(--ink-2)}
 .node line.srdiv{stroke:var(--line);stroke-width:1}
 .node text.srm{font-family:var(--font-mono);font-size:10px;font-weight:500;fill:var(--ink);pointer-events:none}
@@ -1297,8 +1305,9 @@ function render(){
     g.appendChild(svgEl("ellipse",{class:"halo",cx:0,cy:0,rx:R_ICON+(isRouter?3:6),ry:isRouter?R_ICON+3:R_ICON-1}));
     var icg=svgEl("g",{class:"ic"});
     icg.appendChild(NodeIcons.svg(type,{x:-ICON/2, y:-ICON/2, size:ICON,
-      status: isRouter ? ({ok:"up", warn:"warn", crit:"down", idle:"off"})[st.cls] : "",
-      title: n.name+" · "+NodeIcons.label(type)+" · "+n.kind+" · "+st.label}));
+      status: isRouter ? (nodeOps[n.name] && !nodeOps[n.name].done ? "warn" : ({ok:"up", warn:"warn", crit:"down", idle:"off"})[st.cls]) : "",
+      title: n.name+" · "+NodeIcons.label(type)+" · "+n.kind+" · "
+             +(nodeOps[n.name] && !nodeOps[n.name].done ? OP_ING[nodeOps[n.name].op].toLowerCase()+"…" : st.label)}));
     g.appendChild(icg);
     var lbl=svgEl("g",{transform:"translate(0,"+b.top+") scale("+LS.toFixed(3)+")"});
     lbl.appendChild(svgEl("rect",{class:"nmbg",x:-b.bw/2,y:0,width:b.bw,height:b.bh,rx:4}));
@@ -2860,7 +2869,8 @@ function renderNodePanel(box, n){
   var st=statusOf(n), type=NodeIcons.classify(n);
   var running = n.container && n.container.state==="running";
   // header: the node's own icon (with its status ring), name, platform, state
-  var hd=el("div","nhead");
+  var hd=el("div","nhead"), opRun=nodeOps[n.name] && !nodeOps[n.name].done;
+  if(opRun) st={cls:"warn", label:OP_ING[nodeOps[n.name].op].toLowerCase()+"…"};
   var nic=svgEl("svg",{viewBox:"0 0 48 48",class:"nic "+kcls(n.kind,n.image),"aria-hidden":"true"});
   nic.appendChild(NodeIcons.svg(type,{status: type==="router" ? ({ok:"up", warn:"warn", crit:"down", idle:"off"})[st.cls] : ""}));
   hd.appendChild(nic);
@@ -2868,7 +2878,8 @@ function renderNodePanel(box, n){
   hd.appendChild(el("span","pill "+st.cls, st.label));
   hd.appendChild(el("span","sub",(n.external ? "outside the lab" : kindLabel(n))+(nodeIp(n)?" · "+nodeIp(n):"")));
   box.appendChild(hd);
-  if(!n.external && !n._new){
+  var busy=nodeOpStrip(box, n);
+  if(!n.external && !n._new && !busy){
     var ar=el("div","nact");
     if(n.container && !running){
       // a node stopped on its own (or from here): start it back with its links
@@ -3668,6 +3679,49 @@ function saveLab(thenStop){
 }
 
 // ---------- one node: stop / start / restart / reload ----------
+// node operations run in the background: no log window, the panel shows a
+// progress strip and the map's ring pulses until the job ends
+var nodeOps={};                 // node -> {op, id, t0, done, rc, lines}
+var OP_ING={stop:"Stopping", start:"Starting", restart:"Restarting", reload:"Reloading"};
+var OP_NOUN={stop:"Stop", start:"Start", restart:"Restart", reload:"Reload"};
+function nodeOpFollow(name){
+  var o=nodeOps[name]; if(!o || o.done) return;
+  fetch("api/job/"+o.id+"?since="+o.lines.length,{cache:"no-store"}).then(function(r){ return r.json(); }).then(function(j){
+    o.lines=o.lines.concat(j.lines||[]);
+    if(j.running){ setTimeout(function(){ nodeOpFollow(name); }, 2000); return; }
+    o.done=true; o.rc=j.rc;
+    if(j.rc===0){
+      UI.toast({stop:name+" is stopped.", start:name+" is running again.", restart:name+" is running again.",
+                reload:name+" has reloaded and takes logins again."}[o.op], "ok", 6000);
+      delete nodeOps[name];
+    } else {
+      var why=o.lines.filter(function(l){ return /error|failed|did not|refused/i.test(l); }).pop() || "see the details in its panel";
+      UI.toast(OP_NOUN[o.op]+" of "+name+" failed: "+why.replace(/^\s*dashboard error:\s*/,""), "crit", 10000);
+    }
+    pollLive(true); render();
+  }).catch(function(){ setTimeout(function(){ nodeOpFollow(name); }, 4000); });
+}
+function nodeOpStrip(box, n){
+  var o=nodeOps[n.name]; if(!o) return false;
+  var st=el("div","nop"+(o.done?" bad":""));
+  if(!o.done){
+    st.appendChild(el("span","spin"));
+    var s_=Math.round((Date.now()-o.t0)/1000);
+    st.appendChild(el("b",null,OP_ING[o.op]+"…"));
+    st.appendChild(el("span","t",Math.floor(s_/60)+":"+("0"+s_%60).slice(-2)));
+  } else {
+    st.appendChild(el("b",null,OP_NOUN[o.op]+" failed"));
+    var x=UI.button("Dismiss","quiet sm",function(){ delete nodeOps[n.name]; render(); });
+    x.style.marginLeft="auto"; st.appendChild(x);
+  }
+  box.appendChild(st);
+  if(o.done){
+    var d=el("details","nlog"); d.appendChild(el("summary",null,"Details"));
+    var pre=el("div","jlog"); o.lines.slice(-40).forEach(function(l){ pre.appendChild(el("div",/error|failed|did not/i.test(l)?"err":null,l)); });
+    d.appendChild(pre); box.appendChild(d);
+  }
+  return !o.done;
+}
 function canReload(n){ return /^cisco_(c8000v|csr1000v|xrd_vrouter|n9kv)$/.test(n.kind); }
 function isVmKind(n){ return /^cisco_(c8000v|csr1000v|xrd_vrouter|n9kv)$/.test(n.kind); }
 function nodePower(n, op){
@@ -3701,20 +3755,15 @@ function nodePower(n, op){
   if(T.note) m.body.appendChild(el("p","hint",T.note));
   m.foot.appendChild(btn("Cancel","",m.close));
   m.foot.appendChild(btn(T.go, T.danger?"danger":"primary", function(){
-    m.body.textContent=""; m.foot.textContent=""; m.scrim.dataset.locked="1";
-    var log=el("div","jlog","starting…"); m.body.appendChild(log);
-    function finish(){ delete m.scrim.dataset.locked; m.foot.appendChild(btn("Close","primary",m.close)); }
-    post("api/node",{lab_id:lab.id, node:n.name, op:op, save:!!(sv && sv.checked)}).then(function(j){
-      log.textContent="";
-      followJob(j.job_id, log, function(res){
-        log.appendChild(el("div", res.rc===0?"ok":"err", res.rc===0
-          ? {stop:n.name+" is stopped.", start:n.name+" is running again.", restart:n.name+" is running again.",
-             reload:n.name+" has reloaded."}[op]
-          : "The "+op+" did not complete - see the log above."));
-        log.scrollTop=log.scrollHeight;
-        finish(); pollLive(true);
-      });
-    }).catch(function(e){ log.textContent=e.message; finish(); });
+    var save=!!(sv && sv.checked);
+    m.close();
+    post("api/node",{lab_id:lab.id, node:n.name, op:op, save:save}).then(function(j){
+      nodeOps[n.name]={op:op, id:j.job_id, t0:Date.now(), done:false, rc:null, lines:[]};
+      var mins={stop:"", start:vm?" - about "+(xr?"3":"2")+" minutes":"", restart:vm?" - about "+(xr?"3":"2")+" minutes":"",
+                reload:" - a few minutes"}[op];
+      UI.toast(OP_ING[op]+" "+n.name+mins+". You can keep working; its panel shows the progress.", "info", 6000);
+      render(); nodeOpFollow(n.name);
+    }).catch(function(e){ UI.toast("Could not "+op+" "+n.name+": "+e.message, "crit", 8000); });
   }));
 }
 
