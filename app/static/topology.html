@@ -646,7 +646,7 @@ var gLinks = document.getElementById("glinks");
 var gBgp = document.getElementById("gbgp");
 var gTrace = document.getElementById("gtrace"), gTraceU = document.getElementById("gtraceu"), gImp = document.getElementById("gimp");
 // path trace: the form, the last result, and "follow" (re-trace every few s)
-var trace = {open:false, src:"", dst:"", ip:"", res:null, err:null, busy:false, follow:false, timer:null, detail:false,
+var trace = {open:false, src:"", dst:"", ip:"", res:null, err:null, busy:false, follow:false, timer:null, detail:false, opened:{},
              prev:null, base:null, hist:{}, repair:true};
 // what-if: a failure set, worked out by the server's IGP model (impact.py)
 var imp = {open:false, links:[], nodes:[], res:null, busy:false, err:null, hover:null, pin:null, seq:0,
@@ -1703,7 +1703,7 @@ function runTrace(){
   if(!trace.src || !(trace.dst || trace.ip)){ trace.err="pick a source and a destination"; renderInspector(true); return; }
   trace.busy=true; trace.err=null; renderInspector(true);
   post("api/trace",{lab_id:labId, src:trace.src, dst:trace.ip || trace.dst})
-    .then(function(r){ traceRemember(r); trace.res=r; })
+    .then(function(r){ if(traceKey(r)!==traceKey(trace.res)) trace.opened={}; traceRemember(r); trace.res=r; })
     .catch(function(e){ trace.err=e.message; trace.res=null; })
     .then(function(){ trace.busy=false; render();
       clearTimeout(trace.timer);
@@ -1809,7 +1809,7 @@ function renderTracePanel(box){
   // one card per router
   var hsh=el("div","subh","Hops"), tog=el("button","tog", trace.detail?"collapse all":"expand all");
   tog.type="button";
-  tog.addEventListener("click",function(){ trace.detail=!trace.detail; renderInspector(true); });
+  tog.addEventListener("click",function(){ trace.detail=!trace.detail; trace.opened={}; renderInspector(true); });
   hsh.appendChild(tog); box.appendChild(hsh);
   var hl=el("div","hops");
   steps.forEach(function(st, i){
@@ -1847,8 +1847,10 @@ function renderTracePanel(box){
     // what happened inside the router first (decap, shift), then where it goes
     subs.forEach(function(x){ card.appendChild(x); });
     if(kv.children.length){
-      var det=el("details","hdet"), sm=el("summary");
-      det.open=!!trace.detail;
+      // the panel is redrawn on every live poll: keep each hop as the user left it
+      var det=el("details","hdet"), sm=el("summary"), dkey=i+"|"+h.node;
+      det.open = dkey in trace.opened ? trace.opened[dkey] : !!trace.detail;
+      det.addEventListener("toggle",function(){ trace.opened[dkey]=det.open; });
       sm.appendChild(rl || el("div","route more","details"));
       det.appendChild(sm); det.appendChild(kv);
       card.appendChild(det);
