@@ -104,7 +104,7 @@
    thumb | name, kinds + notes, path | facts (fixed) | actions (fixed), so the
    numbers and buttons line up from one card to the next. */
 .labs{display:flex;flex-direction:column;gap:10px}
-.lab{position:relative;display:grid;grid-template-columns:128px minmax(0,1fr) 216px 340px;align-items:center;gap:20px;
+.lab{position:relative;display:grid;grid-template-columns:168px minmax(0,1fr) 236px 340px;align-items:center;gap:20px;
   padding:12px 14px 12px 12px;border:1px solid var(--line);border-radius:14px;isolation:isolate;
   background:linear-gradient(180deg,color-mix(in srgb,var(--surface-2) 55%,var(--surface)) 0%,var(--surface) 100%);
   box-shadow:var(--shadow-sm);cursor:pointer;
@@ -123,19 +123,19 @@
 .lab.part::after{background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--warn) 65%,transparent),transparent)}
 .lab.open{border-bottom-left-radius:0;border-bottom-right-radius:0;border-color:var(--line-strong);transform:none}
 
-/* thumbnail: a little dotted canvas with the lab drawn on it */
-.thumb{width:128px;height:76px;border-radius:10px;display:block;overflow:hidden;border:1px solid var(--line);
-  background:radial-gradient(circle at 50% 45%,color-mix(in srgb,var(--accent) 7%,transparent),transparent 70%),
+/* thumbnail: the lab drawn small with the map's own icons, each with its
+   status ring lit, on a dotted canvas */
+.thumb{width:168px;height:94px;border-radius:10px;display:block;overflow:hidden;border:1px solid var(--line);
+  background:radial-gradient(circle at 50% 45%,color-mix(in srgb,var(--accent) 6%,transparent),transparent 70%),
     radial-gradient(var(--grid) 1px,transparent 1.2px) 0 0/8px 8px,var(--canvas)}
-.thumb line{stroke:var(--line-strong);stroke-width:1.2;stroke-linecap:round}
-.thumb circle{fill:var(--oth);stroke:var(--canvas);stroke-width:1.6}
-.thumb .k-xe{fill:var(--xe)} .thumb .k-xr{fill:var(--xr)} .thumb .k-nx{fill:var(--nx)} .thumb .k-lin{fill:var(--lin)}
-.thumb .k-frr{fill:var(--frr)} .thumb .k-srl{fill:var(--srl)}
-.lab:not(.run) .thumb circle{opacity:.75}
-.lab.run .thumb{border-color:color-mix(in srgb,var(--ok) 25%,var(--line))}
-.lab.run .thumb line{stroke:color-mix(in srgb,var(--ok) 60%,var(--line-strong));stroke-dasharray:3 3;animation:flow 1.2s linear infinite}
-@keyframes flow{to{stroke-dashoffset:-6}}
-@media (prefers-reduced-motion:reduce){ .lab.run .thumb line{animation:none} .lab.enter,.nodes.enter{animation:none} }
+.thumb line{stroke:var(--wire);stroke-width:1;stroke-linecap:round}
+.thumb .ni{color:var(--oth)}
+.thumb .k-xe{color:var(--xe)} .thumb .k-xr{color:var(--xr)} .thumb .k-nx{color:var(--nx)} .thumb .k-lin{color:var(--lin)}
+.thumb .k-frr{color:var(--frr)} .thumb .k-srl{color:var(--srl)}
+.lab:not(.run) .thumb .ni{opacity:.55}
+.lab.run .thumb{border-color:color-mix(in srgb,var(--ok) 22%,var(--line))}
+.lab.run .thumb line{stroke:var(--wire-busy)}
+@media (prefers-reduced-motion:reduce){ .lab.enter,.nodes.enter{animation:none} }
 
 .labmain{min-width:0;display:flex;flex-direction:column;gap:7px}
 .labname{display:flex;align-items:center;gap:10px;min-width:0}
@@ -169,12 +169,25 @@
 .acts .ub.main.go svg{color:var(--ok)} .acts .ub.main.re svg{color:var(--warn)} .acts .ub.main.halt svg{color:var(--crit)}
 .acts .chev svg{transition:transform .18s}
 .lab.open .acts .chev svg{transform:rotate(180deg)}
-@media (max-width:1240px){ .lab{grid-template-columns:128px minmax(0,1fr) 190px auto} }
-@media (max-width:1060px){ .lab{grid-template-columns:128px minmax(0,1fr) auto} .facts{display:none} }
+@media (max-width:1240px){ .lab{grid-template-columns:168px minmax(0,1fr) 210px auto} }
+@media (max-width:1060px){ .lab{grid-template-columns:168px minmax(0,1fr) auto} .facts{display:none} }
 @media (max-width:760px){
   .lab{grid-template-columns:minmax(0,1fr) auto} .thumb{display:none}
   .acts .ub.main{min-width:0}
 }
+
+/* skeletons while the first state loads */
+.inst.sk{height:182px;padding:18px 20px;gap:12px}
+.inst.sk .skel:nth-child(1){height:12px;width:40%}
+.inst.sk .skel:nth-child(2){height:26px;width:62%;margin-top:18px}
+.inst.sk .skel:nth-child(3){height:10px;width:48%}
+.lab.sk{cursor:default;grid-template-columns:168px minmax(0,1fr);height:120px}
+.lab.sk:hover{transform:none;box-shadow:var(--shadow-sm);border-color:var(--line)}
+.lab.sk .th{width:168px;height:94px;border-radius:10px}
+.lab.sk div{display:flex;flex-direction:column;gap:10px}
+.lab.sk div .skel:nth-child(1){height:16px;width:180px}
+.lab.sk div .skel:nth-child(2){height:12px;width:260px}
+.lab.sk div .skel:nth-child(3){height:10px;width:340px;max-width:100%}
 
 /* node table */
 .nodes{margin-top:-11px;border:1px solid var(--line-strong);border-top:1px dashed var(--line);
@@ -219,7 +232,12 @@
     <div class="tools" id="headtools"></div>
   </div>
 
-  <section class="host" id="stats" aria-label="Host status"></section>
+  <section class="host" id="stats" aria-label="Host status">
+    <div class="inst sk"><i class="skel"></i><i class="skel"></i><i class="skel"></i></div>
+    <div class="inst sk"><i class="skel"></i><i class="skel"></i><i class="skel"></i></div>
+    <div class="inst sk"><i class="skel"></i><i class="skel"></i><i class="skel"></i></div>
+    <div class="inst sk"><i class="skel"></i><i class="skel"></i><i class="skel"></i></div>
+  </section>
 
   <div class="listhead">
     <div class="lh-title"><h2>Topologies</h2><span class="count" id="labcount"></span></div>
@@ -229,7 +247,11 @@
     </div>
   </div>
 
-  <div class="labs" id="labs"><div class="empty plain"><span class="spin"></span>&nbsp; loading labs…</div></div>
+  <div class="labs" id="labs" aria-busy="true">
+    <div class="lab sk"><i class="skel th"></i><div><i class="skel"></i><i class="skel"></i><i class="skel"></i></div></div>
+    <div class="lab sk"><i class="skel th"></i><div><i class="skel"></i><i class="skel"></i><i class="skel"></i></div></div>
+    <div class="lab sk"><i class="skel th"></i><div><i class="skel"></i><i class="skel"></i><i class="skel"></i></div></div>
+  </div>
 </main>
 
 <div class="console" id="console" hidden>
@@ -260,6 +282,7 @@
 </div>
 
 <script src="ui.js"></script>
+<script src="node-icons.js"></script>
 <script src="lan-dialog.js"></script>
 <script>
 (function(){
@@ -466,7 +489,7 @@ function labSignature(s){
     return [l.id, l.running, l.running_count, l.healthy_count, !!s.busy,
             [!!lan.enabled, (lan.active||[]).slice().sort(), lan.nodes||{}, lan.ssh||{}, (lan.unreachable||[]).slice().sort()],
             l.stale_config, l.stale_containers, l.saved ? [l.saved.at, l.saved.latest, l.saved.since_deploy, l.saved.failed] : null,
-            (l.containers||[]).map(function(c){ return c.name+c.state+c.status+c.ipv4; }).join("")];
+            (l.containers||[]).map(function(c){ return c.name+c.state+c.status+c.ipv4+!!c.started+!!c.mem; }).join("")];
   })) + filter + query + JSON.stringify(Array.from(expanded));
 }
 
@@ -487,6 +510,17 @@ function liveCells(s){
     if (td.textContent !== txt) td.textContent = txt;
     td.classList.toggle("dim", !v);
   });
+  // uptime and memory on the cards tick without a rebuild
+  (s.labs||[]).forEach(function(l){
+    var u = document.querySelector('#labs b[data-up="' + l.id + '"]'), up = labUp(l);
+    if (u && up !== null && u.textContent !== dur(up)) u.textContent = dur(up);
+    var r = document.querySelector('#labs b[data-ram="' + l.id + '"]');
+    var used = (l.containers || []).reduce(function(a, c){ return a + (c.state === "running" ? memMb(c.mem) : 0); }, 0);
+    if (r && used){
+      var g = gb(Math.round(used)).split(" ");
+      if (r.firstChild.textContent !== g[0]) r.firstChild.textContent = g[0];
+    }
+  });
 }
 function toggle(l){
   if (expanded.has(l.id)) expanded.delete(l.id); else { expanded.add(l.id); justOpened = l.id; }
@@ -499,21 +533,30 @@ function setFilter(v){
   if (state) redraw();
 }
 
-// A tiny drawing of the lab: builder positions when the topology has them,
-// otherwise the nodes on a circle. Purely decorative - the map is one click away.
+// A small drawing of the lab with the map's icons: builder positions when
+// the topology has them, otherwise the nodes on a circle. Each icon's ring
+// shows that node's state. Purely decorative - the map is one click away.
+function nodeStatus(l, name){
+  if (!l.running) return "off";
+  var c = (l.containers || []).filter(function(x){ return x.short === name; })[0];
+  if (!c) return "off";
+  if (c.state !== "running") return "down";
+  return c.status === "starting" ? "warn" : c.status === "unhealthy" ? "down" : "up";
+}
 function thumb(l){
-  var W = 128, H = 76, s = svgEl("svg", {"class":"thumb", viewBox:"0 0 " + W + " " + H, "aria-hidden":"true"});
+  var W = 168, H = 94, s = svgEl("svg", {"class":"thumb", viewBox:"0 0 " + W + " " + H, "aria-hidden":"true"});
   var nodes = l.nodes || [], n = nodes.length;
   if (!n) return s;
+  var S = n > 14 ? 12 : n > 8 ? 15 : 18, pad = S / 2 + 5;
   var pos = {}, have = nodes.filter(function(x){ return x.pos && x.pos.length === 2; }).length === n;
   if (have){
     var xs = nodes.map(function(x){ return +x.pos[0]; }), ys = nodes.map(function(x){ return +x.pos[1]; });
     var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
-    var sx = (W - 20) / Math.max(1, x1 - x0), sy = (H - 16) / Math.max(1, y1 - y0), sc = Math.min(sx, sy);
+    var sx = (W - 2 * pad) / Math.max(1, x1 - x0), sy = (H - 2 * pad) / Math.max(1, y1 - y0), sc = Math.min(sx, sy);
     var ox = (W - (x1 - x0) * sc) / 2, oy = (H - (y1 - y0) * sc) / 2;
     nodes.forEach(function(x){ pos[x.name] = [ox + (x.pos[0] - x0) * sc, oy + (x.pos[1] - y0) * sc]; });
   } else {
-    var rx = n === 1 ? 0 : W / 2 - 12, ry = n === 1 ? 0 : H / 2 - 9;
+    var rx = n === 1 ? 0 : W / 2 - pad, ry = n === 1 ? 0 : H / 2 - pad;
     nodes.forEach(function(x, i){
       var a = -Math.PI / 2 + i * 2 * Math.PI / n;
       pos[x.name] = [W / 2 + rx * Math.cos(a), H / 2 + ry * Math.sin(a)];
@@ -523,12 +566,25 @@ function thumb(l){
     var a = pos[k.a], b = pos[k.b];
     if (a && b) s.appendChild(svgEl("line", {x1:a[0], y1:a[1], x2:b[0], y2:b[1]}));
   });
-  var r = n > 14 ? 3 : n > 8 ? 3.6 : 4.4;
   nodes.forEach(function(x){
-    var p = pos[x.name];
-    s.appendChild(svgEl("circle", {cx:p[0], cy:p[1], r:r, "class":UI.kindClass(x.kind, x.image)}));
+    var p = pos[x.name], g = svgEl("g", {"class":"ni " + UI.kindClass(x.kind, x.image)});
+    var type = NodeIcons.classify(x), lit = /^(router|ce|server)$/.test(type);
+    g.appendChild(NodeIcons.svg(type, {x:p[0] - S / 2, y:p[1] - S / 2, size:S,
+      status: lit ? nodeStatus(l, x.name) : "", title: x.name}));
+    s.appendChild(g);
   });
   return s;
+}
+// "8.1GiB" / "512MiB" -> MB
+function memMb(v){
+  var m = /([\d.]+)\s*([KMGT]i?B)/i.exec(v || ""); if (!m) return 0;
+  return +m[1] * ({k:1/1024, m:1, g:1024, t:1048576})[m[2][0].toLowerCase()];
+}
+// running for: from the earliest start of a node still running
+function labUp(l){
+  var t = (l.containers || []).filter(function(c){ return c.state === "running" && c.started; })
+            .map(function(c){ return c.started; });
+  return t.length ? Date.now() / 1000 - Math.min.apply(null, t) : null;
 }
 
 function renderLabs(s){
@@ -549,7 +605,7 @@ function renderLabs(s){
     var t = b.querySelector(".n") || b.appendChild(el("span","n")); t.textContent = n;
   });
 
-  box.textContent = "";
+  box.textContent = ""; box.removeAttribute("aria-busy");
   if (!s.labs.length){
     var first = el("div");
     first.appendChild(el("div","empty plain","No topologies found yet. Start one:"));
@@ -647,10 +703,18 @@ function renderLabs(s){
       b.appendChild(document.createTextNode(v)); if (unit) b.appendChild(el("small", null, unit));
       d.appendChild(b); d.appendChild(el("span", null, k)); facts.appendChild(d);
     }
-    fact(l.running ? String(l.running_count) : String(l.node_count), l.running ? "/" + l.node_count : "", "nodes");
-    fact(String(l.link_count), "", "links");
-    var ram = gb(l.est_ram_mb).split(" ");
-    fact(ram[0], ram[1], l.running ? "ram" : "ram est.", l.running ? "" : "~");
+    fact(l.running ? String(l.running_count) : String(l.node_count), l.running ? "/" + l.node_count : "", l.running ? "nodes up" : "nodes");
+    var up = l.running ? labUp(l) : null;
+    if (up !== null){
+      fact(dur(up), "", "uptime");
+      var uc = facts.lastChild.querySelector("b"); uc.dataset.up = l.id;
+      facts.lastChild.title = l.link_count + " links";
+    } else fact(String(l.link_count), "", "links");
+    var used = (l.containers || []).reduce(function(a, c){ return a + (c.state === "running" ? memMb(c.mem) : 0); }, 0);
+    var ram = gb(Math.round(used || l.est_ram_mb)).split(" ");
+    fact(ram[0], ram[1], used ? "ram used" : "ram est.", used ? "" : "~");
+    if (used) facts.lastChild.querySelector("b").dataset.ram = l.id;
+    if (used) facts.lastChild.title = "memory used by the running nodes (estimate for the whole lab: " + gb(l.est_ram_mb) + ")";
     row.appendChild(facts);
 
     // --- actions: one main button, the map, everything else in the menu ---

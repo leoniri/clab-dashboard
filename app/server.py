@@ -32,6 +32,7 @@ traffic for the map), capture (tcpdump/tshark in the browser), snapshots
 vendorimg (image management), lanexpose (LAN access).
 """
 
+import calendar
 import collections
 import hashlib
 import json
@@ -491,7 +492,25 @@ def docker_stats():
         name, cpu, mem = parts
         used = mem.split("/")[0].strip()
         stats[name.strip()] = {"cpu": cpu.strip(), "mem": used}
+    # when each container last started, for the lab's uptime
+    rc, ids, _ = run([DOCKER, "ps", "-q"], timeout=20)
+    if rc == 0 and ids.split():
+        rc, out, _ = run([DOCKER, "inspect", "--format", "{{.Name}}\t{{.State.StartedAt}}"] + ids.split(), timeout=30)
+        for line in out.splitlines() if rc == 0 else []:
+            name, _, at = line.partition("\t")
+            ts = _iso_ts(at.strip())
+            if name.strip("/ ") in stats and ts and ts > 0:
+                stats[name.strip("/ ")]["started"] = ts
     return stats
+
+
+def _iso_ts(s):
+    """Docker's RFC 3339 time (nanoseconds, Z) as a unix timestamp."""
+    try:
+        base = s.split(".")[0].rstrip("Z")
+        return calendar.timegm(time.strptime(base, "%Y-%m-%dT%H:%M:%S"))
+    except (ValueError, IndexError):
+        return None
 
 
 def read_host_stats(prev_cpu):
@@ -807,6 +826,7 @@ class Collector(threading.Thread):
                         "id": (c.get("container_id") or "")[:12],
                         "cpu": st.get("cpu"),
                         "mem": st.get("mem"),
+                        "started": st.get("started"),
                     })
             lab["containers"] = containers
             lab["running_count"] = sum(1 for c in containers if c["state"] == "running")

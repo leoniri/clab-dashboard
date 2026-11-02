@@ -48,34 +48,110 @@ body{overflow:hidden}
 .legend .lic{width:18px;height:18px;flex:none}
 .legend .sep{border-top:1px solid var(--line);margin:3px 0}
 .legend .lline{width:18px;height:0;border-top:2.5px solid;flex:none}
+.legend .lline.led{position:relative;border-top:1.5px solid var(--wire)}
+.legend .lline.led::before,.legend .lline.led::after{content:"";position:absolute;top:-3.75px;width:6px;height:6px;border-radius:50%;
+  background:var(--c);box-shadow:0 0 5px var(--c)}
+.legend .lline.led::before{left:-1px} .legend .lline.led::after{right:-1px}
 
-/* ---------- svg: links ---------- */
+/* ---------- motion: all of it off under prefers-reduced-motion ---------- */
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+@keyframes swapin{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}
+#inspector.swap{animation:swapin .22s cubic-bezier(.2,.7,.2,1) both}
+.lyfade .ifp,.lyfade .rate,.lyfade .bgp,.lyfade .flowp,.lyfade .lpill,.lyfade .srdiv,.lyfade .srk,.lyfade .srm,.lyfade .srs{animation:fadein .3s ease-out both}
+/* a node whose state just changed: its ring flares once */
+@keyframes flare{0%{transform:scale(1);opacity:1}35%{transform:scale(1.22);opacity:1}100%{transform:scale(1);opacity:1}}
+.node.stchg .ni-led{animation:flare .9s cubic-bezier(.2,.7,.2,1) var(--fl,0ms) both;transform-box:fill-box;transform-origin:center}
+.node.stchg .ni-led .glow{animation:glowup .9s ease-out var(--fl,0ms) both}
+@keyframes glowup{0%,40%{opacity:1;stroke-width:3}100%{stroke-width:1.5}}
+.mapnote:not([hidden]){animation:fadein .25s ease-out both}
+@media (prefers-reduced-motion:reduce){
+  #inspector.swap,.lyfade *,.node.stchg .ni-led,.node.stchg .ni-led .glow,.mapnote{animation:none!important}
+}
+
+/* ---------- hover card ---------- */
+.hov{position:absolute;z-index:9;width:264px;padding:11px 13px 10px;pointer-events:none;opacity:0;transform:translateY(3px);
+  transition:opacity .14s ease,transform .14s ease}
+.hov.on{opacity:1;transform:none}
+.hov .hh{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.hov .hh > span:first-child{flex:none;width:28px;height:28px} .hov .hh svg{width:28px;height:28px;display:block;overflow:visible}
+.hov .hh .k-xe{color:var(--xe)} .hov .hh .k-xr{color:var(--xr)} .hov .hh .k-nx{color:var(--nx)}
+.hov .hh .k-lin{color:var(--lin)} .hov .hh .k-frr{color:var(--frr)} .hov .hh .k-srl{color:var(--srl)} .hov .hh .k-oth{color:var(--oth)}
+.hov .hh b{display:block;font:600 13.5px var(--font-display);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hov .hh span{display:block;font:10.5px var(--font-mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hov .hh > div{min-width:0;flex:1}
+.hov .st{flex:none;display:inline-flex;align-items:center;gap:5px;font:600 10px var(--font-mono);padding:1px 8px;border-radius:99px;
+  color:var(--muted);background:var(--surface-3)}
+.hov .st i{width:6px;height:6px;border-radius:50%;background:currentColor}
+.hov .st.ok{color:var(--ok);background:var(--ok-soft)} .hov .st.warn{color:var(--warn);background:var(--warn-soft)}
+.hov .st.crit{color:var(--crit);background:var(--crit-soft)}
+.hov dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;margin:0;padding-top:8px;border-top:1px solid var(--line);
+  font:11px var(--font-mono)}
+.hov dt{color:var(--muted)} .hov dd{margin:0;color:var(--ink-2);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hov dd.ok{color:var(--ok)} .hov dd.warn{color:var(--warn)} .hov dd.crit{color:var(--crit)}
+.hov .ends{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:center;margin-bottom:8px}
+.hov .ends div{min-width:0} .hov .ends div:last-child{text-align:right}
+.hov .ends b{display:block;font:600 12.5px var(--font-display);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hov .ends span{display:block;font:10.5px var(--font-mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hov .ends em{font-style:normal;color:var(--muted)}
+.hov .foot{margin-top:8px;font:10px var(--font-mono);color:var(--muted)}
+@media (prefers-reduced-motion:reduce){ .hov{transition:none} }
+
+/* ---------- map note: loading / stopped ---------- */
+.mapnote{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:14px;
+  padding:12px 14px 12px 14px;width:max-content;max-width:min(560px,calc(100% - 32px))}
+.mapnote[hidden]{display:none}
+.mapnote .mi{flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;
+  background:var(--surface-3);color:var(--muted)}
+.mapnote .mi svg{width:17px;height:17px}
+.mapnote b{display:block;font:600 13.5px var(--font-sans);color:var(--ink)}
+.mapnote span{display:block;font:11.5px var(--font-sans);color:var(--muted)}
+.mapnote .ub{flex:none}
+.health.skel-row div{min-height:66px}
+.health.skel-row .skel{height:18px;width:38%;margin-bottom:9px}
+.health.skel-row .skel + .skel{height:9px;width:70%;margin:0}
+.nl.skel-list .r{grid-template-columns:8px minmax(0,1fr) 46px}
+.nl.skel-list .skel{height:9px}
+
+/* ---------- svg: links ----------
+   A link is a quiet hairline. Its state is lit at the two ports, like the
+   routers' neon ring: one small LED where it leaves each node. Traffic runs
+   along it as short comets, a failure or impairment is a pill in the middle. */
 .lk{cursor:pointer}
-.lk .link{stroke:var(--line-strong);stroke-width:2.2;fill:none;stroke-linecap:round;transition:stroke .2s}
+.lk .link{stroke:var(--wire);stroke-width:1.6;fill:none;stroke-linecap:round;transition:stroke .2s,stroke-width .2s}
 .lk .link.ext{stroke-dasharray:6 5}
 .lk .link-hit{stroke:transparent;stroke-width:16;fill:none}
-.lk:hover .link{stroke:var(--accent);stroke-width:2.8}
-.lk.hi .link{stroke:var(--accent);stroke-width:3}
-.lk.sel .link{stroke:var(--accent);stroke-width:4;filter:drop-shadow(0 0 5px var(--accent))}
+.lk:hover .link{stroke:var(--accent);stroke-width:2.2}
+.lk.hi .link{stroke:color-mix(in srgb,var(--accent) 75%,var(--wire));stroke-width:2}
+.lk.sel .link{stroke:var(--accent);stroke-width:2.6;filter:drop-shadow(0 0 4px color-mix(in srgb,var(--accent) 60%,transparent))}
 .lk.dim{opacity:.28}
-.lk .flowp{fill:none;stroke-width:2;stroke-linecap:round;stroke-dasharray:1.5 11;pointer-events:none;
-  stroke:var(--ink);opacity:.75;animation:flow 1.1s linear infinite}
-@keyframes flow{to{stroke-dashoffset:-25}}
+.lk.busy .link{stroke:var(--wire-busy)}
+.lk.st-lost .link{stroke:color-mix(in srgb,var(--led-down) 55%,var(--wire))}
+.lk.st-down .link{stroke:color-mix(in srgb,var(--led-down) 70%,var(--wire));stroke-dasharray:2.5 5}
+.lk.imp .link{stroke:color-mix(in srgb,var(--led-warn) 45%,var(--wire))}
+.lk .flowp{fill:none;stroke-width:1.8;stroke-linecap:round;stroke-dasharray:9 23;pointer-events:none;
+  stroke:var(--flow);animation:flow var(--fd,1.6s) linear infinite}
+.lk .flowp.rev{animation-direction:reverse}
+@keyframes flow{to{stroke-dashoffset:-32}}
+@media (prefers-reduced-motion:reduce){ .lk .flowp{animation:none} }
+/* port LEDs: halo, body, white-hot core - the same recipe as the node ring */
+.plmp{color:var(--led-off);pointer-events:none}
+.plmp .glow{opacity:0} .plmp .core{opacity:0}
+.plmp.up{color:var(--led-up)} .plmp.warn{color:var(--led-warn)} .plmp.down{color:var(--led-down)}
+.plmp.up .glow,.plmp.warn .glow,.plmp.down .glow{opacity:var(--led-glow)}
+.plmp.up .core{opacity:.9;fill:var(--led-up-core)} .plmp.warn .core{opacity:.9;fill:var(--led-warn-core)}
+.plmp.down .core{opacity:.9;fill:var(--led-down-core)}
+.lk.dim .plmp .glow{opacity:0}
 .ifp rect{fill:var(--surface);stroke:var(--line-strong);stroke-width:1}
 .ifp text{font-family:var(--font-mono);font-size:9.5px;font-weight:500;fill:var(--ink-2)}
 .lk.hi .ifp rect,.lk.sel .ifp rect,.lk:hover .ifp rect{stroke:var(--accent);fill:color-mix(in srgb,var(--accent) 16%,var(--surface))}
 .lk.hi .ifp text,.lk.sel .ifp text,.lk:hover .ifp text{fill:var(--accent-ink)}
-/* live state */
-.lk.st-up .link{stroke:var(--ok);filter:drop-shadow(0 0 3px color-mix(in srgb,var(--ok) 70%,transparent))}
-.lk.st-partial .link{stroke:var(--warn);filter:drop-shadow(0 0 3px color-mix(in srgb,var(--warn) 70%,transparent))}
-.lk.st-lost .link,.lk.st-down .link{stroke:var(--crit);filter:drop-shadow(0 0 3px color-mix(in srgb,var(--crit) 70%,transparent))}
-.lk.st-down .link{stroke-dasharray:3 6}
-.lk.st-up:hover .link,.lk.st-partial:hover .link,.lk.st-lost:hover .link,.lk.st-down:hover .link{stroke-width:3.4}
-.lk.sel.st-up .link,.lk.sel.st-partial .link,.lk.sel.st-lost .link,.lk.sel.st-down .link{stroke-width:4.4}
-:root[data-theme="light"] .lk .link{filter:none!important}
-.badge circle{stroke:var(--canvas);stroke-width:2}
-.badge text{font-family:var(--font-mono);font-size:10px;font-weight:700;fill:#fff;pointer-events:none}
-.badge.fail circle{fill:var(--crit)} .badge.imp circle{fill:var(--warn)}
+/* middle pill: failed / impaired / down */
+.lpill rect{stroke-width:1}
+.lpill text{font-family:var(--font-mono);font-size:9.5px;font-weight:600;pointer-events:none}
+.lpill.fail rect,.lpill.down rect{fill:color-mix(in srgb,var(--led-down) 14%,var(--canvas));stroke:color-mix(in srgb,var(--led-down) 55%,transparent)}
+.lpill.fail text,.lpill.down text{fill:var(--crit)}
+.lpill.imp rect{fill:color-mix(in srgb,var(--led-warn) 14%,var(--canvas));stroke:color-mix(in srgb,var(--led-warn) 55%,transparent)}
+.lpill.imp text{fill:var(--warn)}
 .rate rect{fill:var(--surface);stroke:var(--line-strong);stroke-width:1}
 .rate text{font-family:var(--font-mono);font-size:9px;fill:var(--ink-2)}
 .bgp path{fill:none;stroke-width:1.6;stroke-dasharray:2 5;stroke-linecap:round;pointer-events:none}
@@ -259,7 +335,7 @@ i.res.reached{color:var(--ok);background:var(--ok-soft)} i.res.blackhole,i.res.n
 
 /* what if */
 .whatif .lk .link{stroke:var(--line-strong) !important;filter:none !important;transition:none !important}
-.whatif .lk .flowp,.whatif .lk .rate,.whatif .lk .badge{display:none}
+.whatif .lk .flowp,.whatif .lk .rate,.whatif .lk .lpill,.whatif .lk .plmp,.tracing .lk .plmp{display:none}
 .whatif .bgp{opacity:.12}
 .whatif .lk,.whatif .node{cursor:crosshair}
 .imfail path:not(.x){fill:none;stroke:var(--crit);stroke-width:1.6;stroke-dasharray:4 4;pointer-events:none}
@@ -642,6 +718,12 @@ i.res.reached{color:var(--ok);background:var(--ok-soft)} i.res.blackhole,i.res.n
         <button class="ub" id="t_whatif" aria-pressed="false" title="what if a link or router fails - the blast radius, worked out before you fail it (w)"></button>
         <button class="ub" id="t_guide" aria-pressed="false" title="what this lab is for, the role of each node and checks to run (l)" hidden></button>
         <button class="ub" id="t_edit" aria-pressed="false" title="add or remove nodes and links (e)"></button>
+      </div>
+      <div class="hov glass" id="hov" aria-hidden="true"></div>
+      <div class="mapnote glass" id="mapnote" role="status">
+        <span class="mi" id="mapnote_i"><span class="spin"></span></span>
+        <div><b id="mapnote_t">Loading the topology…</b><span id="mapnote_s"></span></div>
+        <span id="mapnote_a"></span>
       </div>
       <div class="hud glass" id="hud">
         <span class="led" id="hudled"></span><span class="htxt" id="hudtxt">static</span>
@@ -1144,6 +1226,7 @@ function ifPill(parent, pos, info){
   parent.appendChild(g);
 }
 
+var stSeen={};
 function render(){
   LS = labelScale();
   gNodes.textContent=""; gLinks.textContent=""; gBgp.textContent="";
@@ -1197,31 +1280,51 @@ function render(){
       var isSel = selLink === l;
       var dim = (sel && !hi) || (selLink && !isSel);
       var lv = liveOf(l);
+      var tot = lv ? (lv.d.ab_bps||0)+(lv.d.ba_bps||0) : 0;
+      var flowing = lv && showRate && !lv.d.down && tot>0;
       var g=svgEl("g",{"data-lid":l.id, class:"lk"+(hi?" hi":"")+(isSel?" sel":"")+(dim?" dim":"")
-                           +(l._new?" new":"")+(l._del?" del":"")+(lv&&lv.st?" st-"+lv.st:"")});
+                           +(l._new?" new":"")+(l._del?" del":"")+(lv&&lv.st?" st-"+lv.st:"")
+                           +(flowing?" busy":"")+(lv&&lv.d.impaired&&!lv.d.down?" imp":"")});
       var ext = !l.a_known || !l.b_known;
       var lp=svgEl("path",{d:d, class:"link"+(ext?" ext":"")});
-      if(lv && showRate){
-        // thicker with load: 2.2 px idle, up to ~7 px at 10 Gb/s
-        var tot=(lv.d.ab_bps||0)+(lv.d.ba_bps||0);
-        lp.style.strokeWidth=(2.2+Math.min(5,Math.log10(tot/1000+1)*0.75)).toFixed(2);
+      if(flowing){
+        // a touch heavier with load: 1.6 px idle, up to ~4 px at 10 Gb/s
+        lp.style.strokeWidth=(1.6+Math.min(2.4,Math.log10(tot/1000+1)*0.4)).toFixed(2);
       }
       g.appendChild(lp);
-      if(lv && showRate && !lv.d.failed && ((lv.d.ab_bps||0)+(lv.d.ba_bps||0))>0)
-        g.appendChild(svgEl("path",{d:d, class:"flowp"}));
+      if(flowing){
+        // one lane of comets per direction, either side of the wire; faster with more traffic
+        var aIsS = l.a===A.name;
+        [[aIsS?lv.d.ab_bps:lv.d.ba_bps, 1.7, ""], [aIsS?lv.d.ba_bps:lv.d.ab_bps, -1.7, " rev"]].forEach(function(f){
+          if(!(f[0]>0)) return;
+          var o=f[1], sh=function(p){ return (p.x+nx*o).toFixed(1)+","+(p.y+ny*o).toFixed(1); };
+          var fp=svgEl("path",{d:"M"+sh(seg.p0)+" Q"+sh(seg.p1)+" "+sh(seg.p2), class:"flowp"+f[2]});
+          fp.style.setProperty("--fd", Math.max(0.6, 2.4-Math.log10(f[0]/1000+1)*0.28).toFixed(2)+"s");
+          g.appendChild(fp);
+        });
+      }
       g.appendChild(svgEl("path",{d:d, class:"link-hit"}));
-      var tt=svgEl("title",{});
-      tt.textContent=l.a+" "+ifInfo(byName[l.a],l.a_if).full+"  ↔  "+l.b+" "+ifInfo(byName[l.b],l.b_if).full;
-      g.appendChild(tt);
 
       if(lv){
         var mid=qpt(seg,0.5), mang=tangentAng(seg,0.5);
-        if(showRate && ((lv.d.ab_bps||0)+(lv.d.ba_bps||0))>0){
+        // port LEDs, a few px out from where the link leaves each node
+        var sl=Math.hypot(seg.p2.x-seg.p0.x, seg.p2.y-seg.p0.y)||1;
+        [[A.name,0.0],[B.name,1.0]].forEach(function(e){
+          var t=Math.abs(e[1]-Math.min(0.45,4/sl)), lp_=qpt(seg,t);
+          var m=svgEl("g",{class:"plmp "+portLed(l,lv,e[0]), transform:"translate("+lp_.x.toFixed(1)+","+lp_.y.toFixed(1)+")"});
+          m.appendChild(svgEl("circle",{class:"glow",r:3.2,fill:"currentColor",filter:"url(#ni-neon)"}));
+          m.appendChild(svgEl("circle",{class:"body",r:2.1,fill:"currentColor"}));
+          m.appendChild(svgEl("circle",{class:"core",r:0.85}));
+          g.appendChild(m);
+        });
+        var pill = lv.d.failed ? ["fail","✕ failed"] : lv.d.down ? ["down","✕ down"]
+                 : lv.d.impaired ? ["imp","~ "+netemShort(lv.d)] : null;
+        if(showRate && tot>0 && !lv.d.down){
           // rate label beside the middle of the link, turned to follow it
           var aIsA0 = l.a===A.name;
           var t1s=fmtBps(aIsA0?lv.d.ab_bps:lv.d.ba_bps), t2s=fmtBps(aIsA0?lv.d.ba_bps:lv.d.ab_bps);
           var txt=t1s+" ▸ ◂ "+t2s, rw=txt.length*5.4+10;
-          var off=(lv.d.failed||lv.d.impaired)?15:0;
+          var off=pill?15:0;
           var rx=mid.x-Math.sin(mang)*off, ry=mid.y+Math.cos(mang)*off;
           var rg=svgEl("g",{class:"rate",transform:"translate("+rx.toFixed(1)+","+ry.toFixed(1)+") rotate("
                           +(mang*180/Math.PI).toFixed(1)+") scale("+LS.toFixed(3)+")"});
@@ -1232,16 +1335,17 @@ function render(){
           g.appendChild(rg);
           obstacles.push(quad(rx,ry,rw*LS+4,14*LS,mang));
         }
-        if(lv.d.failed || lv.d.impaired){
-          var bg=svgEl("g",{class:"badge "+(lv.d.failed?"fail":"imp"),
-                            transform:"translate("+mid.x.toFixed(1)+","+mid.y.toFixed(1)+") scale("+LS.toFixed(3)+")"});
-          bg.appendChild(svgEl("circle",{r:8}));
-          var bt=svgEl("text",{x:0,y:3.5,"text-anchor":"middle"}); bt.textContent=lv.d.failed?"✕":"~";
+        if(pill){
+          var pw=pill[1].length*5.9+12;
+          var bg=svgEl("g",{class:"lpill "+pill[0],transform:"translate("+mid.x.toFixed(1)+","+mid.y.toFixed(1)+") rotate("
+                            +(mang*180/Math.PI).toFixed(1)+") scale("+LS.toFixed(3)+")"});
+          bg.appendChild(svgEl("rect",{x:-pw/2,y:-7.5,width:pw,height:15,rx:7.5}));
+          var bt=svgEl("text",{x:0,y:3.3,"text-anchor":"middle"}); bt.textContent=pill[1];
           bg.appendChild(bt);
           var btt=svgEl("title",{}); btt.textContent=lv.d.failed?"failed from the dashboard ("+lv.d.failed.mode+")"
-                                                                 :"impaired (netem)"; bg.appendChild(btt);
+            : lv.d.down ? "interface down" : "impaired (netem): "+netemShort(lv.d, true); bg.appendChild(btt);
           g.appendChild(bg);
-          obstacles.push(box(mid.x-10,mid.y-10,mid.x+10,mid.y+10));
+          obstacles.push(quad(mid.x,mid.y,(pw+4)*LS,17*LS,mang));
         }
       }
       var adjs = srv.adj && lv && lv.d.adj;
@@ -1298,7 +1402,11 @@ function render(){
     var isSel = sel && sel.name===n.name;
     var inLink = selLink && (selLink.a===n.name || selLink.b===n.name);
     var rn=rp.run && rp.nodes[n.name];
-    var g=svgEl("g",{class:"node "+(n.external?"ext ":"")+kcls(n.kind,n.image)+(isSel||inLink?" sel":"")
+    // remember each node's state; for a short while after it changes the ring flares
+    var stk=(nodeOps[n.name] && !nodeOps[n.name].done) ? "op" : st.cls, prevSt=stSeen[n.name], now_=Date.now();
+    if(prevSt && prevSt.k!==stk) stSeen[n.name]={k:stk, at:now_}; else if(!prevSt) stSeen[n.name]={k:stk, at:0};
+    var since=now_-stSeen[n.name].at, flare=since<900;
+    var g=svgEl("g",{class:"node "+(flare?"stchg ":"")+(n.external?"ext ":"")+kcls(n.kind,n.image)+(isSel||inLink?" sel":"")
                      +(n._new?" new":"")+(n._del?" del":"")+(rn&&rn.frozen?" frozen":"")
                      +(imp.open&&imp.nodes.indexOf(n.name)>=0?" imdown":""),
                      transform:"translate("+n.x.toFixed(1)+","+n.y.toFixed(1)+")"});
@@ -1308,8 +1416,7 @@ function render(){
     var icg=svgEl("g",{class:"ic"});
     icg.appendChild(NodeIcons.svg(type,{x:-ICON/2, y:-ICON/2, size:ICON,
       status: isRouter ? (nodeOps[n.name] && !nodeOps[n.name].done ? "warn" : ({ok:"up", warn:"warn", crit:"down", idle:"off"})[st.cls]) : "",
-      title: n.name+" · "+NodeIcons.label(type)+" · "+n.kind+" · "
-             +(nodeOps[n.name] && !nodeOps[n.name].done ? OP_ING[nodeOps[n.name].op].toLowerCase()+"…" : st.label)}));
+      title: ""}));
     g.appendChild(icg);
     var lbl=svgEl("g",{transform:"translate(0,"+b.top+") scale("+LS.toFixed(3)+")"});
     lbl.appendChild(svgEl("rect",{class:"nmbg",x:-b.bw/2,y:0,width:b.bw,height:b.bh,rx:4}));
@@ -1337,6 +1444,7 @@ function render(){
       h.addEventListener("pointerdown",function(e){ startLinkDrag(e,n); });
       g.appendChild(h);
     }
+    if(flare) g.style.setProperty("--fl", -since+"ms");
     g.setAttribute("data-node", n.name);
     gNodes.appendChild(g);
   });
@@ -1354,6 +1462,22 @@ function updateHud(){
   $("hudled").className="led "+(running ? (live.on ? (live.data ? "ok pulse" : "warn pulse") : "ok") : "");
   $("hudtxt").textContent = !running ? "stopped" : !live.on ? "running · live off" : live.data ? "live" : "live · connecting";
   $("hudsum").textContent = real+" nodes · "+links.length+" links";
+  mapNote();
+}
+// the note at the bottom of the map: a stopped lab says so and offers to start it
+var noteSig="";
+function mapNote(){
+  var box=$("mapnote"), show=lab && !lab.running && !editing && !rp.run && !window._busy;
+  box.hidden=!show;
+  if(!show){ noteSig=""; return; }
+  var sig=lab.id+(lab.stale_config?"r":"")+(lab.saved&&lab.saved.at||"")+(startLab?"s":"");
+  if(sig===noteSig) return; noteSig=sig;
+  $("mapnote_i").textContent=""; $("mapnote_i").appendChild(UI.icon("stop"));
+  $("mapnote_t").textContent=(lab.name||lab.file)+" is stopped";
+  $("mapnote_s").textContent=lab.saved&&lab.saved.at ? "The map shows the saved layout. Starting boots every node from the config saved "+when(lab.saved.at)+"."
+    : "The map shows the layout. Start the lab to bring the nodes up and see live state.";
+  var a=$("mapnote_a"); a.textContent="";
+  if(startLab) a.appendChild(UI.button("Start lab","primary sm",function(){ this.disabled=true; startLab(); },"play"));
 }
 
 function nodeLink(name){
@@ -1375,6 +1499,30 @@ function liveOf(l){
   var d=src.links[l.id]; if(!d) return null;
   var st = d.down ? "down" : (d.igp_state || null);
   return {st:st, d:d};
+}
+// state of one end's port LED: the adjacency as that node sees it
+var UP_WORDS=/up|full|established/i;
+function portLed(l, lv, node){
+  var d=lv.d;
+  if(d.down || lv.st==="lost") return "down";
+  var mine=(d.igp||[]).filter(function(a){ return a.node===node; });
+  if(lv.st==="partial") return mine.length && mine.every(function(a){ return UP_WORDS.test(a.state||""); }) ? "up" : "warn";
+  if(lv.st==="up") return "up";
+  // no IGP on this link (a CE, a host): an interface that is up is good enough
+  var side = l.a===node ? d.a : d.b;
+  return side && side.up ? "up" : "off";
+}
+function netemShort(d, long){
+  var parts=[];
+  ["a","b"].forEach(function(s){
+    var n=d[s] && d[s].netem; if(!n) return;
+    if(n.delay_ms) parts.push(n.delay_ms+" ms"+(n.jitter_ms?" ±"+n.jitter_ms:""));
+    if(n.loss_pct) parts.push(n.loss_pct+"% loss");
+    if(n.corrupt_pct) parts.push(n.corrupt_pct+"% corrupt");
+    if(n.rate_kbit) parts.push(fmtBps(n.rate_kbit*1000)+"b/s cap");
+  });
+  parts=parts.filter(function(p,i){ return parts.indexOf(p)===i; });
+  return parts.length ? (long ? parts.join(", ") : parts.slice(0,2).join(" · ")) : "impaired";
 }
 function fmtBps(b){
   b=b||0;
@@ -2726,7 +2874,15 @@ function renderNodeProto(box, n){
   var p=live.data && live.data.nodes && live.data.nodes[n.name];
   if(!live.on){ box.appendChild(el("p","hint","Live state is off."));
     box.appendChild(UI.button("Turn on live state","sm",function(){ setLive(true); },"bolt")); return; }
-  if(!p){ box.appendChild(el("p","hint", lab && lab.running ? "collecting…" : "The lab is not running.")); return; }
+  if(!p){
+    if(!(lab && lab.running)){ box.appendChild(el("div","nempty","The lab is not running.")); return; }
+    // still collecting: the shape of the lists, filled in when the first poll lands
+    nSection(box, "Adjacencies");
+    var sk=nList(box); sk.classList.add("skel-list");
+    [62,48,55].forEach(function(w){ var r=el("div","r"); r.appendChild(el("i","d"));
+      var a=el("i","skel"); a.style.width=w+"%"; r.appendChild(a); r.appendChild(el("i","skel")); sk.appendChild(r); });
+    return;
+  }
   if(p.error) box.appendChild(el("p","te-note err",p.error));
   var igp=p.igp||[], bgp=p.bgp||[];
   var protos={}; igp.forEach(function(a){ protos[a.proto]=1; });
@@ -2770,6 +2926,7 @@ function setLive(on){
   renderLegend(); pollLive(true); render();
 }
 
+var lastSubj="";
 function renderInspector(force){
   var box=$("inspector");
   // don't pull a dropdown or text field away from under the user on a refresh
@@ -2790,7 +2947,12 @@ function renderInspector(force){
   else if(guide.open) renderGuidePanel(box);
   else if(trace.open) renderTracePanel(box);
   else renderLabPanel(box);
-  box.parentNode.scrollTop=scroll;
+  // a new subject slides in; a refresh of the same one stays still
+  var subj = rp.run?"rp":imp.open?"imp":selLink?"l:"+selLink.id:sel?"n:"+sel.name:guide.open?"guide":trace.open?"trace":"lab";
+  if(subj!==lastSubj){
+    box.classList.remove("swap"); void box.offsetWidth; box.classList.add("swap");
+    lastSubj=subj; box.parentNode.scrollTop=0;
+  } else box.parentNode.scrollTop=scroll;
 }
 
 function renderLabPanel(box){
@@ -2807,6 +2969,11 @@ function renderLabPanel(box){
     if(guide.data){ var ra=UI.button("Run all "+guide.data.checks.length+" checks","sm",function(){ setGuide(true); runAllChecks(); },"play");
       ra.disabled=!lab.running; ra.title=lab.running?"":"start the lab first"; gar.appendChild(ra); }
     gc.appendChild(gar); box.appendChild(gc);
+  }
+  if(lab.running && live.on && !(live.data && live.data.links)){
+    var hs=el("div","health skel-row");
+    for(var hi_=0;hi_<3;hi_++){ var c_=el("div"); c_.appendChild(el("i","skel")); c_.appendChild(el("i","skel")); hs.appendChild(c_); }
+    box.appendChild(hs);
   }
   if(lab.running && live.on && live.data && live.data.links){
     var up=0, bad=0, sess=0, sessUp=0;
@@ -3012,6 +3179,7 @@ function labAction(action){
     .then(function(j){ if(j.error) alert(j.error); });
 }
 var headSig="";
+var startLab=null;
 function renderLabHeader(){
   $("labname").textContent = lab.name || lab.file;
   document.title = (lab.name || lab.file) + " · topology";
@@ -3044,8 +3212,9 @@ function renderLabHeader(){
           +"and not saved is lost.",{ok:"Stop lab",danger:true,extra:chk.wrap}).then(function(ok){
           if(!ok) return;
           if(chk.box.checked) saveLab(true); else { b.disabled=true; labAction("destroy"); } }); },"stop")
-    : UI.button(needsRe&&!fromSave?"Redeploy":"Start lab","primary",function(){
-        b.disabled=true; labAction(needsRe?"redeploy":"deploy"); }, needsRe&&!fromSave?"redo":"play");
+    : UI.button(needsRe&&!fromSave?"Redeploy":"Start lab","primary",function(){ startLab(); }, needsRe&&!fromSave?"redo":"play");
+  startLab = lab.running ? null : function(){ b.disabled=true; labAction(needsRe?"redeploy":"deploy"); };
+  mapNote();
   b.disabled=!!window._busy;
   if(window._busy) b.title="another action is running";
   else if(!lab.running && fromSave)
@@ -3083,8 +3252,12 @@ function renderLegend(){
   });
   if(live.on){
     L.appendChild(el("div","sep"));
-    [["var(--ok)","adjacency up",""],["var(--warn)","adjacency not full",""],["var(--crit)","down / lost",""],
-     ["var(--xr)","BGP session","dashed"]].forEach(function(p){
+    // port LEDs at each end of a link, then the line styles
+    [["var(--led-up)","adjacency up"],["var(--led-warn)","adjacency not full"],["var(--led-down)","down / lost"]].forEach(function(p){
+      var d=el("div"), i=el("span","lline led"); i.style.setProperty("--c",p[0]);
+      d.appendChild(i); d.appendChild(document.createTextNode(p[1])); L.appendChild(d);
+    });
+    [["var(--flow)","traffic",""],["var(--crit)","failed","dashed"],["var(--xr)","BGP session","dashed"]].forEach(function(p){
       var d=el("div"), i=el("span","lline"); i.style.borderTopColor=p[0]; if(p[2]) i.style.borderTopStyle="dashed";
       d.appendChild(i); d.appendChild(document.createTextNode(p[1])); L.appendChild(d);
     });
@@ -3105,6 +3278,99 @@ function renderLegend(){
     });
   }
 }
+
+// ---------- hover cards ----------
+// A short summary of a node or link under the pointer, so a glance does not
+// need the side panel. Shown after a short pause, gone on any drag or click.
+var hov={t:null, key:"", x:0, y:0};
+function hideHover(){ clearTimeout(hov.t); hov.key=""; $("hov").classList.remove("on"); }
+function uptimeText(sec){
+  var d=Math.floor(sec/86400), h=Math.floor(sec%86400/3600), m=Math.floor(sec%3600/60);
+  return d ? d+"d "+h+"h" : h ? h+"h "+m+"m" : m+"m";
+}
+function hovRows(dl, rows){
+  rows.forEach(function(r){ if(!r) return; dl.appendChild(el("dt",null,r[0])); dl.appendChild(el("dd",r[2]||null,r[1])); });
+}
+function nodeCard(box, n){
+  var st=statusOf(n), op=nodeOps[n.name] && !nodeOps[n.name].done ? nodeOps[n.name] : null;
+  var type=NodeIcons.classify(n), lit=/^(router|ce|server)$/.test(type);
+  var hh=el("div","hh"), ic=el("span",kcls(n.kind,n.image));
+  ic.innerHTML='<svg viewBox="0 0 48 48">'+NodeIcons.markup(type,{ status: lit ? (op ? "warn" : ({ok:"up",warn:"warn",crit:"down",idle:"off"})[st.cls]) : ""})+'</svg>';
+  hh.appendChild(ic);
+  var t=el("div"); t.appendChild(el("b",null,n.name));
+  t.appendChild(el("span",null,n.external ? "external endpoint" : NodeIcons.label(type)+" · "+kindLabel(n))); hh.appendChild(t);
+  var pill=el("span","st "+(op?"warn":st.cls)); pill.appendChild(el("i"));
+  pill.appendChild(document.createTextNode(op ? OP_ING[op.op].toLowerCase()+"…" : st.cls==="ok" ? "up" : st.cls==="warn" ? "starting" : st.cls==="crit" ? "down" : "off"));
+  hh.appendChild(pill); box.appendChild(hh);
+  if(n.external) return;
+  var c=n.container||{}, p=live.on && live.data && live.data.nodes && live.data.nodes[n.name];
+  var f=srOf(n), lo=f && (f.loopbacks||[])[0];
+  var igp=p&&p.igp||[], bgp=p&&p.bgp||[];
+  var iu=igp.filter(function(a){ return /up|full/i.test(a.state); }).length;
+  var bu=bgp.filter(function(b){ return /established|up/i.test(b.state||""); }).length;
+  var dl=el("dl");
+  hovRows(dl, [
+    c.state==="running" && c.started ? ["uptime", uptimeText(Date.now()/1000-c.started)] : null,
+    nodeIp(n) ? ["mgmt", nodeIp(n)] : null,
+    lo ? ["loopback", lo.v4.concat(lo.v6)[0]||lo.name] : null,
+    p && igp.length ? ["adjacencies", iu+"/"+igp.length+" up", iu===igp.length?"ok":"warn"] : null,
+    p && bgp.length ? ["BGP", bu+"/"+bgp.length+" established", bu===bgp.length?"ok":"warn"] : null,
+    c.cpu ? ["cpu · mem", c.cpu+" · "+String(c.mem||"—").split("/")[0].trim()] : null,
+    !n.container ? ["state", "not deployed"] : null
+  ]);
+  if(dl.children.length) box.appendChild(dl);
+  box.appendChild(el("div","foot","click for details · drag to move"));
+}
+function linkCard(box, l){
+  var A=nodes.filter(function(x){ return x.name===l.a; })[0], B=nodes.filter(function(x){ return x.name===l.b; })[0];
+  var ends=el("div","ends");
+  [[l.a,ifInfo(A,l.a_if).short],null,[l.b,ifInfo(B,l.b_if).short]].forEach(function(e){
+    if(!e){ ends.appendChild(el("em",null,"⟷")); return; }
+    var d=el("div"); d.appendChild(el("b",null,e[0])); d.appendChild(el("span",null,e[1])); ends.appendChild(d);
+  });
+  box.appendChild(ends);
+  var lv=liveOf(l), d=lv&&lv.d, s=stLabel(d), dl=el("dl");
+  var adjTxt=function(list){ return (list||[]).map(function(a){ return a.sid!=null ? (a.type==="srv6" ? sidShortTxt(a.sid) : String(a.sid)) : ""; })
+                                         .filter(Boolean).join(" "); };
+  hovRows(dl, [
+    s ? ["state", s[1], {ok:"ok",warn:"warn",crit:"crit"}[s[0]]] : ["state", lab&&lab.running ? (live.on?"collecting…":"live state off") : "lab stopped"],
+    d && d.failed ? ["failed", "from the dashboard · "+d.failed.mode, "crit"] : null,
+    d && d.impaired ? ["netem", netemShort(d), "warn"] : null,
+    d ? [l.a+" → "+l.b, fmtBps(d.ab_bps)+"b/s"] : null,
+    d ? [l.b+" → "+l.a, fmtBps(d.ba_bps)+"b/s"] : null,
+    d && d.adj && adjTxt(d.adj.a) ? ["adj-SID "+l.a, adjTxt(d.adj.a)] : null,
+    d && d.adj && adjTxt(d.adj.b) ? ["adj-SID "+l.b, adjTxt(d.adj.b)] : null
+  ]);
+  box.appendChild(dl);
+  box.appendChild(el("div","foot","click to fail, impair or capture"));
+}
+function sidShortTxt(sid){ var x=String(sid); return x.length>22 ? x.slice(0,20)+"…" : x; }
+function placeHover(){
+  var c=$("hov"), r=stage.getBoundingClientRect(), w=c.offsetWidth, h=c.offsetHeight;
+  var x=hov.x-r.left+16, y=hov.y-r.top+16;
+  if(x+w>r.width-10) x=hov.x-r.left-w-16;
+  if(y+h>r.height-10) y=Math.max(10, hov.y-r.top-h-16);
+  c.style.left=Math.max(10,x)+"px"; c.style.top=y+"px";
+}
+function showHover(key, fill){
+  var c=$("hov"); c.textContent=""; fill(c); hov.key=key; placeHover(); c.classList.add("on");
+}
+svg.addEventListener("pointermove",function(e){
+  hov.x=e.clientX; hov.y=e.clientY;
+  if(drag || pan || ldrag || e.buttons){ hideHover(); return; }
+  var ng=e.target.closest && e.target.closest(".node"), lg=!ng && e.target.closest && e.target.closest(".lk");
+  var key = ng ? "n:"+ng.getAttribute("data-node") : lg ? "l:"+lg.getAttribute("data-lid") : "";
+  if(!key || (trace.open && trace.res) || imp.open){ if(hov.key||hov.t) hideHover(); return; }
+  if(key===hov.key){ placeHover(); return; }
+  hideHover();
+  hov.t=setTimeout(function(){
+    if(key[0]==="n"){ var n=nodes.filter(function(x){ return x.name===key.slice(2); })[0]; if(n) showHover(key,function(b){ nodeCard(b,n); }); }
+    else { var l=linkById(key.slice(2)); if(l) showHover(key,function(b){ linkCard(b,l); }); }
+  }, 280);
+});
+svg.addEventListener("pointerleave", hideHover);
+svg.addEventListener("pointerdown", hideHover, true);
+svg.addEventListener("wheel", hideHover, {passive:true});
 
 // ---------- interaction ----------
 var drag=null, pan=null;
@@ -3196,11 +3462,14 @@ $("t_view").addEventListener("click",function(){
     {label:"Legend", checked:showLegend, onClick:setLegend}
   ], {align:"left", focus:false});
 });
-function setIfs(v){ showIfs=v; store("clabd-topo-ifs",v); render(); }
-function setRate(v){ showRate=v; store("clabd-rate",v); if(v && !live.on) setLive(true); render(); }
-function setBgp(v){ showBgp=v; store("clabd-bgp",v); if(v && !live.on) setLive(true); render(); }
+// labels and overlays fade in when a View layer is switched, instead of popping
+var fadeT=null;
+function fadeLayers(){ stage.classList.add("lyfade"); clearTimeout(fadeT); fadeT=setTimeout(function(){ stage.classList.remove("lyfade"); }, 400); }
+function setIfs(v){ showIfs=v; store("clabd-topo-ifs",v); fadeLayers(); render(); }
+function setRate(v){ showRate=v; store("clabd-rate",v); fadeLayers(); if(v && !live.on) setLive(true); render(); }
+function setBgp(v){ showBgp=v; store("clabd-bgp",v); fadeLayers(); if(v && !live.on) setLive(true); render(); }
 function setSr(k,v){
-  srv[k]=v; store("clabd-sr-"+k,v);
+  srv[k]=v; store("clabd-sr-"+k,v); fadeLayers();
   if(v && !live.on) setLive(true);
   else if(v) pollLive(true);
   if(v && lab && lab.running && !(live.data && live.data.sr_ready))

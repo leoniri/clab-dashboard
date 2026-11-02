@@ -54,6 +54,8 @@
   /* router status ring (node-icons.js): neon on the map */
   --led-up:#39FF8E; --led-up-core:#E2FFEE; --led-warn:#FFB020; --led-warn-core:#FFF1D0;
   --led-down:#FF2E55; --led-down-core:#FFD9E0; --led-off:#2A3442; --led-glow:.95;
+  /* links on the map: a quiet wire, a brighter one under load, cyan comets */
+  --wire:#3A4859; --wire-busy:#4F6A80; --flow:#7FE9F5;
   /* protocols in the capture viewer */
   --p-tcp:#5AA9FF; --p-icmp:#4ADE80; --p-arp:#FBBF24; --p-mpls:#B794F6; --p-rt:#FB923C;
 }
@@ -86,6 +88,7 @@
   --host:#55677F;
   --led-up:#00D468; --led-up-core:#B6FFD6; --led-warn:#F59E0B; --led-warn-core:#FFE7B0;
   --led-down:#F0123F; --led-down-core:#FFC2CE; --led-off:#CBD3DD; --led-glow:.7;
+  --wire:#A9B5C3; --wire-busy:#7F93A8; --flow:#0A8FA3;
   --p-tcp:#1F6FE0; --p-icmp:#15803D; --p-arp:#9A6700; --p-mpls:#7A3DD6; --p-rt:#C2530E;
 }
 
@@ -318,6 +321,12 @@ input[type=range]{accent-color:var(--accent)}
 .empty{text-align:center;padding:54px 20px;color:var(--muted);font:13px var(--font-mono)}
 .empty::before{content:"¯\\_(ツ)_/¯";display:block;font-size:18px;color:var(--line-strong);margin-bottom:10px}
 .empty.plain::before{display:none}
+/* skeleton: grey shapes standing in for data that is on its way */
+.skel{display:block;border-radius:6px;background:linear-gradient(90deg,var(--surface-3) 0%,
+  color-mix(in srgb,var(--surface-3) 55%,var(--line-strong)) 50%,var(--surface-3) 100%) 0 0/200% 100%;
+  animation:skel 1.4s ease-in-out infinite}
+@keyframes skel{from{background-position:100% 0}to{background-position:-100% 0}}
+@media (prefers-reduced-motion:reduce){ .skel{animation:none} }
 .spin{display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid var(--line-strong);
   border-top-color:var(--accent);animation:spin .7s linear infinite;flex:none;vertical-align:-2px}
 
