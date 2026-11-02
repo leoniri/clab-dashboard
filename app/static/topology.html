@@ -433,6 +433,20 @@ i.res.reached{color:var(--ok);background:var(--ok-soft)} i.res.blackhole,i.res.n
 .trline .lk{display:inline-flex;align-items:center;font:600 9.5px var(--font-mono);color:var(--muted);padding:0 2px}
 .trline .lk::before,.trline .lk::after{content:"";width:8px;height:2px;background:var(--line-strong)}
 .trline .lk i{font-style:normal;padding:1px 5px;border-radius:4px;background:var(--surface-3);color:var(--ink-2);margin:0 2px}
+/* encapsulation phases: one row per stretch of the path that carries the same header */
+.trph{display:flex;flex-direction:column;gap:6px;margin:2px 0 4px}
+.trph .row{display:grid;grid-template-columns:3px auto minmax(0,1fr);gap:3px 10px;align-items:center;padding:8px 11px 8px 9px;
+  border:1px solid var(--line);border-radius:10px;background:var(--surface-2);cursor:default;transition:border-color .15s}
+.trph .row:hover{border-color:color-mix(in srgb,var(--k) 55%,var(--line))}
+.trph .bar{grid-row:1/3;align-self:stretch;border-radius:2px;background:var(--k)}
+.trph .kd{font:700 9.5px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--k)}
+.trph .hd{font:500 11px var(--font-mono);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trph .rt{grid-column:2/4;font:10.5px var(--font-mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trph .rt b{font-weight:600;color:var(--ink-2)}
+.trph .k-ip{--k:var(--sr-lo)} .trph .k-srv6{--k:var(--srv6)} .trph .k-mpls{--k:var(--sr-mpls)}
+.subh .tog{margin-left:auto;font:500 10px var(--font-mono);letter-spacing:0;text-transform:none;color:var(--ink-2);background:none;border:0;cursor:pointer;padding:0}
+.subh .tog:hover{color:var(--accent-ink)}
+.subh{display:flex;align-items:center}
 .hops{display:flex;flex-direction:column;gap:0;position:relative}
 .hop{position:relative;display:grid;grid-template-columns:26px 1fr;gap:12px;padding:0 0 14px}
 .hop::before{content:"";position:absolute;left:12px;top:26px;bottom:0;width:1.5px;border-radius:2px;
@@ -443,8 +457,23 @@ i.res.reached{color:var(--ok);background:var(--ok-soft)} i.res.blackhole,i.res.n
 .hop:first-child .n,.hop:last-child .n{background:var(--trace);color:var(--on-trace)}
 .hop .card{border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--surface-2);transition:border-color .15s,box-shadow .15s}
 .hop:hover .card{border-color:var(--c);box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 40%,transparent)}
-.hop .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.hop .top b{font:600 13.5px var(--font-display)}
+.hop .top{display:flex;align-items:center;gap:8px;min-width:0}
+.hop .top b{font:600 13.5px var(--font-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.hop .top .role,.hop .top .vrf{white-space:nowrap;flex:none}
+.hop .top .op{flex:none;white-space:nowrap}
+.hop .route{display:flex;align-items:center;gap:6px;margin-top:5px;font:11px var(--font-mono);color:var(--ink-2);min-width:0}
+.hop .route .ar{color:var(--muted)}
+.hop .route .to{font-weight:600;color:var(--ink)}
+.hop .route .if{white-space:nowrap}
+.hop details.hdet summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none}
+.hop details.hdet summary::-webkit-details-marker{display:none}
+.hop details.hdet summary .route{flex:1}
+.hop details.hdet summary .route.more{font:500 10px var(--font-mono);color:var(--muted)}
+.hop details.hdet summary::after{content:"";flex:none;width:5px;height:5px;margin:4px 2px 0 0;border-right:1.5px solid var(--muted);
+  border-bottom:1.5px solid var(--muted);transform:rotate(-45deg);transition:transform .12s}
+.hop details.hdet[open] summary::after{transform:rotate(45deg);margin-top:2px}
+.hop details.hdet summary:hover .route .to,.hop details.hdet summary:hover .route .if{color:var(--accent-ink)}
+.hop details.hdet .hkv{margin-top:6px}
 .hop .role{font:600 9px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .hop .vrf{font:500 10px var(--font-mono);padding:1px 6px;border-radius:4px;background:var(--surface-3);color:var(--ink-2)}
 .op{display:inline-flex;align-items:center;gap:5px;font:600 10.5px var(--font-mono);padding:2px 8px;border-radius:99px;margin-left:auto}
@@ -454,7 +483,7 @@ i.res.reached{color:var(--ok);background:var(--ok-soft)} i.res.blackhole,i.res.n
 .op.encap{color:var(--xe);background:var(--xe-soft)} .op.err{color:var(--crit);background:var(--crit-soft)}
 .hop .hkv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin-top:8px;font:11px var(--font-mono);color:var(--ink-2)}
 .hop .hkv > span:nth-child(odd){color:var(--muted);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;padding-top:1px}
-.hop .hkv > span{min-width:0;overflow-wrap:anywhere}
+.hop .hkv > span{min-width:0;overflow-wrap:anywhere;white-space:pre-line}
 .pkt{display:inline-flex;border-radius:5px;overflow:hidden;border:1px solid var(--line-strong);vertical-align:middle}
 .pkt i{font:700 10px var(--font-mono);font-style:normal;padding:1px 6px}
 .pkt i.lb{background:var(--accent-soft);color:var(--trace-ink)} .pkt i.lb + i.lb{border-left:1px solid var(--line-strong)}
@@ -617,7 +646,7 @@ var gLinks = document.getElementById("glinks");
 var gBgp = document.getElementById("gbgp");
 var gTrace = document.getElementById("gtrace"), gTraceU = document.getElementById("gtraceu"), gImp = document.getElementById("gimp");
 // path trace: the form, the last result, and "follow" (re-trace every few s)
-var trace = {open:false, src:"", dst:"", ip:"", res:null, err:null, busy:false, follow:false, timer:null,
+var trace = {open:false, src:"", dst:"", ip:"", res:null, err:null, busy:false, follow:false, timer:null, detail:false,
              prev:null, base:null, hist:{}, repair:true};
 // what-if: a failure set, worked out by the server's IGP model (impact.py)
 var imp = {open:false, links:[], nodes:[], res:null, busy:false, err:null, hover:null, pin:null, seq:0,
@@ -1758,20 +1787,30 @@ function renderTracePanel(box){
   rs.appendChild(document.createTextNode(r.commands+" show commands")); sum.appendChild(rs);
   box.appendChild(sum);
   traceCompareBox(box, r);
-  // the path as one line: router, the header on the wire, router, …
-  var line=el("div","trline");
-  steps.forEach(function(st, i){
-    var c=el("span","st", st.node); c.style.setProperty("--c", trColor(N>1?i/(N-1):0));
-    c.addEventListener("mouseenter",function(){ traceHover(i, st.node, true); });
-    c.addEventListener("mouseleave",function(){ traceHover(i, st.node, false); });
-    line.appendChild(c);
-    if(i<N-1){
-      var lk=el("span","lk"); lk.appendChild(el("i",null, wireOf(st.h, r.dst).map(function(x){ return x.t; }).slice(0,-1).join("·") || "IP"));
-      line.appendChild(lk);
-    }
-  });
-  box.appendChild(line);
+  // what the packet looks like on the wire, one row per stretch with the same header
+  var phases=tracePhases(steps, r);
+  if(phases.length){
+    box.appendChild(el("div","subh","Encapsulation"));
+    var ph_=el("div","trph");
+    phases.forEach(function(p){
+      var row=el("div","row k-"+p.kind);
+      row.appendChild(el("span","bar"));
+      row.appendChild(el("span","kd",p.label));
+      var hd=el("span","hd",p.head); hd.title=p.head; row.appendChild(hd);
+      var rt=el("span","rt"); rt.appendChild(el("b",null,p.from)); rt.appendChild(document.createTextNode(" → "));
+      rt.appendChild(el("b",null,p.to)); rt.appendChild(document.createTextNode(" · "+p.hops+" hop"+(p.hops>1?"s":"")));
+      row.appendChild(rt);
+      row.addEventListener("mouseenter",function(){ for(var k=p.i0;k<=p.i1;k++) traceHover(k, steps[k].node, true); });
+      row.addEventListener("mouseleave",function(){ for(var k=p.i0;k<=p.i1;k++) traceHover(k, steps[k].node, false); });
+      ph_.appendChild(row);
+    });
+    box.appendChild(ph_);
+  }
   // one card per router
+  var hsh=el("div","subh","Hops"), tog=el("button","tog", trace.detail?"collapse all":"expand all");
+  tog.type="button";
+  tog.addEventListener("click",function(){ trace.detail=!trace.detail; renderInspector(true); });
+  hsh.appendChild(tog); box.appendChild(hsh);
   var hl=el("div","hops");
   steps.forEach(function(st, i){
     var h=st.h, op=opOf(h.action);
@@ -1782,19 +1821,38 @@ function renderTracePanel(box){
     top.appendChild(el("b",null,h.node));
     top.appendChild(el("span","role", i===0?"source":i===N-1?(ok?"destination":"last hop"):"transit"));
     if(h.vrf) top.appendChild(el("span","vrf","vrf "+h.vrf));
-    top.appendChild(el("span","op "+op, h.action||""));
+    var opc=el("span","op "+op, h.blocked ? "drops" : opShort(h.action));
+    if(h.blocked) opc.className="op err";
+    opc.title=h.action||""; top.appendChild(opc);
     card.appendChild(top);
-    st.subs.forEach(function(a){ var sb=el("div","sub","↳ "+a); card.appendChild(sb); });
-    if(h.blocked){ top.querySelector(".op").className="op err"; top.querySelector(".op").textContent="drops the packet"; }
+    // where it goes next, by router name - the addresses are in the details,
+    // which open from this line
+    var rl=null;
+    if(h.out_if || h.link){
+      var nxt=nextNode(h); rl=el("div","route");
+      rl.appendChild(el("span","if",shortIf(h.out_if||"")));
+      if(nxt){ rl.appendChild(el("span","ar","→")); rl.appendChild(el("span","to",nxt)); }
+      if(h.nh) rl.title="next hop "+h.nh;
+    }
+    var subs=st.subs.map(function(a){ return el("div","sub","↳ "+a); });
     var kv=el("div","hkv");
     function row_(k, v){ kv.appendChild(el("span",null,k)); var x=el("span"); if(typeof v==="string") x.textContent=v; else x.appendChild(v); kv.appendChild(x); }
+    if(h.action) row_("action", h.action);
     if(h.in_labels && h.in_labels.length){ row_("in", pkt(h.in_labels.map(String).concat([(r.dst||"").indexOf(":")>=0?"IPv6":"IPv4"]))); }
     if(h.lookup) row_("lookup", h.lookup + (h.via ? "  via BGP nh "+h.via : ""));
-    if(h.out_if) row_("out", h.out_if+(h.nh?"  →  "+h.nh:""));
+    if(h.out_if) row_("out", h.out_if+(h.nh?"\nnext hop "+h.nh:""));
     if(h.link) row_("wire", pkt(wireOf(h, r.dst).map(function(x){ return x.t; })));
     if(h.backup) row_("backup", backupEl(h.backup));
     if(h.fib_updated) row_("fib", "updated "+h.fib_updated);
-    if(kv.children.length) card.appendChild(kv);
+    // what happened inside the router first (decap, shift), then where it goes
+    subs.forEach(function(x){ card.appendChild(x); });
+    if(kv.children.length){
+      var det=el("details","hdet"), sm=el("summary");
+      det.open=!!trace.detail;
+      sm.appendChild(rl || el("div","route more","details"));
+      det.appendChild(sm); det.appendChild(kv);
+      card.appendChild(det);
+    } else if(rl) card.appendChild(rl);
     if(h.backup && h.backup.repair && h.backup.repair.length>1) card.appendChild(el("div","why rep",
       "If "+(h.out_if||"this link")+" fails, "+h.node+" switches to the "+h.backup.kind+" path at once: "
       +h.backup.repair.map(function(x){ return x.node; }).join(" › ")+" — dashed amber on the map — until the IGP converges."));
@@ -1812,6 +1870,26 @@ function renderTracePanel(box){
   box.appendChild(hl);
   traceBranchesBox(box, r);
   traceHistoryBox(box, r);
+}
+// the router at the far end of a hop's link
+function nextNode(h){
+  var l=h.link && linkById(h.link); if(!l) return null;
+  return l.a===h.node ? l.b : l.b===h.node ? l.a : null;
+}
+// stretches of the path that carry the same header: IP, an SRv6 DA, an MPLS stack
+function tracePhases(steps, r){
+  var inner=(r.dst||"").indexOf(":")>=0 ? "IPv6" : "IPv4", out=[];
+  steps.forEach(function(st, i){
+    if(i===steps.length-1 || !st.h.link) return;
+    var hdr=(st.h.stack_out||[]).map(String), head, kind, label;
+    if(!hdr.length){ kind="ip"; label=inner; head="to "+(r.dst||"")+(st.h.vrf?" · VRF "+st.h.vrf:""); }
+    else if(/^DA /.test(hdr[0])){ kind="srv6"; label="SRv6"; head=hdr.join(" · ")+" · "+inner+" inside"; }
+    else { kind="mpls"; label="MPLS"; head="labels "+hdr.join(" / ")+" · "+inner+" inside"; }
+    var last=out[out.length-1];
+    if(last && last.key===kind+"|"+hdr.join(",")){ last.to=steps[i+1].node; last.hops++; last.i1=i+1; return; }
+    out.push({key:kind+"|"+hdr.join(","), kind:kind, label:label, head:head, from:st.node, to:steps[i+1].node, hops:1, i0:i, i1:i+1});
+  });
+  return out;
 }
 function pkt(parts){
   var p=el("span","pkt");

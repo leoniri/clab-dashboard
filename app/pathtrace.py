@@ -223,6 +223,13 @@ def parse_xr_cef(text):
     if res["via"] and res["paths"]:
         bottom = [p["labels"][-1] for p in res["paths"] if len(p["labels"]) > 1]
         res["vpn_label"] = bottom[0] if bottom else None
+    if not res["paths"]:
+        # a directly connected subnet: "via GigabitEthernet0/0/0/1, 2 dependencies,
+        # ...  glean adjacency" - an interface and no next-hop address
+        m = re.search(r"^\s*via ((?!%s)[A-Za-z][\w/.:-]*), \d+ dependenc" % ADDR_RE, text, re.M)
+        if m and re.search(r"glean|attached", text):
+            res["paths"].append({"nh": None, "out_if": m.group(1), "labels": []})
+            res["connected"] = True
     if not res["paths"] and re.search(r"attached|local adjacency", text):
         res["connected"] = True
     return _split_backups(res)
