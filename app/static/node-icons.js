@@ -3,24 +3,27 @@
  *
  * Shared by the topology map and the builder palette. No dependencies.
  *
- *   NodeIcons.TYPES                 ["router","switch","server","firewall",
+ *   NodeIcons.TYPES                 ["router","ce","switch","server","firewall",
  *                                    "cloud","trafficgen"]
  *   NodeIcons.classify(node)        -> one of TYPES
  *       node: {name, kind, image, icon, external}
  *       Order: node.icon (the clab label `graph-icon`) wins, then external
- *       endpoints are clouds, then the kind, then - for kind linux - image
- *       and name heuristics.
+ *       endpoints are clouds, then CE by name (ce1, site-ce, cpe2 ...): a
+ *       Cisco CE is "ce" (the CE monogram), any other CE a server (the rack),
+ *       then the kind, then - for kind linux - image and name heuristics.
  *   NodeIcons.label(type)           -> human name, e.g. "traffic generator"
  *   NodeIcons.markup(type)          -> SVG markup string for a <g>, drawn in
  *                                      a 48x48 box at the origin
  *   NodeIcons.svg(type, opts)       -> SVGGElement
  *       opts: {size: 48, x: 0, y: 0, title: "", status: ""} - (x,y) is the
  *       top-left of the box, size scales it. status (up | warn | down | off)
- *       lights the router's neon ring and adds class ni-st-<status>; the
- *       colours live in ui.css. Other types ignore it.
+ *       lights the neon status ring (router, ce, server) and adds class
+ *       ni-st-<status>; the colours live in ui.css. Other types ignore it.
  *
  * Routers are a flat disc with the router mark, a fine outer ring and,
- * when a status is given, a neon ring in the gap between the two.
+ * when a status is given, a neon ring in the gap between the two. CE routers
+ * (a "CE" monogram) and servers (two rack units) use the same disc and ring,
+ * in the host colour (--host).
  *
  * Colours: bodies use currentColor, so set `color:` on the element (or a
  * parent) to pick the family colour. Glyphs on the body (arrows, slots,
@@ -32,15 +35,15 @@
 
   var NS = "http://www.w3.org/2000/svg";
   var GLYPH = "var(--icon-glyph, var(--surface, #fff))";
-  var TYPES = ["router", "switch", "server", "firewall", "cloud", "trafficgen"];
+  var TYPES = ["router", "ce", "switch", "server", "firewall", "cloud", "trafficgen"];
   var LABELS = {
-    router: "router", switch: "switch", server: "server / host",
+    router: "router", ce: "CE router", switch: "switch", server: "server / host",
     firewall: "firewall", cloud: "external / cloud", trafficgen: "traffic generator"
   };
 
   // clab graph-icon values -> our types
   var ICON_ALIASES = {
-    router: "router", switch: "switch", host: "server", server: "server",
+    router: "router", ce: "ce", cpe: "ce", switch: "switch", host: "server", server: "server",
     client: "server", pc: "server", firewall: "firewall", fw: "firewall",
     cloud: "cloud", internet: "cloud", trafficgen: "trafficgen",
     "traffic-generator": "trafficgen", generator: "trafficgen"
@@ -50,6 +53,7 @@
   var SWITCH_KINDS = /(^|_)(n9kv|nxos|ceos|eos|srl|srlinux|sonic|cvx|cumulus|vjunosswitch|vqfx|cat9kv|dell_|bridge$|ovs-bridge|ovs$)|^sonic|^bridge$|^ovs-bridge$/;
   var FIREWALL_KINDS = /(fortinet|fortigate|paloalto|panos|checkpoint|asav|ftdv|vsrx|pfsense|opnsense)/;
   var ROUTER_IMAGES = /(frr|frrouting|gobgp|bird|openbgpd|quagga|vyos|exabgp|bgpd)/;
+  var CE_NAME = /(^|[-_.])(ce|cpe)\d*([-_.]|$)|^(ce|cpe)\d/;
   var TRAFFIC_IMAGES = /(traffic-gen|trafficgen|iperf|trex|ixia|ostinato|pktgen|scapy)/;
 
   function classify(node) {
@@ -61,6 +65,8 @@
     var name = String(node.name || "").toLowerCase();
 
     if (node.external || kind === "external" || EXTERNAL.test(kind)) return "cloud";
+    // a CE by its name: a Cisco one gets the CE monogram, any other the rack
+    if (CE_NAME.test(name)) return /^cisco_/.test(kind) ? "ce" : "server";
     if (kind === "bridge" || kind === "ovs-bridge" || SWITCH_KINDS.test(kind)) return "switch";
     if (FIREWALL_KINDS.test(kind)) return "firewall";
     if (kind === "linux" || kind === "" || kind === "k8s-kind" || kind === "ext-container") {
@@ -89,10 +95,11 @@
   var SHADE = 'fill="#000" fill-opacity=".22"';
   var LIGHT = 'fill="#fff" fill-opacity=".16"';
 
+  var HALO_RING = '<circle cx="24" cy="24" r="21.55" fill="none" stroke="currentColor" stroke-width="1.2" stroke-opacity=".85"/>';
+  var LIT = /^(router|ce|server)$/;        // types that carry the neon status ring
   var DRAW = {
     router: function () {
-      return '' +
-        '<circle cx="24" cy="24" r="21.55" fill="none" stroke="currentColor" stroke-width="1.2" stroke-opacity=".85"/>' +
+      return HALO_RING +
         '<circle cx="24" cy="24" r="18" fill="currentColor"/>' + routerMark(24, 24, .84, 2.2);
     },
     switch: function () {
@@ -106,10 +113,18 @@
         arrow(34, 32, 22, 32, 4.6) + arrow(19, 32, 7, 32, 4.6);
     },
     server: function () {
-      return serverBody() +
-        '<g stroke="' + GLYPH + '" stroke-width="2" stroke-linecap="round" vector-effect="non-scaling-stroke">' +
-        '<path d="M17 12H29M17 17H29M17 22H29"/></g>' +
-        '<circle cx="23" cy="36" r="2.2" fill="' + GLYPH + '"/>';
+      // two rounded rack units with a light each, on the router's disc
+      var w = 'stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"';
+      return HALO_RING + '<circle cx="24" cy="24" r="18" fill="currentColor"/>' +
+        '<rect x="15.2" y="16.6" width="17.6" height="6.4" rx="2.2" ' + w + '/>' +
+        '<rect x="15.2" y="25" width="17.6" height="6.4" rx="2.2" ' + w + '/>' +
+        '<circle cx="28.6" cy="19.8" r="1.15" fill="#fff"/><circle cx="28.6" cy="28.2" r="1.15" fill="#fff"/>';
+    },
+    ce: function () {
+      // the CE of Leonir's diagrams: a disc with the name as the symbol
+      return HALO_RING + '<circle cx="24" cy="24" r="18" fill="currentColor"/>' +
+        '<text x="24" y="28.6" text-anchor="middle" font-family="Inter,\'Segoe UI\',system-ui,sans-serif" ' +
+        'font-size="13.5" font-weight="700" letter-spacing="-.3" fill="#fff">CE</text>';
     },
     trafficgen: function () {
       return serverBody() +
@@ -182,7 +197,7 @@
   }
 
   function markup(type, opts) {
-    var t = DRAW[type] ? type : "router", st = opts && STATUS.test(opts.status || "") && t === "router" ? opts.status : "";
+    var t = DRAW[type] ? type : "router", st = opts && STATUS.test(opts.status || "") && LIT.test(t) ? opts.status : "";
     if (st) ensureNeon();
     return '<g class="nodeicon ni-' + t + (st ? " ni-st-" + st : "") + '">' + DRAW[t]() + (st ? routerLed() : "") + '</g>';
   }
@@ -191,7 +206,7 @@
     opts = opts || {};
     var size = opts.size || 48;
     var g = document.createElementNS(NS, "g"), t = DRAW[type] ? type : "router";
-    var st = STATUS.test(opts.status || "") && t === "router" ? opts.status : "";
+    var st = STATUS.test(opts.status || "") && LIT.test(t) ? opts.status : "";
     g.setAttribute("class", "nodeicon ni-" + t + (st ? " ni-st-" + st : ""));
     g.setAttribute("transform", "translate(" + (opts.x || 0) + " " + (opts.y || 0) +
       ") scale(" + (size / 48) + ")");

@@ -50,6 +50,7 @@
   --oth:#FBBF24; --oth-soft:rgba(251,191,36,.13);
   /* addresses and SIDs on the topology map */
   --sr-lo:#9FB0C2; --sr-mpls:#E8B55A; --srv6:#4CC9E6;
+  --host:#8FA3BC;               /* CE routers and hosts (node-icons ce / server) */
   /* router status ring (node-icons.js): neon on the map */
   --led-up:#39FF8E; --led-up-core:#E2FFEE; --led-warn:#FFB020; --led-warn-core:#FFF1D0;
   --led-down:#FF2E55; --led-down-core:#FFD9E0; --led-off:#2A3442; --led-glow:.95;
@@ -82,6 +83,7 @@
   --srl:#15803D; --srl-soft:rgba(21,128,61,.10);
   --oth:#9A6700; --oth-soft:rgba(154,103,0,.10);
   --sr-lo:#5B6B80; --sr-mpls:#946300; --srv6:#0A7A94;
+  --host:#55677F;
   --led-up:#00D468; --led-up-core:#B6FFD6; --led-warn:#F59E0B; --led-warn-core:#FFE7B0;
   --led-down:#F0123F; --led-down-core:#FFC2CE; --led-off:#CBD3DD; --led-glow:.7;
   --p-tcp:#1F6FE0; --p-icmp:#15803D; --p-arp:#9A6700; --p-mpls:#7A3DD6; --p-rt:#C2530E;
@@ -347,6 +349,7 @@ input[type=range]{accent-color:var(--accent)}
 .dlg > footer{display:flex;gap:8px;justify-content:flex-end;padding:12px 20px 16px;border-top:1px solid var(--line);background:var(--surface)}
 
 /* --------------------------------------------- router status ring */
+.nodeicon.ni-ce,.nodeicon.ni-server{color:var(--host)}
 .ni-led{color:var(--led-off)}
 .ni-led .glow,.ni-led .core{opacity:0}
 .ni-st-up .ni-led{color:var(--led-up)} .ni-st-warn .ni-led{color:var(--led-warn)} .ni-st-down .ni-led{color:var(--led-down)}
