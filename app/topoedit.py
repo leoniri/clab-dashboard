@@ -50,6 +50,8 @@ CLAB = sysbin.find("clab", "containerlab")
 NSENTER = sysbin.find("nsenter")
 IP = sysbin.find("ip")
 TC = sysbin.find("tc")
+ETHTOOL = sysbin.find("ethtool")
+VETH_MTU = 9500                 # what containerlab gives its links
 
 # vrnetlab router kinds: VM inside the container, NICs fixed at boot
 ROUTERS = {
@@ -536,10 +538,39 @@ def rewire(cname, port, log):
 
 
 def veth(ca, pa, cb, pb, log):
-    rc, out, err = _run([CLAB, "tools", "veth", "create", "-a", "%s:%s" % (ca, pa),
-                         "-b", "%s:%s" % (cb, pb)], timeout=60)
+    """A link between two containers, made in the kernel: a veth pair created
+    under temporary names, each end moved into its container's netns and
+    renamed to the port. Works on a frozen container - `clab tools veth
+    create` waits for both to be running (clab >= 0.8x), and a vrnetlab VM
+    must stay frozen until all of its NICs exist."""
+    import secrets
+    pids = {}
+    for c in (ca, cb):
+        pids[c] = _pid(c)
+        if not pids[c]:
+            raise TopoError("veth %s:%s - %s:%s: %s has no running process" % (ca, pa, cb, pb, c))
+    tag = secrets.token_hex(3)
+    ta, tb = "cdA" + tag, "cdB" + tag
+    # a port of that name left over from before goes first
+    for c, port in ((ca, pa), (cb, pb)):
+        _ns(c, IP, "link", "del", port)
+    rc, _, err = _run([IP, "link", "add", ta, "mtu", str(VETH_MTU), "type", "veth",
+                       "peer", "name", tb, "mtu", str(VETH_MTU)], timeout=30)
     if rc != 0:
-        raise TopoError("veth %s:%s - %s:%s failed: %s" % (ca, pa, cb, pb, (err or out).strip()[-300:]))
+        raise TopoError("veth %s:%s - %s:%s: %s" % (ca, pa, cb, pb, err.strip()))
+    try:
+        for tmp, c, port in ((ta, ca, pa), (tb, cb, pb)):
+            for cmd, inside in (([IP, "link", "set", tmp, "netns", str(pids[c])], False),
+                                ([IP, "link", "set", tmp, "name", port], True),
+                                ([IP, "link", "set", port, "up"], True)):
+                rc, _, err = _ns(c, *cmd) if inside else _run(cmd, timeout=30)
+                if rc != 0:
+                    raise TopoError("veth %s:%s - %s:%s: %s" % (ca, pa, cb, pb, err.strip()))
+            if ETHTOOL and os.path.exists(ETHTOOL):
+                _ns(c, ETHTOOL, "-K", port, "tx", "off")      # as containerlab does
+    except TopoError:
+        _run([IP, "link", "del", ta], timeout=30)
+        raise
     log("  veth %s:%s <-> %s:%s created" % (ca, pa, cb, pb))
 
 
@@ -751,8 +782,19 @@ def node_power(lab, node, op, save, log):
     if c is None:
         raise TopoError("%s has no container - start the lab first" % node)
     kind = _node_kind(doc, node)
-    running = c.get("state") == "running"
     cname = c["name"]
+    rc, st, _ = _run([DOCKER, "inspect", "-f", "{{.State.Status}}", cname], timeout=20)
+    st = st.strip()
+    if st == "paused":
+        # left frozen by an earlier start that did not finish: power it off cleanly
+        log("  %s was left frozen by an earlier attempt - stopping it first" % node)
+        _run([DOCKER, "unpause", cname], timeout=60)
+        _run([DOCKER, "stop", "-t", "2", cname], timeout=120)
+        st = "exited"
+        if op == "stop":
+            return
+        op = "start" if op == "restart" else op
+    running = st == "running"
     if op == "start" and running:
         raise TopoError("%s is already running" % node)
     if op == "stop" and not running:
