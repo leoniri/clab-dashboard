@@ -597,10 +597,7 @@ def _reset_disks(cname, kind, log):
 def restart_routers(lab, doc_after, nodes, log):
     """Restart routers so their VMs boot with every link in doc_after."""
     import devcfg
-    base = os.path.dirname(lab["path"])
-    links = _links(doc_after)
-    cn = {n: _cname(lab, n) for n in nodes}
-    # 1. save running configs and hand the startup file to the node dir
+    # 1. save running configs (a restart boots from the startup file)
     for n in nodes:
         try:
             r = devcfg.save_startup(lab, n)
@@ -609,27 +606,59 @@ def restart_routers(lab, doc_after, nodes, log):
             raise TopoError("saving %s's running config failed (%s) - nothing was restarted"
                             % (n, exc))
     _, _, doc_after = _load(lab)        # save_startup may have added startup-config lines
+    _hand_startup(lab, doc_after, nodes, log)
+    # 2. stop all, reset disks
     for n in nodes:
-        ncfg = doc_after["topology"]["nodes"][n]
-        rel = ncfg.get("startup-config")
+        _run([DOCKER, "stop", "-t", "10", _cname(lab, n)], timeout=120)
+        _reset_disks(_cname(lab, n), _node_kind(doc_after, n), log)
+    _boot_linked(lab, doc_after, nodes, log)
+
+
+def _hand_startup(lab, doc, nodes, log):
+    """Copy each vrnetlab node's startup file to where its launcher reads it."""
+    base = os.path.dirname(lab["path"])
+    for n in nodes:
+        rel = (doc["topology"]["nodes"].get(n) or {}).get("startup-config")
         dst = os.path.join(base, "clab-%s" % lab["name"], n, "config", "startup-config.cfg")
         if rel and os.path.isdir(os.path.dirname(dst)):
             shutil.copyfile(os.path.join(base, rel), dst)
             log("  %s: startup file handed to the node" % n)
-    # 2. stop all, reset disks
-    for n in nodes:
-        _run([DOCKER, "stop", "-t", "10", cn[n]], timeout=120)
-        _reset_disks(cn[n], _node_kind(doc_after, n), log)
-    # 3. start frozen
+
+
+def _exec_lines(doc, node):
+    """The topology's exec: lines for a node (node, else its kind, else defaults)."""
+    topo = doc.get("topology") or {}
+    ncfg = (topo.get("nodes") or {}).get(node) or {}
+    kcfg = (topo.get("kinds") or {}).get(_node_kind(doc, node)) or {}
+    for src in (ncfg, kcfg, topo.get("defaults") or {}):
+        if src.get("exec"):
+            return [str(x) for x in src["exec"]]
+    return []
+
+
+def _boot_linked(lab, doc, nodes, log):
+    """Start stopped nodes frozen, give them every link they have in doc, then
+    let them run. vrnetlab VMs see their NICs at boot; native containers get
+    the topology's exec: lines again (VRFs, MTUs, sysctls live in the netns
+    that went away with the stop)."""
+    links = _links(doc)
+    cn = {n: _cname(lab, n) for n in nodes}
+    # 1. start - a VM frozen, so its launcher sees every NIC at first boot
+    #    (clab cannot plumb a veth into a frozen native container, and
+    #    FRR / SR Linux / linux pick interfaces up whenever they appear)
+    vm = {n: _node_kind(doc, n) in ROUTERS for n in nodes}
     for n in nodes:
         rc, _, err = _run([DOCKER, "start", cn[n]], timeout=120)
         if rc != 0:
             raise TopoError("docker start %s: %s" % (cn[n], err.strip()))
-        _run([DOCKER, "pause", cn[n]], timeout=60)
-        log("  %s started and frozen while its links are created" % n)
-    # 4. every link of a restarted node
+        if vm[n]:
+            _run([DOCKER, "pause", cn[n]], timeout=60)
+            log("  %s started and frozen while its links are created" % n)
+        else:
+            log("  %s started" % n)
+    # 2. every link of a restarted node
     running = {c.get("short") for c in lab.get("containers") or [] if c.get("state") == "running"}
-    done = set()
+    done, renewed = set(), []
     for a, ai, b, bi, _ in links:
         if a not in nodes and b not in nodes:
             continue
@@ -643,12 +672,16 @@ def restart_routers(lab, doc_after, nodes, log):
             continue
         veth(_cname(lab, a), ai, _cname(lab, b), bi, log)
         for n, p in ((a, ai), (b, bi)):
-            if n not in nodes and _node_kind(doc_after, n) in ROUTERS:
+            if n not in nodes and _node_kind(doc, n) in ROUTERS:
                 rewire(_cname(lab, n), p, log)
-    # 5. dummies: fill gaps (XRd needs consecutive ports) and reach the
+            elif n not in nodes:
+                renewed.append((n, p))
+    # 3. dummies: fill gaps (XRd needs consecutive ports) and reach the
     #    interface count the launcher waits for
     for n in nodes:
-        kind = _node_kind(doc_after, n)
+        kind = _node_kind(doc, n)
+        if kind not in ROUTERS:
+            continue
         mine = sorted(port_num(p) for a, ai, b, bi, _ in links
                       for (x, p) in ((a, ai), (b, bi)) if x == n)
         rc, env, _ = _run([DOCKER, "inspect", "-f", "{{range .Config.Env}}{{println .}}{{end}}", cn[n]])
@@ -670,11 +703,78 @@ def restart_routers(lab, doc_after, nodes, log):
             _ns(cn[n], IP, "link", "set", "eth%d" % i, "up")
         if fill:
             log("  %s: placeholder interfaces %s" % (n, ", ".join("eth%d" % i for i in fill)))
-    # 6. go
+    # 4. go
     for n in nodes:
-        _run([DOCKER, "unpause", cn[n]], timeout=60)
-    log("  booting %s" % ", ".join(nodes))
-    wait_healthy([cn[n] for n in nodes], log)
+        if vm[n]:
+            _run([DOCKER, "unpause", cn[n]], timeout=60)
+    for n in nodes:
+        if _node_kind(doc, n) in ROUTERS:
+            continue
+        for cmd in _exec_lines(doc, n):
+            rc, out, err = _run([DOCKER, "exec", cn[n], "sh", "-c", cmd], timeout=60)
+            log("  %s: %s%s" % (n, cmd, "" if rc == 0 else "  (failed: %s)" % (err or out).strip()[:160]))
+    # the neighbour's end of each link is new too: its MTU, MPLS input and
+    # VRF membership came from its own exec: lines for that port
+    for n, p in renewed:
+        for cmd in _exec_lines(doc, n):
+            if re.search(r"(?<![\w-])%s(?![\w-])" % re.escape(p), cmd):
+                rc, out, err = _run([DOCKER, "exec", _cname(lab, n), "sh", "-c", cmd], timeout=60)
+                log("  %s: %s%s" % (n, cmd, "" if rc == 0 else "  (failed: %s)" % (err or out).strip()[:160]))
+    vms = [cn[n] for n in nodes if _node_kind(doc, n) in ROUTERS]
+    if vms:
+        log("  booting %s" % ", ".join(n for n in nodes if cn[n] in vms))
+        wait_healthy(vms, log)
+    for n in nodes:
+        if cn[n] not in vms:
+            log("  %s is running" % n)
+
+
+def node_power(lab, node, op, save, log):
+    """Stop, start or restart one node of a running lab.
+
+    stop     (save the running config,) power it off - its links go down on
+             the neighbours, as when a router fails
+    start    boot it from its startup config with all of its links
+    restart  (save,) stop, start
+
+    A vrnetlab router always boots fresh from its startup file (the launcher
+    cannot boot a previous run's disks), so unsaved changes are lost unless
+    save is set. Native containers keep their files; their netns is rebuilt.
+    """
+    import devcfg
+    if op not in ("stop", "start", "restart"):
+        raise TopoError("unknown operation %r" % op)
+    _, _, doc = _load(lab)
+    if node not in ((doc.get("topology") or {}).get("nodes") or {}):
+        raise TopoError("%s is not a node of this lab" % node)
+    c = _container(lab, node)
+    if c is None:
+        raise TopoError("%s has no container - start the lab first" % node)
+    kind = _node_kind(doc, node)
+    running = c.get("state") == "running"
+    cname = c["name"]
+    if op == "start" and running:
+        raise TopoError("%s is already running" % node)
+    if op == "stop" and not running:
+        raise TopoError("%s is not running" % node)
+    if op in ("stop", "restart") and running and save:
+        if devcfg.platform_of(kind, c.get("image")):
+            r = devcfg.save_startup(lab, node)
+            log("  %s: running config saved to %s" % (node, r["path"]))
+            _, _, doc = _load(lab)
+        else:
+            log("  %s: no running config to save on this kind" % node)
+    if op in ("stop", "restart") and running:
+        rc, _, err = _run([DOCKER, "stop", "-t", "10", cname], timeout=120)
+        if rc != 0:
+            raise TopoError("docker stop %s: %s" % (cname, err.strip()))
+        log("  %s stopped - its links are down on the neighbours" % node)
+    if op == "stop":
+        return
+    if kind in ROUTERS:
+        _hand_startup(lab, doc, [node], log)
+        _reset_disks(cname, kind, log)
+    _boot_linked(lab, doc, [node], log)
 
 
 # --------------------------------------------------------------------------

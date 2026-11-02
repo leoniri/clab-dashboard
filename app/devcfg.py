@@ -757,6 +757,74 @@ def write_startup(lab, node, platform, text, audit=None):
 # HTTP glue (server.py calls these)
 # --------------------------------------------------------------------------
 
+RELOAD_CMD = {"cisco_xe": "reload", "cisco_xr": "reload location all", "cisco_nxos": "reload"}
+
+
+def reload_os(lab, node, save, log, wait=900):
+    """Reload the router's own OS: the container and its links stay up.
+
+    save writes the running config on the device first (IOS-XE `write memory`,
+    NX-OS `copy running-config startup-config`; IOS-XR commits are already
+    persistent). Then answers the reload prompts and waits until the router
+    takes a login again.
+    """
+    import time
+    nent = next((n for n in lab.get("nodes") or [] if n.get("name") == node), None)
+    c = next((c for c in lab.get("containers") or [] if c.get("short") == node), None)
+    platform = platform_of((nent or {}).get("kind"), (nent or {}).get("image"))
+    if platform not in RELOAD_CMD:
+        raise DevError("an OS reload is available for IOS-XE, IOS-XR and NX-OS - use Restart for %s" % node)
+    if not c or c.get("state") != "running":
+        raise DevError("%s is not running" % node, 409)
+    conn = _connect(lab, node, c, platform, timeout=120)
+    try:
+        if save and platform == "cisco_xr":
+            log("  %s: IOS-XR keeps committed config across a reload - nothing to save" % node)
+        elif save:
+            out = conn.save_config()
+            log("  %s: running config saved on the router (%s)" % (
+                node, "write memory" if platform == "cisco_xe" else "copy running-config startup-config"))
+            if re.search(r"(error|fail|invalid)", out or "", re.I):
+                raise DevError("saving on %s failed: %s" % (node, out.strip()[-200:]))
+        log("  %s: %s" % (node, RELOAD_CMD[platform]))
+        out = conn.send_command_timing(RELOAD_CMD[platform], read_timeout=30)
+        for _ in range(4):
+            if re.search(r"Save\?|\[yes/no\]", out):
+                out = conn.send_command_timing("no", read_timeout=30)      # saved above, or not wanted
+            elif re.search(r"\(y/n\)|\[y/n\]", out):
+                out = conn.send_command_timing("y", read_timeout=30)
+            elif "[confirm]" in out:
+                out = conn.send_command_timing("\n", read_timeout=30)
+            else:
+                break
+        if re.search(r"(Invalid input|% ?Error|not allowed|denied)", out or "", re.I):
+            raise DevError("%s refused the reload: %s" % (node, out.strip()[-200:]))
+    except DevError:
+        raise
+    except Exception:                                   # noqa: BLE001
+        pass                    # the session dropping is the reload taking effect
+    finally:
+        try:
+            conn.disconnect()
+        except Exception:                               # noqa: BLE001
+            pass
+    log("  %s is reloading - waiting for it to take a login again" % node)
+    t0 = time.time()
+    time.sleep(45)              # do not log straight back into the old OS
+    last = 0
+    while time.time() - t0 < wait:
+        try:
+            _connect(lab, node, c, platform, timeout=30).disconnect()
+            log("  %s is back after %d s" % (node, time.time() - t0))
+            return
+        except Exception:                               # noqa: BLE001
+            if time.time() - last > 30:
+                log("  still booting ... %d s" % (time.time() - t0))
+                last = time.time()
+            time.sleep(15)
+    raise DevError("%s did not come back within %d s" % (node, wait))
+
+
 def _err(exc):
     status = getattr(exc, "status", 400)
     return status, {"error": str(exc)}

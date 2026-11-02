@@ -143,6 +143,7 @@ body{overflow:hidden}
 .nkv dt{color:var(--muted)} .nkv dd{margin:0;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nkv dd .q{color:var(--muted)}
 .nfoot{font:11px var(--font-sans);color:var(--muted);margin-top:12px}
+.te-modal label.ucheck{text-transform:none;letter-spacing:0;font:12.5px/1.4 var(--font-sans);color:var(--ink-2)}
 .node line.srdiv{stroke:var(--line);stroke-width:1}
 .node text.srm{font-family:var(--font-mono);font-size:10px;font-weight:500;fill:var(--ink);pointer-events:none}
 .node text.srs{font-family:var(--font-mono);font-size:8.5px;fill:var(--muted);pointer-events:none}
@@ -2869,10 +2870,16 @@ function renderNodePanel(box, n){
   box.appendChild(hd);
   if(!n.external && !n._new){
     var ar=el("div","nact");
-    var cli=UI.button("CLI","primary sm",function(){
-      openTerm(n); },"terminal");
-    cli.disabled=!running; cli.title=running?"open a CLI session to "+n.name:"the node has to be running";
-    ar.appendChild(cli);
+    if(n.container && !running){
+      // a node stopped on its own (or from here): start it back with its links
+      var sb=UI.button("Start","primary sm",function(){ nodePower(n, "start"); },"play");
+      sb.title="boot "+n.name+" from its startup config and recreate its links"; ar.appendChild(sb);
+    } else {
+      var cli=UI.button("CLI","primary sm",function(){
+        openTerm(n); },"terminal");
+      cli.disabled=!running; cli.title=running?"open a CLI session to "+n.name:"the node has to be running";
+      ar.appendChild(cli);
+    }
     if(canConfigure(n) && window.DeviceConfig){
       var cfg=UI.button("Configure","sm",function(){ DeviceConfig.open(lab, n.name); },"gear");
       cfg.disabled=!running; cfg.title=running?"running config, push configuration, save to startup":"the node has to be running";
@@ -2887,7 +2894,15 @@ function renderNodePanel(box, n){
       {label:"CLI in a new tab", icon:"external", disabled:!running,
        href: running ? UI.term.url(n.container.name) : undefined, target:"_blank"},
       canConfigure(n) ? {label:"Show running config", icon:"file", disabled:!running,
-       onClick:function(){ DeviceConfig.open(lab, n.name, {tab:"running"}); }} : null
+       onClick:function(){ DeviceConfig.open(lab, n.name, {tab:"running"}); }} : null,
+      n.container ? {head:"Power"} : null,
+      n.container && running ? {label:"Restart router", icon:"redo", hint:"power cycle",
+       onClick:function(){ nodePower(n, "restart"); }} : null,
+      n.container && running && canReload(n) ? {label:"Reload OS", icon:"redo", hint:"links stay up",
+       onClick:function(){ nodePower(n, "reload"); }} : null,
+      n.container && running ? {label:"Stop router", icon:"stop", danger:true,
+       onClick:function(){ nodePower(n, "stop"); }} : null,
+      n.container && !running ? {label:"Start router", icon:"play", onClick:function(){ nodePower(n, "start"); }} : null
     ]; }, "more actions", "sm more"));
     box.appendChild(ar);
   }
@@ -3650,6 +3665,57 @@ function saveLab(thenStop){
       finish();
     });
   }).catch(function(e){ log.textContent=e.message; finish(); });
+}
+
+// ---------- one node: stop / start / restart / reload ----------
+function canReload(n){ return /^cisco_(c8000v|csr1000v|xrd_vrouter|n9kv)$/.test(n.kind); }
+function isVmKind(n){ return /^cisco_(c8000v|csr1000v|xrd_vrouter|n9kv)$/.test(n.kind); }
+function nodePower(n, op){
+  var nl=links.filter(function(l){ return l.a===n.name || l.b===n.name; }).length;
+  var vm=isVmKind(n), xr=n.kind==="cisco_xrd_vrouter";
+  var T={
+    stop:{title:"Stop "+n.name, go:"Stop router", danger:true,
+      what:"Powers "+n.name+" off. Its "+nl+" link"+(nl===1?"":"s")+" go down on the neighbours, as if the router failed - "
+          +"the IGP and BGP react to it. It stays off until you start it here.",
+      save:"Save the running config first, so the next start boots from it"},
+    start:{title:"Start "+n.name, go:"Start router",
+      what:"Boots "+n.name+" from its startup config and recreates its "+nl+" link"+(nl===1?"":"s")+"."
+          +(vm ? " A "+kindLabel(n)+" VM takes about "+(xr?"3":"2")+" minutes to boot." : "")},
+    restart:{title:"Restart "+n.name, go:"Restart router",
+      what:"Powers "+n.name+" off and boots it again with all of its links. Its neighbours see the links go down and come back."
+          +(vm ? " The VM boots fresh from its startup config (about "+(xr?"3":"2")+" minutes)." : ""),
+      save:"Save the running config first, so it comes back with the current config"},
+    reload:{title:"Reload "+n.name, go:"Reload OS",
+      what:"Reloads the router's own OS: the container and its links stay up, the router reboots from the config it has saved itself.",
+      save: xr ? null : "Save the running config on the router first ("+(n.kind==="cisco_n9kv"?"copy running-config startup-config":"write memory")+")",
+      note: xr ? "IOS-XR keeps committed config across a reload - nothing to save." : null}
+  }[op];
+  var m=modal(T.title);
+  m.body.appendChild(el("p","te-note",T.what));
+  var sv=null;
+  if(T.save){
+    var w=el("label","ucheck"); sv=el("input"); sv.type="checkbox"; sv.checked=true;
+    w.appendChild(sv); w.appendChild(document.createTextNode(T.save)); m.body.appendChild(w);
+    if(vm && op!=="reload") m.body.appendChild(el("p","hint","Without it, changes since the last save are lost: the router boots from its startup config."));
+  }
+  if(T.note) m.body.appendChild(el("p","hint",T.note));
+  m.foot.appendChild(btn("Cancel","",m.close));
+  m.foot.appendChild(btn(T.go, T.danger?"danger":"primary", function(){
+    m.body.textContent=""; m.foot.textContent=""; m.scrim.dataset.locked="1";
+    var log=el("div","jlog","starting…"); m.body.appendChild(log);
+    function finish(){ delete m.scrim.dataset.locked; m.foot.appendChild(btn("Close","primary",m.close)); }
+    post("api/node",{lab_id:lab.id, node:n.name, op:op, save:!!(sv && sv.checked)}).then(function(j){
+      log.textContent="";
+      followJob(j.job_id, log, function(res){
+        log.appendChild(el("div", res.rc===0?"ok":"err", res.rc===0
+          ? {stop:n.name+" is stopped.", start:n.name+" is running again.", restart:n.name+" is running again.",
+             reload:n.name+" has reloaded."}[op]
+          : "The "+op+" did not complete - see the log above."));
+        log.scrollTop=log.scrollHeight;
+        finish(); pollLive(true);
+      });
+    }).catch(function(e){ log.textContent=e.message; finish(); });
+  }));
 }
 
 // ---------- snapshots ----------

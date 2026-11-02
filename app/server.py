@@ -2435,7 +2435,39 @@ def _capture_post(handler, p):
     return 400, {"error": "unknown op"}
 
 
+NODE_OPS = {"stop": "stop", "start": "start", "restart": "restart", "reload": "reload the OS of"}
+
+
+def _node_post(handler, p):
+    """Stop / start / restart one node, or reload its OS - as a job."""
+    lab = COLLECTOR.index().get(p.get("lab_id"))
+    if lab is None:
+        return 404, {"error": "unknown lab id"}
+    node, op, save = p.get("node"), p.get("op"), bool(p.get("save"))
+    if op not in NODE_OPS:
+        return 400, {"error": "op must be one of %s" % ", ".join(NODE_OPS)}
+    if not any(n.get("name") == node for n in lab.get("nodes") or []):
+        return 404, {"error": "%s is not a node of this lab" % node}
+    if not lab.get("containers"):
+        return 409, {"error": "the lab is not deployed"}
+    lid = lab["id"]
+    fresh = lambda: COLLECTOR.index().get(lid) or lab       # noqa: E731
+
+    def run(log):
+        if op == "reload":
+            devcfg.reload_os(fresh(), node, save, log)
+        else:
+            topoedit.node_power(fresh(), node, op, save, log)
+    label = "%s %s%s" % (NODE_OPS[op], node, " (save the running config first)" if save else "")
+    audit("REQUEST node-%s lab=%s node=%s save=%s from=%s" % (op, lab.get("name"), node, save, handler._who()))
+    job, err = JOBS.start(lab, "node-" + op, [(label, run)])
+    if job is None:
+        return 409, {"error": err}
+    return 200, {"job_id": job.id}
+
+
 MANAGE_POST = {
+    "/api/node": _node_post,
     "/api/trace": _trace_post,
     "/api/guide/run": _guide_run_post,
     "/api/convergence": _conv_post,
