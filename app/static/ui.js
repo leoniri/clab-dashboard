@@ -651,7 +651,7 @@ function dock(){
   var tabsEl = el("div", "ttabs"), lay = el("div", "tlay"), right = el("div", "tlay");
   tabsEl.setAttribute("role", "tablist");
   TD = {el:d, tabs:tabsEl, count:cnt, lay:lay, stage:el("div", "tstage"),
-        sessions:[], slots:[null], layout:"1", manual:false, focus:0, mode:"open"};
+        sessions:[], slots:[null], layout:"1", manual:false, focus:0, mode:"open", split:{x:.5, y:.5}};
   ["1", "2v", "2h", "4"].forEach(function(k){
     var b = tib("lay" + k, "layout: " + LAYOUT_NAMES[k], function(){ setLayout(k, true); });
     b.dataset.layout = k; lay.appendChild(b);
@@ -686,12 +686,12 @@ function startResize(e){
   var grip = e.currentTarget, root = document.documentElement;
   var below = innerHeight - TD.el.getBoundingClientRect().bottom;
   try { grip.setPointerCapture(e.pointerId); } catch (x) {}
-  root.classList.add("tdock-drag");                    // iframes would swallow the moves
+  root.classList.add("tdock-drag", "tdock-drag-y");    // iframes would swallow the moves
   function move(ev){
     TD.el.style.height = Math.max(140, Math.min(innerHeight - 60, innerHeight - below - ev.clientY)) + "px";
   }
   function up(){
-    root.classList.remove("tdock-drag");
+    root.classList.remove("tdock-drag", "tdock-drag-y");
     grip.removeEventListener("pointermove", move); grip.removeEventListener("pointerup", up);
     try { localStorage.setItem(TERM_H, parseInt(TD.el.style.height, 10)); } catch (x) {}
   }
@@ -901,12 +901,50 @@ function drop(i){
   TD.slots[i] = id; TD.focus = i;
   render(); focusPane(i);
 }
+// Pane sizes: split.x is the left column's share of the width, split.y the
+// top row's share of the height. Dragging a splitter only changes the grid
+// tracks, so the sessions stay up; each ttyd refits to its new size.
+function tracks(){
+  var L = LAYOUTS[TD.layout];
+  function t(n, f){ return n > 1 ? "minmax(0, " + f + "fr) minmax(0, " + (1 - f) + "fr)" : "minmax(0, 1fr)"; }
+  TD.stage.style.gridTemplateColumns = t(L.c, TD.split.x);
+  TD.stage.style.gridTemplateRows = t(Math.ceil(L.n / L.c), TD.split.y);
+  TD.stage.querySelectorAll(".tsplit").forEach(function(g){
+    g.style[g.dataset.axis === "x" ? "left" : "top"] = "calc(" + (TD.split[g.dataset.axis] * 100) + "% - 4px)";
+  });
+}
+function splitter(axis){
+  var g = el("div", "tsplit " + axis);
+  g.dataset.axis = axis;
+  g.title = "drag to resize the panes " + (axis === "x" ? "left / right" : "up / down") + " - double-click for equal sizes";
+  g.addEventListener("pointerdown", function(e){
+    e.preventDefault();
+    var root = document.documentElement, r = TD.stage.getBoundingClientRect(), raf = 0;
+    var min = Math.min(.45, (axis === "x" ? 200 / r.width : 80 / r.height));
+    try { g.setPointerCapture(e.pointerId); } catch (x) {}
+    root.classList.add("tdock-drag", "tdock-drag-" + axis); g.classList.add("on");
+    function move(ev){
+      var v = axis === "x" ? (ev.clientX - r.left) / r.width : (ev.clientY - r.top) / r.height;
+      TD.split[axis] = Math.max(min, Math.min(1 - min, v));
+      if (!raf) raf = requestAnimationFrame(function(){ raf = 0; tracks(); });
+    }
+    function up(){
+      root.classList.remove("tdock-drag", "tdock-drag-" + axis); g.classList.remove("on");
+      g.removeEventListener("pointermove", move); g.removeEventListener("pointerup", up);
+      tracks(); save();
+    }
+    g.addEventListener("pointermove", move); g.addEventListener("pointerup", up);
+  });
+  g.addEventListener("dblclick", function(){ TD.split[axis] = .5; tracks(); save(); });
+  return g;
+}
 function render(){
   if (!TD) return;
   var L = LAYOUTS[TD.layout], shown = 0;
-  TD.stage.style.gridTemplateColumns = "repeat(" + L.c + ", minmax(0, 1fr))";
-  TD.stage.style.gridTemplateRows = "repeat(" + Math.ceil(L.n / L.c) + ", minmax(0, 1fr))";
-  TD.stage.querySelectorAll(".tempty").forEach(function(x){ x.remove(); });
+  TD.stage.querySelectorAll(".tempty,.tsplit").forEach(function(x){ x.remove(); });
+  if (L.c > 1) TD.stage.appendChild(splitter("x"));
+  if (L.n > L.c) TD.stage.appendChild(splitter("y"));
+  tracks();
   function at(node, i){ node.style.gridRow = String(Math.floor(i / L.c) + 1); node.style.gridColumn = String(i % L.c + 1); }
   TD.sessions.forEach(function(s){
     var i = TD.slots.indexOf(s.id);
@@ -954,7 +992,7 @@ function save(){
     sessionStorage.setItem(TERM_KEY, JSON.stringify({
       sessions: TD.sessions.map(function(s){ return {c:s.c, name:s.name, lab:s.lab, meta:s.meta, font:s.font}; }),
       slots: TD.slots.map(function(id){ return TD.sessions.indexOf(byId(id)); }),
-      layout: TD.layout, manual: TD.manual, focus: TD.focus, mode: TD.mode}));
+      layout: TD.layout, manual: TD.manual, focus: TD.focus, mode: TD.mode, split: TD.split}));
   } catch (e) {}
 }
 // Back on another page: same tabs and layout, the visible panes log in again,
@@ -965,6 +1003,7 @@ function restore(){
   if (!st || !Array.isArray(st.sessions) || !st.sessions.length) return;
   var made = st.sessions.map(function(x){ return add(x, false); });
   TD.manual = !!st.manual;
+  ["x", "y"].forEach(function(a){ var v = st.split && +st.split[a]; if (v > .05 && v < .95) TD.split[a] = v; });
   resize(LAYOUTS[st.layout] ? st.layout : "1");
   TD.slots = TD.slots.map(function(_, i){ var k = (st.slots || [])[i]; return made[k] ? made[k].id : null; });
   TD.focus = Math.min(Math.max(0, st.focus | 0), TD.slots.length - 1);
