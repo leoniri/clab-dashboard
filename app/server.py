@@ -1281,7 +1281,7 @@ class Handler(BaseHTTPRequestHandler):
                 LINKS.status(lab)             # forgets failures of a stopped lab
                 self._json({"running": False, "links": {}, "nodes": {}, "bgp_edges": []})
             else:
-                body = LIVE.get(lab["id"])
+                body = LIVE.get(lab["id"], sr=q.get("sr") == "1")
                 body["running"] = True
                 self._json(body)
         elif u.path == "/api/snapshots" or u.path.startswith("/api/snapshots/"):

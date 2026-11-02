@@ -101,6 +101,17 @@ body{overflow:hidden}
 .node.sel text.nm{fill:var(--accent-ink)}
 .node text.ip{font-family:var(--font-mono);font-size:9.5px;fill:var(--muted);pointer-events:none}
 .node circle.st{stroke:var(--canvas);stroke-width:2.5}
+/* addressing and SIDs in the name card: a hairline, then one row per fact */
+.srh{margin:14px 0 6px;font:600 10px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.kv dd.mono{font-family:var(--font-mono);white-space:pre-line}
+.node line.srdiv{stroke:var(--line);stroke-width:1}
+.node text.srm{font-family:var(--font-mono);font-size:10px;font-weight:500;fill:var(--ink);pointer-events:none}
+.node text.srs{font-family:var(--font-mono);font-size:8.5px;fill:var(--muted);pointer-events:none}
+.srk.lo{fill:var(--sr-lo)} .srk.mpls{fill:var(--sr-mpls)} .srk.srv6{fill:var(--srv6)}
+.ifp rect.sidseg.mpls{fill:color-mix(in srgb,var(--sr-mpls) 16%,var(--surface));stroke:none}
+.ifp rect.sidseg.srv6{fill:color-mix(in srgb,var(--srv6) 16%,var(--surface));stroke:none}
+.ifp text.sid{font-weight:600}
+.ifp text.sid.mpls{fill:var(--sr-mpls)} .ifp text.sid.srv6{fill:var(--srv6)}
 
 /* ---------- path trace ----------
    Hairline by design: off-path elements step back; the path is a 1.4 px line
@@ -619,6 +630,12 @@ var guide = {open:false, data:null, readme:null, loaded:false, tab:"checks", res
 // live protocol state (api/live), polled while the lab runs and "live" is on
 var live = {on:false, data:null, timer:null};
 var showRate = false, showBgp = false;
+// addressing and SID layers, read from the routers by the live poller (?sr=1)
+var srv = {lo:false, loc:false, psid:false, adj:false};
+try{ Object.keys(srv).forEach(function(k){ srv[k] = localStorage.getItem("clabd-sr-"+k) === "1"; }); }catch(e){}
+function srOn(){ return srv.lo || srv.loc || srv.psid || srv.adj; }
+function srWanted(){ return srOn() || insTab.node==="sr"; }
+function srOf(n){ var d=live.on && live.data && live.data.nodes && live.data.nodes[n.name]; return d && d.sr || null; }
 try{ live.on = localStorage.getItem("clabd-live") !== "0";
      showRate = localStorage.getItem("clabd-rate") === "1";
      showBgp = localStorage.getItem("clabd-bgp") === "1"; }catch(e){}
@@ -676,9 +693,75 @@ function ifInfo(node, ifn){
 // ---------- node geometry ----------
 function nodeBox(n){
   // label block under the icon, used both to draw it and to clip links
-  var ip = nodeIp(n);
-  var bw = Math.max(n.name.length*CHAR_W, ip.length*IP_CHAR_W) + 12, bh = ip ? 31 : 18;
-  return {bw:bw, bh:bh, w:bw*LS, top:R_ICON+1, bottom:R_ICON+1+bh*LS};
+  var ip = nodeIp(n), rows = srRows(n);
+  var bw = Math.max(n.name.length*CHAR_W, ip.length*IP_CHAR_W) + 12, bh = ip ? 31 : 18, base = bh;
+  rows.forEach(function(r){ bw = Math.max(bw, 38 + r.m.length*6.3 + r.s.length*5.4); });
+  if(rows.length) bh += 6 + rows.length*14;
+  return {bw:bw, bh:bh, w:bw*LS, top:R_ICON+1, bottom:R_ICON+1+bh*LS, rows:rows, base:base};
+}
+// at most two rows of each kind on the map; the rest are counted, and all of
+// it is in the tooltip and the node panel
+function srRows(n){
+  var f=srOf(n), rows=[]; if(!f) return rows;
+  function add(list, k, m, sub){
+    list.slice(0,2).forEach(function(x, i){
+      var r={k:k, m:m(x), s:sub(x)};
+      if(i===1 && list.length>2) r.s += "  +"+(list.length-2);
+      rows.push(r);
+    });
+  }
+  if(srv.lo){
+    var lo=(f.loopbacks||[])[0];
+    if(lo) add(lo.v4.concat(lo.v6), "lo", function(a){ return a; },
+               function(){ return shortIf(lo.name) + ((f.loopbacks||[]).length>1 ? " +"+(f.loopbacks.length-1)+" lo" : ""); });
+  }
+  if(srv.psid) add(f.prefix_sids||[], "mpls", function(p){ return String(p.label); },
+                   function(p){ return (p.index!=null ? "idx "+p.index : "absolute") + (p.algo ? " · FA"+p.algo : ""); });
+  if(srv.loc) add(f.locators||[], "srv6", function(l){ return l.prefix; },
+                  function(l){ return l.name + (l.algo ? " · FA"+l.algo : "") + (l.up===false ? " · down" : ""); });
+  return rows;
+}
+function srTip(n){
+  var f=srOf(n); if(!f) return "";
+  var t=[];
+  (f.loopbacks||[]).forEach(function(l){ t.push(l.name+"  "+l.v4.concat(l.v6).join("  ")); });
+  if(f.srgb) t.push("SRGB  "+f.srgb[0]+"–"+f.srgb[1]);
+  (f.prefix_sids||[]).forEach(function(p){ t.push("Prefix-SID  "+p.prefix+"  "+p.label+(p.index!=null?" (index "+p.index+")":"")+(p.algo?"  algo "+p.algo:"")); });
+  (f.locators||[]).forEach(function(l){ t.push("Locator "+l.name+"  "+l.prefix+(l.algo?"  algo "+l.algo:"")+(l.usid?"  uN "+l.usid:"")); });
+  return t.join("\n");
+}
+// the part of an SRv6 SID after its locator: fc00:1:1:e000:: in fc00:1:1::/48 -> e000
+function expand6(a){
+  var h=String(a).split("::"), L=h[0]?h[0].split(":"):[], R=h.length>1&&h[1]?h[1].split(":"):[];
+  var g=L.concat(Array(Math.max(0,8-L.length-R.length)).fill("0"), R);
+  return g.map(function(x){ return parseInt(x||"0",16)||0; });
+}
+function sidShort(sid, locs){
+  var g=expand6(sid), plen=48;
+  (locs||[]).forEach(function(l){
+    var p=l.prefix.split("/"), lg=expand6(p[0]), n=Math.floor(+p[1]/16);
+    if(lg.slice(0,n).join()===g.slice(0,n).join()) plen=+p[1];
+  });
+  var rest=g.slice(Math.floor(plen/16));
+  while(rest.length && !rest[rest.length-1]) rest.pop();
+  return rest.length ? rest.map(function(x){ return x.toString(16); }).join(":") : "::";
+}
+// the adjacency SIDs at one end of a link, as pill text
+function adjInfo(node, list){
+  if(!srv.adj || !list || !list.length) return null;
+  // the data plane whose layer is on comes first (SRv6 when locators are shown
+  // without prefix-SIDs), then protected SIDs
+  var f=srOf(node)||{}, v6first=srv.loc && !srv.psid;
+  var sorted=list.slice().sort(function(a,b){
+    var ta=(a.type==="srv6")===v6first?0:1, tb=(b.type==="srv6")===v6first?0:1;
+    return ta-tb || (b.protected?1:0)-(a.protected?1:0);
+  });
+  var a=sorted[0];
+  var txt = a.type==="srv6" ? (a.behavior||"uA")+" "+sidShort(a.sid, f.locators) : String(a.label);
+  if(sorted.length>1) txt += " +"+(sorted.length-1);
+  return {txt:txt, kind:a.type==="srv6"?"srv6":"mpls",
+          tip:sorted.map(function(x){ return "Adj-SID  "+(x.type==="srv6" ? (x.behavior||"uA")+" "+x.sid+(x.algo?"  algo "+x.algo:"")
+                                                         : x.label+(x.protected?"  protected":"")+(x.proto?"  "+x.proto:"")); }).join("\n")};
 }
 function inside(n, px, py){
   var dx=px-n.x, dy=py-n.y;
@@ -917,7 +1000,10 @@ function hits(q){
   }
   return false;
 }
-function pillW(info){ return (info.short.length*5.9+10)*LS; }
+function pillParts(info){
+  return {wn: info.short ? info.short.length*5.9+10 : 0, ws: info.sid ? info.sid.txt.length*5.9+10 : 0};
+}
+function pillW(info){ var p=pillParts(info); return (p.wn+p.ws)*LS; }
 function tangentAng(c,t){
   var dx=2*(1-t)*(c.p1.x-c.p0.x)+2*t*(c.p2.x-c.p1.x);
   var dy=2*(1-t)*(c.p1.y-c.p0.y)+2*t*(c.p2.y-c.p1.y);
@@ -959,11 +1045,22 @@ function ifPill(parent, pos, info){
   var w=pillW(info)/LS, h=14;
   var g=svgEl("g",{class:"ifp",
     transform:"translate("+pos.x.toFixed(1)+","+pos.y.toFixed(1)+") rotate("+(pos.ang*180/Math.PI).toFixed(1)+") scale("+LS.toFixed(3)+")"});
+  var pp=pillParts(info);
   g.appendChild(svgEl("rect",{x:-w/2, y:-h/2, width:w, height:h, rx:7}));
-  var t=svgEl("text",{x:0, y:3.4, "text-anchor":"middle"}); t.textContent=info.short;
-  g.appendChild(t);
+  if(info.sid){
+    // the SID sits in its own tinted end of the pill
+    g.appendChild(svgEl("rect",{class:"sidseg "+info.sid.kind, x:-w/2+pp.wn+(pp.wn?0:1.5), y:-h/2+1.5,
+                                 width:pp.ws-(pp.wn?1.5:3), height:h-3, rx:5.5}));
+    var st_=svgEl("text",{class:"sid "+info.sid.kind, x:-w/2+pp.wn+pp.ws/2-(pp.wn?.75:0), y:3.4, "text-anchor":"middle"});
+    st_.textContent=info.sid.txt; g.appendChild(st_);
+  }
+  if(info.short){
+    var t=svgEl("text",{x:-w/2+pp.wn/2, y:3.4, "text-anchor":"middle"}); t.textContent=info.short;
+    g.appendChild(t);
+  }
   var tt=svgEl("title",{});
-  tt.textContent = info.full + (info.raw && info.raw!==info.full ? "  (clab " + info.raw + ")" : "");
+  tt.textContent = info.full + (info.raw && info.raw!==info.full ? "  (clab " + info.raw + ")" : "")
+    + (info.sid ? "\n" + info.sid.tip : "");
   g.appendChild(tt);
   parent.appendChild(g);
 }
@@ -1068,13 +1165,16 @@ function render(){
           obstacles.push(box(mid.x-10,mid.y-10,mid.x+10,mid.y+10));
         }
       }
-      if(showIfs || hi || isSel){
-        // pills just outside each end, on the curve
+      var adjs = srv.adj && lv && lv.d.adj;
+      if(showIfs || hi || isSel || adjs){
+        // pills just outside each end, on the curve: interface name, adjacency SID or both
         var aIsA = l.a===A.name;
         var infA=ifInfo(A, aIsA?l.a_if:l.b_if), infB=ifInfo(B, aIsA?l.b_if:l.a_if);
         var force = hi || isSel, pp;
-        if(infA.short && (pp=placePill(c,t0,t1,infA,force))) ifPill(g, pp, infA);
-        if(infB.short && (pp=placePill(c,t1,t0,infB,force))) ifPill(g, pp, infB);
+        if(!(showIfs || hi || isSel)){ infA.short=""; infB.short=""; }
+        if(adjs){ infA.sid=adjInfo(A, adjs[aIsA?"a":"b"]); infB.sid=adjInfo(B, adjs[aIsA?"b":"a"]); }
+        if((infA.short||infA.sid) && (pp=placePill(c,t0,t1,infA,force))) ifPill(g, pp, infA);
+        if((infB.short||infB.sid) && (pp=placePill(c,t1,t0,infB,force))) ifPill(g, pp, infB);
       }
       g.addEventListener("pointerdown",function(ev){ ev.stopPropagation(); });
       g.addEventListener("click",function(ev){
@@ -1137,6 +1237,16 @@ function render(){
     if(ip){
       var ipt=svgEl("text",{class:"ip",x:0,y:26,"text-anchor":"middle"});
       ipt.textContent=ip; lbl.appendChild(ipt);
+    }
+    if(b.rows.length){
+      lbl.appendChild(svgEl("line",{class:"srdiv",x1:-b.bw/2+6,x2:b.bw/2-6,y1:b.base+2.5,y2:b.base+2.5}));
+      b.rows.forEach(function(r,i){
+        var cy=b.base+6+i*14+7;
+        lbl.appendChild(svgEl("circle",{class:"srk "+r.k,cx:-b.bw/2+10,cy:cy,r:2.6}));
+        var tm=svgEl("text",{class:"srm",x:-b.bw/2+17,y:cy+3.4}); tm.textContent=r.m; lbl.appendChild(tm);
+        var ts=svgEl("text",{class:"srs",x:b.bw/2-7,y:cy+3,"text-anchor":"end"}); ts.textContent=r.s; lbl.appendChild(ts);
+      });
+      var tip=svgEl("title",{}); tip.textContent=n.name+"\n"+srTip(n); lbl.appendChild(tip);
     }
     g.appendChild(lbl);
     if(!n.external && !isRouter) g.appendChild(svgEl("circle",{class:"st",cx:23,cy:-15,r:6,fill:st.color}));
@@ -2481,7 +2591,7 @@ function pollLive(now){
     if(live.data){ live.data=null; render(); }
     live.timer=setTimeout(pollLive, 3000); return;
   }
-  fetch("api/live?lab="+encodeURIComponent(labId),{cache:"no-store"})
+  fetch("api/live?lab="+encodeURIComponent(labId)+(srWanted()?"&sr=1":""),{cache:"no-store"})
     .then(function(r){ return r.json(); })
     .then(function(j){ live.data=j; if(!drag) render(); })
     .catch(function(){})
@@ -2568,6 +2678,42 @@ function kindLabel(n){
   return {cisco_c8000v:"IOS-XE · c8000v", cisco_csr1000v:"IOS-XE · csr1000v", cisco_xrd_vrouter:"IOS-XR · XRd",
           cisco_n9kv:"NX-OS · n9kv", nokia_srlinux:"SR Linux", linux:"Linux"}[n.kind] || n.kind;
 }
+// everything the map card summarises, in full
+function renderNodeSr(box, n, mine){
+  var f=srOf(n);
+  if(!live.on || !f){
+    box.appendChild(el("p","hint", live.on ? "Reading addresses and SIDs from "+n.name+" - this takes a few seconds."
+                                           : "Switch on live state (View) to read addresses and SIDs from the router."));
+    if(!live.on){ var b=UI.button("Switch on live state","",function(){ setLive(true); renderInspector(true); },"pulse"); box.appendChild(b); }
+    return;
+  }
+  function section(title, rows, empty){
+    var sec=el("div","sec"); sec.appendChild(el("h4","srh",title));
+    if(!rows.length){ sec.appendChild(el("p","hint",empty)); box.appendChild(sec); return; }
+    var dl=el("dl","kv");
+    rows.forEach(function(r){ dl.appendChild(el("dt",null,r[0])); var dd=el("dd","mono",r[1]); if(r[2]) dd.title=r[2]; dl.appendChild(dd); });
+    sec.appendChild(dl); box.appendChild(sec);
+  }
+  section("Loopbacks", (f.loopbacks||[]).map(function(l){ return [l.name, l.v4.concat(l.v6).join("\n")]; }), "no loopback addresses");
+  var ps=(f.prefix_sids||[]).map(function(p){ return [p.prefix, p.label+(p.index!=null?"  index "+p.index:"")+(p.algo?"  algo "+p.algo:"")]; });
+  if(f.srgb) ps.unshift(["SRGB", f.srgb[0]+" – "+f.srgb[1]]);
+  section("SR-MPLS prefix-SIDs", ps, "none configured");
+  section("SRv6 locators", (f.locators||[]).map(function(l){
+    return [l.name, l.prefix+(l.algo?"  algo "+l.algo:"")+(l.usid?"\nuN "+l.usid:"")+(l.up===false?"\ndown":"")]; }), "none configured");
+  var adj=[];
+  mine.forEach(function(l){
+    var side=l.a===n.name?"a":"b", far=side==="a"?l.b:l.a, lv=liveOf(l);
+    var list=(lv && lv.d && lv.d.adj && lv.d.adj[side]) || [];
+    list.forEach(function(a){
+      adj.push([ifInfo(n, l[side+"_if"]).short+" → "+far,
+                a.type==="srv6" ? (a.behavior||"uA")+" "+a.sid+(a.algo?"  algo "+a.algo:"")
+                                : a.label+(a.protected?"  protected":"")+(a.proto?"  "+a.proto:"")]);
+    });
+  });
+  section("Adjacency-SIDs", adj, "none on this router's links");
+  box.appendChild(el("p","hint","Read from the router about once a minute while this tab or a View layer is on."));
+}
+
 function renderNodePanel(box, n){
   var st=statusOf(n), type=NodeIcons.classify(n);
   var running = n.container && n.container.state==="running";
@@ -2605,10 +2751,12 @@ function renderNodePanel(box, n){
   var gchecks=((guide.data&&guide.data.checks)||[]).filter(function(c){ return c.node===n.name; });
   if(!n.external && (guideRole(n.name) || gchecks.length)) tl.push({id:"guide",label:"Guide",n:gchecks.length||null});
   if(!n.external && canConfigure(n)) tl.push({id:"proto",label:"Protocols"});
+  if(!n.external && running && canConfigure(n)) tl.push({id:"sr",label:"Addressing & SIDs"});
   tl.push({id:"links",label:"Links",n:mine.length});
   if(!tl.some(function(t){ return t.id===insTab.node; })) insTab.node="overview";
   UI.tabs(box, tl, insTab.node, function(id){ insTab.node=id; renderInspector(true); });
   if(insTab.node==="proto"){ renderNodeProto(box, n); return; }
+  if(insTab.node==="sr"){ renderNodeSr(box, n, mine); return; }
   if(insTab.node==="guide"){ renderNodeGuide(box, n); return; }
   if(insTab.node==="links"){
     var byName={}; nodes.forEach(function(x){ byName[x.name]=x; });
@@ -2732,6 +2880,15 @@ function renderLegend(){
     var d=el("div"); var i=el("i"); i.style.background=p[0];
     d.appendChild(i); d.appendChild(document.createTextNode(p[1])); L.appendChild(d);
   });
+  if(srOn()){
+    L.appendChild(el("div","sep"));
+    [[srv.lo,"var(--sr-lo)","loopback address"],[srv.psid||srv.adj,"var(--sr-mpls)","MPLS label (SR-MPLS)"],
+     [srv.loc||srv.adj,"var(--srv6)","SRv6 locator / SID"]].forEach(function(p){
+      if(!p[0]) return;
+      var d=el("div"); var i=el("i"); i.style.background=p[1];
+      d.appendChild(i); d.appendChild(document.createTextNode(p[2])); L.appendChild(d);
+    });
+  }
 }
 
 // ---------- interaction ----------
@@ -2815,6 +2972,11 @@ $("t_view").addEventListener("click",function(){
     {label:"Adjacency colours", checked:live.on, onClick:function(v){ setLive(v); }},
     {label:"Traffic on links", checked:showRate, onClick:setRate},
     {label:"BGP sessions", checked:showBgp, onClick:setBgp},
+    {head:"Addresses and SIDs"+(running?"":" (lab not running)")},
+    {label:"Loopback addresses", checked:srv.lo, onClick:function(v){ setSr("lo",v); }},
+    {label:"SRv6 locators", checked:srv.loc, onClick:function(v){ setSr("loc",v); }},
+    {label:"Prefix-SIDs", hint:"SR-MPLS", checked:srv.psid, onClick:function(v){ setSr("psid",v); }},
+    {label:"Adjacency-SIDs", hint:"on link ends", checked:srv.adj, onClick:function(v){ setSr("adj",v); }},
     {sep:1},
     {label:"Legend", checked:showLegend, onClick:setLegend}
   ], {align:"left", focus:false});
@@ -2822,6 +2984,14 @@ $("t_view").addEventListener("click",function(){
 function setIfs(v){ showIfs=v; store("clabd-topo-ifs",v); render(); }
 function setRate(v){ showRate=v; store("clabd-rate",v); if(v && !live.on) setLive(true); render(); }
 function setBgp(v){ showBgp=v; store("clabd-bgp",v); if(v && !live.on) setLive(true); render(); }
+function setSr(k,v){
+  srv[k]=v; store("clabd-sr-"+k,v);
+  if(v && !live.on) setLive(true);
+  else if(v) pollLive(true);
+  if(v && lab && lab.running && !(live.data && live.data.sr_ready))
+    UI.toast("Reading addresses and SIDs from the routers - this takes a few seconds.", "info", 4000);
+  renderLegend(); render();
+}
 function setLegend(v){ showLegend=v; store("clabd-legend",v); renderLegend(); }
 // zoom around the middle of the stage, not the world origin
 function zoomBy(f){

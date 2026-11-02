@@ -48,6 +48,8 @@
   --frr:#FB923C; --frr-soft:rgba(251,146,60,.14);
   --srl:#4ADE80; --srl-soft:rgba(74,222,128,.13);
   --oth:#FBBF24; --oth-soft:rgba(251,191,36,.13);
+  /* addresses and SIDs on the topology map */
+  --sr-lo:#9FB0C2; --sr-mpls:#E8B55A; --srv6:#4CC9E6;
   /* router status ring (node-icons.js): neon on the map */
   --led-up:#39FF8E; --led-up-core:#E2FFEE; --led-warn:#FFB020; --led-warn-core:#FFF1D0;
   --led-down:#FF2E55; --led-down-core:#FFD9E0; --led-off:#2A3442; --led-glow:.95;
@@ -79,6 +81,7 @@
   --frr:#C2530E; --frr-soft:rgba(194,83,14,.10);
   --srl:#15803D; --srl-soft:rgba(21,128,61,.10);
   --oth:#9A6700; --oth-soft:rgba(154,103,0,.10);
+  --sr-lo:#5B6B80; --sr-mpls:#946300; --srv6:#0A7A94;
   --led-up:#00D468; --led-up-core:#B6FFD6; --led-warn:#F59E0B; --led-warn-core:#FFE7B0;
   --led-down:#F0123F; --led-down-core:#FFC2CE; --led-off:#CBD3DD; --led-glow:.7;
   --p-tcp:#1F6FE0; --p-icmp:#15803D; --p-arp:#9A6700; --p-mpls:#7A3DD6; --p-rt:#C2530E;

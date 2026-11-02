@@ -11,6 +11,9 @@ collects, and the map colours itself from:
                containers.
   every ~10 s  per router: IGP adjacencies (IS-IS, OSPF), BGP sessions and the
                router's IPv4 addresses (to tell which node a BGP peer is).
+  every ~60 s  per router, only while the map asks for them (?sr=1):
+               loopbacks, prefix-SIDs, SRv6 locators, adjacency SIDs
+               (srstate.py), over the same sessions.
                IOS-XE / IOS-XR / NX-OS over one persistent SSH session per
                router (netmiko); FRR and SR Linux through docker exec, with
                their JSON output.
@@ -33,10 +36,12 @@ import time
 
 import devcfg
 import linkctl
+import srstate
 
 FAST = 3.0
 RATE_WINDOW = 12.0
 SLOW = 10.0
+SR_EVERY = 60.0
 IDLE_STOP = 45.0
 UP_WORDS = ("up", "full", "established")
 
@@ -402,6 +407,8 @@ class LabPoller(threading.Thread):
         self.ifstate = {}
         self.proto = {}               # node -> {igp, bgp, ips, error, platform, t}
         self.seen_up = set()          # (link id) that had an IGP adjacency up
+        self.sr = {}                  # node -> srstate facts + t
+        self.want_sr = 0.0            # last time a viewer asked for SR facts
         self.stop = False
         self._last_slow = 0.0
         self.pool = concurrent.futures.ThreadPoolExecutor(max_workers=8)
@@ -477,6 +484,7 @@ class LabPoller(threading.Thread):
             c = next((c for c in lab.get("containers") or [] if c.get("short") == n["name"]), None)
             if not plat or not c or c.get("state") != "running":
                 self.proto.pop(n["name"], None)
+                self.sr.pop(n["name"], None)
                 continue
             if plat in devcfg.SUPPORTED.values() and plat not in devcfg.EXEC_PLATFORMS \
                     and c.get("status") not in ("healthy", None, ""):
@@ -498,6 +506,7 @@ class LabPoller(threading.Thread):
             if plat in devcfg.EXEC_PLATFORMS:
                 conn = devcfg.ExecConn(c["name"], plat)
                 igp, bgp, ips = (collect_frr if plat == "frr" else collect_srl)(conn, c["name"])
+                self._sr(name, conn, plat)
             else:
                 conn, lk = self.conns.get(name) or (None, threading.Lock())
                 with lk:
@@ -506,6 +515,7 @@ class LabPoller(threading.Thread):
                         self.conns[name] = (conn, lk)
                     try:
                         igp, bgp, ips = collect_ios(conn, plat)
+                        self._sr(name, conn, plat)
                     except Exception:
                         self.conns.pop(name, None)
                         try:
@@ -521,6 +531,22 @@ class LabPoller(threading.Thread):
             old = self.proto.get(name) or {}
             self.proto[name] = {"platform": plat, "igp": old.get("igp", []), "bgp": old.get("bgp", []),
                                 "ips": old.get("ips", []), "error": str(exc)[:200], "t": time.time()}
+
+    def _sr(self, name, conn, plat):
+        """SR facts for one node, when a viewer wants them and the last are old."""
+        now = time.time()
+        if now - self.want_sr > IDLE_STOP or now - (self.sr.get(name) or {}).get("t", 0) < SR_EVERY:
+            return
+        try:
+            facts = srstate.collect(conn, plat)
+        except Exception:                             # noqa: BLE001
+            facts = None
+        if facts is None:
+            return
+        for a in facts.get("adj") or []:
+            a["port"] = to_port(plat, a.get("iface"))
+        facts["t"] = now
+        self.sr[name] = facts
 
     def command(self, lab, name, c, plat, cmd, timeout=40):
         """One show command on a node, over the poller's persistent session."""
@@ -571,6 +597,8 @@ class LabPoller(threading.Thread):
                 rx = (ent[y] or {}).get("rx_bps")
                 ent[key] = rx if rx is not None else (ent[x] or {}).get("tx_bps")
             ent["impaired"] = any(ent[s] and ent[s].get("netem") for s in ("a", "b"))
+            ent["adj"] = {s: [a for a in (self.sr.get(l[s]) or {}).get("adj") or []
+                              if a.get("port") == l[s + "_if"]] for s in ("a", "b")}
             ent["failed"] = failures.get(linkctl.link_key(l))
             if ent["down"]:
                 ent["igp_state"] = "down"
@@ -604,6 +632,9 @@ class LabPoller(threading.Thread):
             nodes[node] = {"platform": devcfg.PLATFORM_NAMES.get(p.get("platform"), p.get("platform")),
                            "igp": p.get("igp") or [], "bgp": bgp, "error": p.get("error"),
                            "age": round(time.time() - p.get("t", 0), 1)}
+            f = self.sr.get(node)
+            if f:
+                nodes[node]["sr"] = {k: v for k, v in f.items() if k not in ("t", "adj")}
         edge_list = []
         for e in edges.values():
             # each session is seen from both ends
@@ -614,7 +645,8 @@ class LabPoller(threading.Thread):
             edge_list.append(e)
         with self.lock:
             self.snap.update({"updated": time.time(), "links": links, "nodes": nodes,
-                              "bgp_edges": edge_list, "error": None})
+                              "bgp_edges": edge_list, "error": None,
+                              "sr_ready": bool(self.sr)})
 
     def snapshot(self):
         with self.lock:
@@ -652,7 +684,8 @@ class Live:
         self.lock = threading.Lock()
         self.pollers = {}
 
-    def get(self, lab_id):
+    def get(self, lab_id, sr=False):
+        """The lab's live snapshot; sr=True also has the poller collect SR facts."""
         with self.lock:
             p = self.pollers.get(lab_id)
             if p is None or p.stop or not p.is_alive():
@@ -660,4 +693,8 @@ class Live:
                 self.pollers[lab_id] = p
                 p.start()
             p.touch()
+            if sr:
+                if time.time() - p.want_sr > IDLE_STOP:
+                    p._last_slow = 0.0        # first request: collect on the next round
+                p.want_sr = time.time()
         return p.snapshot()
