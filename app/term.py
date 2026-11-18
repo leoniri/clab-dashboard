@@ -81,51 +81,24 @@ def running_nodes():
 
 
 def credentials(topo_path, lab, container):
-    """USERNAME / PASSWORD for this node, from the topology file."""
-    user, pw = DEFAULT_USER, DEFAULT_PASS
-    if not topo_path or not os.path.isfile(topo_path):
-        return user, pw
-    try:
-        import yaml
-        with open(topo_path) as fh:
-            doc = yaml.safe_load(fh) or {}
-    except Exception:                                  # noqa: BLE001
-        return user, pw
+    """Login for this node - the same resolution the Configure dialog uses.
 
-    topo = doc.get("topology") or {}
-    nodes = topo.get("nodes") or {}
-    kinds = topo.get("kinds") or {}
+    devcfg.credentials() knows the per-kind fixed logins (Cumulus root/root,
+    SR Linux, cEOS, ...), topology defaults > kind > node env, and the
+    --username/--password a vrnetlab router was really started with.
+    """
     short = container
     prefix = "clab-%s-" % (lab or "")
     if lab and short.startswith(prefix):
         short = short[len(prefix):]
-
-    ncfg = nodes.get(short) if isinstance(nodes, dict) else None
-    ncfg = ncfg if isinstance(ncfg, dict) else {}
-    kcfg = kinds.get(ncfg.get("kind")) if isinstance(kinds, dict) else None
-    kcfg = kcfg if isinstance(kcfg, dict) else {}
-
-    env = {}
-    env.update(kcfg.get("env") or {})
-    env.update(ncfg.get("env") or {})
-    if env.get("USERNAME"):
-        user = str(env["USERNAME"])
-    if env.get("PASSWORD"):
-        pw = str(env["PASSWORD"])
-    # the credentials the router was really started with win (containerlab
-    # passes --username/--password; for n9kv it ignores the topology's env)
+    if not topo_path or not os.path.isfile(topo_path):
+        return DEFAULT_USER, DEFAULT_PASS
     try:
-        import json as _json
-        out = subprocess.run([DOCKER, "inspect", "-f", "{{json .Config.Cmd}}", container],
-                             capture_output=True, text=True, timeout=15).stdout
-        cmd = _json.loads(out or "null") or []
-        args = {cmd[i][2:]: cmd[i + 1] for i in range(len(cmd) - 1)
-                if cmd[i] in ("--username", "--password")}
-        if args.get("username") and args.get("password"):
-            user, pw = args["username"], args["password"]
+        import devcfg
+        return devcfg.credentials(
+            {"path": topo_path, "containers": [{"name": container, "short": short}]}, short)
     except Exception:                                  # noqa: BLE001
-        pass
-    return user, pw
+        return DEFAULT_USER, DEFAULT_PASS
 
 
 def main():
